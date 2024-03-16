@@ -1,5 +1,5 @@
 use eframe::egui;
-use betula_egui::PanZoom;
+use betula_egui::TreeView;
 
 fn main() {
     let native_options = eframe::NativeOptions::default();
@@ -8,7 +8,7 @@ fn main() {
 
 #[derive(Default)]
 struct MyEguiApp {
-    zoom: PanZoom,
+    zoom: TreeView,
 }
 
 impl MyEguiApp {
@@ -25,6 +25,14 @@ impl eframe::App for MyEguiApp {
    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
        egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Hello World!");
+            ui.label(
+                "Pan, zoom in, and zoom out with scrolling (see the plot demo for more instructions). \
+                       Double click on the background to reset.",
+            );
+            ui.vertical_centered(|ui| {
+                // ui.add(crate::egui_github_link_file!());
+            });
+            ui.separator();
             self.zoom.ui(ui);
             ui.allocate_space(ui.available_size()); // put this LAST in your panel/window code
        });

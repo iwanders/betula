@@ -2,24 +2,16 @@ use egui::emath::TSTransform;
 
 #[derive(Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct PanZoom {
+pub struct TreeView {
     transform: TSTransform,
     drag_value: f32,
 }
 
-impl Eq for PanZoom {}
+impl Eq for TreeView {}
 
 
-impl PanZoom {
+impl TreeView {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.label(
-            "Pan, zoom in, and zoom out with scrolling (see the plot demo for more instructions). \
-                   Double click on the background to reset.",
-        );
-        ui.vertical_centered(|ui| {
-            // ui.add(crate::egui_github_link_file!());
-        });
-        ui.separator();
 
         let (id, rect) = ui.allocate_space(ui.available_size());
         let response = ui.interact(rect, id, egui::Sense::click_and_drag());
