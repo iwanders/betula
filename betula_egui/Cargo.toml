@@ -4,8 +4,9 @@ version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"
 
+# Use egui from source as the PanZoom example is really new.
 [dependencies]
-egui = "0.26.2"
+egui = { git = "https://github.com/emilk/egui.git", rev = "bf7ffb982a6e8c0a40d0871c38bccacef9ee8efb"}
 
 [dev-dependencies]
-eframe = "0.26.2"
+eframe = { git = "https://github.com/emilk/egui.git", rev = "bf7ffb982a6e8c0a40d0871c38bccacef9ee8efb"}

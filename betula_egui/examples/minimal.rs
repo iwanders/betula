@@ -1,4 +1,5 @@
 use eframe::egui;
+use betula_egui::PanZoom;
 
 fn main() {
     let native_options = eframe::NativeOptions::default();
@@ -6,7 +7,9 @@ fn main() {
 }
 
 #[derive(Default)]
-struct MyEguiApp {}
+struct MyEguiApp {
+    zoom: PanZoom,
+}
 
 impl MyEguiApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -21,7 +24,9 @@ impl MyEguiApp {
 impl eframe::App for MyEguiApp {
    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
        egui::CentralPanel::default().show(ctx, |ui| {
-           ui.heading("Hello World!");
+            ui.heading("Hello World!");
+            self.zoom.ui(ui);
+            ui.allocate_space(ui.available_size()); // put this LAST in your panel/window code
        });
    }
 }
