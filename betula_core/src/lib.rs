@@ -1,24 +1,26 @@
 /*
     All behaviour tree execution is single threaded.
     Classical:
-    Control flow:
+    Control flow (internal nodes):
         fallback, sequence, parallel, decorator
-    Execution:
+    Execution (leafs):
         action, condition
 
 */
 
-mod nodes;
-mod runner;
+pub mod basic;
+pub mod nodes;
 
 pub mod prelude {
     pub use crate::{Context, Error, Node, NodeId, Status, Tree};
 }
 
 /// Node Id that's used to refer to nodes in a context.
-pub struct NodeId(usize);
+#[derive(Copy, Clone, Debug)]
+pub struct NodeId(pub usize);
 
 /// The result states returned by a node.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Status {
     Running,
     Failure,
@@ -30,8 +32,9 @@ pub trait Tree {
     /// Return a list of all node ids.
     fn nodes(&self) -> Vec<NodeId>;
 
-    fn node(&self, id: NodeId) -> &dyn Node;
-    fn node_mut(&mut self, id: NodeId) -> &mut dyn Node;
+    fn add_node(&mut self, node: Box<dyn Node>) -> NodeId;
+
+    fn add_relation(&mut self, parent: NodeId, child: NodeId);
 
     /// Get the children of a particular node.
     fn children(&self, id: NodeId) -> Vec<NodeId>;
@@ -46,7 +49,7 @@ pub trait Context {}
 /// The error type.
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
-pub trait Node {
+pub trait Node: std::fmt::Debug {
     /// The tick function for each node to perform actions / return status.
     ///   The return of Result is only there to indicate failure that would halt
     ///   behaviour tree execution on the spot. `Status::Failure` should be propagated
@@ -59,6 +62,6 @@ pub trait Node {
         &mut self,
         self_id: NodeId,
         tree: &dyn Tree,
-        ctx: &dyn Context,
+        ctx: &mut dyn Context,
     ) -> Result<Status, Error>;
 }

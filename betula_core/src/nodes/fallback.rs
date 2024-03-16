@@ -1,8 +1,8 @@
 use crate::prelude::*;
 
 #[derive(Debug, Copy, Clone)]
-pub struct Sequence {}
-impl Node for Sequence {
+pub struct Fallback {}
+impl Node for Fallback {
     fn tick(
         &mut self,
         self_id: NodeId,
@@ -11,12 +11,12 @@ impl Node for Sequence {
     ) -> Result<Status, Error> {
         for id in tree.children(self_id) {
             match tree.run(id)? {
-                Status::Running => {}
+                Status::Failure => {}
                 other => return Ok(other),
             }
         }
 
         // No children, should this be an error instead?
-        Ok(Status::Failure)
+        Ok(Status::Success)
     }
 }
