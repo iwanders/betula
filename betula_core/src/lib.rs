@@ -1,10 +1,11 @@
 /*
     All behaviour tree execution is single threaded.
+
     Classical:
-    Control flow (internal nodes):
-        fallback, sequence, parallel, decorator
-    Execution (leafs):
-        action, condition
+        Control flow (internal nodes):
+            fallback, sequence, parallel, decorator
+        Execution (leafs):
+            action, condition
 
 */
 
@@ -32,18 +33,23 @@ pub trait Tree {
     /// Return a list of all node ids.
     fn nodes(&self) -> Vec<NodeId>;
 
+    /// Add a node to the tree, returning the NodeId for the node that was
+    /// just added.
     fn add_node(&mut self, node: Box<dyn Node>) -> NodeId;
 
+    /// Add a relation between a parent and a child.
     fn add_relation(&mut self, parent: NodeId, child: NodeId);
 
     /// Get the children of a particular node.
     fn children(&self, id: NodeId) -> Vec<NodeId>;
 
     /// Run a particular node by id, this will in turn run other nodes.
+    /// Nodes do NOT have direct access to other nodes, instead they must
+    /// call other nodes (including their children) through this method.
     fn run(&self, id: NodeId) -> Result<Status, Error>;
 }
 
-/// Do we need this?
+/// Do we need this, yes, but it needs some more thinking.
 pub trait Context {}
 
 /// The error type.
@@ -64,4 +70,7 @@ pub trait Node: std::fmt::Debug {
         tree: &dyn Tree,
         ctx: &mut dyn Context,
     ) -> Result<Status, Error>;
+
+    // We probably want clone here, such that we can duplicate from the
+    // ui.
 }
