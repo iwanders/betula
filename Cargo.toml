@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "betula_egui",
+]
+
+# https://doc.rust-lang.org/cargo/reference/profiles.html
+[profile.dev]
+# Enable some optimisations, but not all of it.
+opt-level = 2
+# Only using line numbers as debug information shaves off 10 seconds on linking the viewer.
+debug = 1
+# Disable lto, it's slow for development
+lto = false
