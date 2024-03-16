@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "betula_core",
     "betula_egui",
 ]
 
