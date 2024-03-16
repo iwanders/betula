@@ -11,12 +11,12 @@ impl Node for Sequence {
     ) -> Result<Status, Error> {
         for id in tree.children(self_id) {
             match tree.run(id)? {
-                Status::Running => {}
-                other => return Ok(other),
+                Status::Success => {}
+                other => return Ok(other), // fail or running.
             }
         }
 
-        // No children, should this be an error instead?
-        Ok(Status::Failure)
+        // All children succeeded.
+        Ok(Status::Success)
     }
 }

@@ -16,7 +16,7 @@ impl Node for Fallback {
             }
         }
 
-        // No children, should this be an error instead?
-        Ok(Status::Success)
+        // Reached here, all children must've failed.
+        Ok(Status::Failure)
     }
 }
