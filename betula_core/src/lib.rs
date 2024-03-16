@@ -7,6 +7,9 @@
         Execution (leafs):
             action, condition
 
+
+    Thoughts:
+        Would be nice if the node ids were stable...
 */
 
 pub mod basic;
@@ -17,7 +20,7 @@ pub mod prelude {
 }
 
 /// Node Id that's used to refer to nodes in a context.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct NodeId(pub usize);
 
 /// The result states returned by a node.

@@ -14,3 +14,7 @@ opt-level = 2
 debug = 1
 # Disable lto, it's slow for development
 lto = false
+
+[workspace.dependencies]
+betula_core = { version = "0.0.1", path = "betula_core", default-features = false }
+betula_egui = { version = "0.0.1", path = "betula_egui", default-features = false }

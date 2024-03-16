@@ -1,18 +1,40 @@
 use egui::emath::TSTransform;
 
+use betula_core::NodeId;
+
+#[derive(PartialEq, Clone)]
+struct TreeNode {
+    id: NodeId,
+    children: Vec<NodeId>,
+
+    position: egui::Pos2,
+}
+
 #[derive(Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct TreeView {
     transform: TSTransform,
     drag_value: f32,
+
+    nodes: Vec<TreeNode>,
 }
 
 impl Eq for TreeView {}
 
-
 impl TreeView {
-    pub fn ui(&mut self, ui: &mut egui::Ui) {
+    pub fn update(&mut self, tree: &dyn betula_core::Tree) {
+        self.nodes.clear();
+        for id in tree.nodes() {
+            let n = TreeNode {
+                id,
+                children: tree.children(id),
+                position: egui::Pos2::new(0.0, 120.0),
+            };
+            self.nodes.push(n);
+        }
+    }
 
+    pub fn ui(&mut self, ui: &mut egui::Ui) {
         let (id, rect) = ui.allocate_space(ui.available_size());
         let response = ui.interact(rect, id, egui::Sense::click_and_drag());
         // Allow dragging the background as well.
@@ -46,48 +68,9 @@ impl TreeView {
             }
         }
 
-        for (i, (pos, callback)) in [
-            (
-                egui::Pos2::new(0.0, 0.0),
-                Box::new(|ui: &mut egui::Ui, _: &mut Self| ui.button("top left!"))
-                    as Box<dyn Fn(&mut egui::Ui, &mut Self) -> egui::Response>,
-            ),
-            (
-                egui::Pos2::new(0.0, 120.0),
-                Box::new(|ui: &mut egui::Ui, _| ui.button("bottom left?")),
-            ),
-            (
-                egui::Pos2::new(120.0, 120.0),
-                Box::new(|ui: &mut egui::Ui, _| ui.button("right bottom :D")),
-            ),
-            (
-                egui::Pos2::new(120.0, 0.0),
-                Box::new(|ui: &mut egui::Ui, _| ui.button("right top ):")),
-            ),
-            (
-                egui::Pos2::new(60.0, 60.0),
-                Box::new(|ui, state| {
-                    use egui::epaint::*;
-                    // Smiley face.
-                    let painter = ui.painter();
-                    painter.add(CircleShape::filled(pos2(0.0, -10.0), 1.0, Color32::YELLOW));
-                    painter.add(CircleShape::filled(pos2(10.0, -10.0), 1.0, Color32::YELLOW));
-                    painter.add(QuadraticBezierShape::from_points_stroke(
-                        [pos2(0.0, 0.0), pos2(5.0, 3.0), pos2(10.0, 0.0)],
-                        false,
-                        Color32::TRANSPARENT,
-                        Stroke::new(1.0, Color32::YELLOW),
-                    ));
-
-                    ui.add(egui::Slider::new(&mut state.drag_value, 0.0..=100.0).text("My value"))
-                }),
-            ),
-        ]
-        .into_iter()
-        .enumerate()
-        {
+        for (i, node) in self.nodes.iter().enumerate() {
             let id = egui::Area::new(id.with(("subarea", i)))
-                .default_pos(pos)
+                .default_pos(node.position)
                 // Need to cover up the pan_zoom demo window,
                 // but may also cover over other windows.
                 .order(egui::Order::Foreground)
@@ -100,7 +83,8 @@ impl TreeView {
                         .fill(ui.style().visuals.panel_fill)
                         .show(ui, |ui| {
                             ui.style_mut().wrap = Some(false);
-                            callback(ui, self)
+                            // callback(ui, self)
+                            ui.add(Box::new(|ui: &mut egui::Ui| ui.button("right top ):")))
                         });
                 })
                 .response

@@ -1,14 +1,19 @@
-use eframe::egui;
+use betula_core::basic::BasicTree;
 use betula_egui::TreeView;
+use eframe::egui;
 
 fn main() {
     let native_options = eframe::NativeOptions::default();
-    eframe::run_native("My egui App", native_options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
+    eframe::run_native(
+        "My egui App",
+        native_options,
+        Box::new(|cc| Box::new(MyEguiApp::new(cc))),
+    );
 }
 
-#[derive(Default)]
 struct MyEguiApp {
-    zoom: TreeView,
+    view: TreeView,
+    bt: BasicTree,
 }
 
 impl MyEguiApp {
@@ -17,13 +22,25 @@ impl MyEguiApp {
         // Restore app state using cc.storage (requires the "persistence" feature).
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
-        Self::default()
+        use betula_core::nodes;
+        use betula_core::prelude::*;
+        let mut bt = BasicTree::new();
+        let root = bt.add_node(Box::new(nodes::Fallback {}));
+        let f1 = bt.add_node(Box::new(nodes::Failure {}));
+        let s1 = bt.add_node(Box::new(nodes::Success {}));
+        bt.add_relation(root, f1);
+        bt.add_relation(root, s1);
+        // let res = bt.run(root);
+        // assert_eq!(res.ok(), Some(Status::Success));
+        let view = TreeView::default();
+        MyEguiApp { view, bt }
     }
 }
 
 impl eframe::App for MyEguiApp {
-   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-       egui::CentralPanel::default().show(ctx, |ui| {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.view.update(&self.bt);
+        egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Hello World!");
             ui.label(
                 "Pan, zoom in, and zoom out with scrolling (see the plot demo for more instructions). \
@@ -33,8 +50,8 @@ impl eframe::App for MyEguiApp {
                 // ui.add(crate::egui_github_link_file!());
             });
             ui.separator();
-            self.zoom.ui(ui);
+            self.view.ui(ui);
             ui.allocate_space(ui.available_size()); // put this LAST in your panel/window code
        });
-   }
+    }
 }

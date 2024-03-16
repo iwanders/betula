@@ -6,7 +6,7 @@ impl Context for BasicContext {}
 
 use std::cell::RefCell;
 #[derive(Debug)]
-struct BasicTree {
+pub struct BasicTree {
     nodes: Vec<RefCell<Box<dyn Node>>>,
     children: Vec<Vec<NodeId>>,
 }

@@ -8,5 +8,7 @@ license = "BSD-3-Clause"
 [dependencies]
 egui = { git = "https://github.com/emilk/egui.git", rev = "bf7ffb982a6e8c0a40d0871c38bccacef9ee8efb"}
 
+betula_core = { workspace = true, default-features = false }
+
 [dev-dependencies]
 eframe = { git = "https://github.com/emilk/egui.git", rev = "bf7ffb982a6e8c0a40d0871c38bccacef9ee8efb"}
