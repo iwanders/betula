@@ -75,22 +75,12 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 // use std::cell::RefCell;
+use std::any::Any;
 
 use std::any::TypeId;
+#[derive(Debug, Default)]
 pub struct BasicBlackboard {
-    values: HashMap<(TypeId, String), Rc<RefCell<Box<dyn std::any::Any>>>>,
-}
-
-struct BasicProvider<T> {
-    v: Rc<Cell<Box<T>>>,
-}
-impl<T> crate::Provider for BasicProvider<T> {
-    type ProviderItem = T;
-    fn set(&self, v: Self::ProviderItem) -> Result<Self::ProviderItem, Error> {
-        // let z = self.v.get();
-
-        Err("dlkjsfls".into())
-    }
+    values: HashMap<(TypeId, String), Rc<RefCell<Box<dyn Any>>>>,
 }
 
 impl crate::BlackboardContext for BasicBlackboard {
@@ -99,19 +89,20 @@ impl crate::BlackboardContext for BasicBlackboard {
         id: &TypeId,
         key: &str,
         default: crate::BlackboardValueCreator,
-    ) -> Box<dyn std::any::Any> {
+    ) -> Rc<RefCell<Box<dyn Any>>> {
         let rc = self
             .values
             .entry((*id, key.to_string()))
             .or_insert_with(|| Rc::new(RefCell::new(default())))
             .clone();
-        Box::new(0)
+        // Box::new(0)
+        rc
     }
-    fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any> {
-        // let cloned_rc = self.values.get(&(*id, key.to_string())).clone();
-        // Box::new(cloned_rc)
-        Box::new(0)
-    }
+    // fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any> {
+    // let cloned_rc = self.values.get(&(*id, key.to_string())).clone();
+    // Box::new(cloned_rc)
+    // Box::new(0)
+    // }
 }
 
 #[cfg(test)]
@@ -139,5 +130,13 @@ mod tests {
         tree.add_relation(root, s1);
         let res = tree.run(root);
         assert_eq!(res.ok(), Some(Status::Success));
+    }
+
+    #[test]
+    fn blackboard_provider() {
+        let mut bb = BasicBlackboard::default();
+        let mut w = crate::BlackboardWrapper::new(&mut bb);
+        let p = w.provides::<u32, _>("value", || 3u32);
+        println!("P: {p:?}");
     }
 }
