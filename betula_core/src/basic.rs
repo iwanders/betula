@@ -1,11 +1,11 @@
 /// A simple implementation of the Tree.
 use crate::prelude::*;
 
-struct TreeInterface<'a> {
+struct TreeContext<'a> {
     this_node: usize,
     tree: &'a BasicTree,
 }
-impl Tree for TreeInterface<'_> {
+impl Context for TreeContext<'_> {
     fn children(&self) -> usize {
         self.tree.children(NodeId(self.this_node)).len()
     }
@@ -14,9 +14,6 @@ impl Tree for TreeInterface<'_> {
         self.tree.run(ids[index])
     }
 }
-
-struct BasicContext {}
-impl Context for BasicContext {}
 
 /// Node Id that's used to refer to nodes in a context.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
@@ -40,7 +37,7 @@ impl BasicTree {
         &self.nodes[id.0]
     }
 
-    fn nodes(&self) -> Vec<NodeId> {
+    pub fn nodes(&self) -> Vec<NodeId> {
         self.nodes
             .iter()
             .enumerate()
@@ -48,29 +45,29 @@ impl BasicTree {
             .collect()
     }
 
-    fn add_node(&mut self, node: Box<dyn Node>) -> NodeId {
+    pub fn add_node(&mut self, node: Box<dyn Node>) -> NodeId {
         let id = NodeId(self.nodes.len());
         self.nodes.push(RefCell::new(node));
         self.children.push(vec![]);
         id
     }
 
-    fn add_relation(&mut self, parent: NodeId, child: NodeId) {
+    pub fn add_relation(&mut self, parent: NodeId, child: NodeId) {
         self.children[parent.0].push(child);
     }
 
-    fn children(&self, id: NodeId) -> Vec<NodeId> {
+    pub fn children(&self, id: NodeId) -> Vec<NodeId> {
         self.children[id.0].clone()
     }
 
-    fn run(&self, id: NodeId) -> Result<Status, Error> {
+    pub fn run(&self, id: NodeId) -> Result<Status, Error> {
         let mut n = self.nodes[id.0].try_borrow_mut()?;
-        let mut context = TreeInterface {
+        let mut context = TreeContext {
             this_node: id.0,
             tree: &self,
         };
 
-        n.tick(&mut context, &mut BasicContext {})
+        n.tick(&mut context)
     }
 }
 

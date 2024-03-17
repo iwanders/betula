@@ -16,7 +16,7 @@ pub mod basic;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{Context, Error, Node, Status, Tree};
+    pub use crate::{Context, Error, Node, Status};
 }
 
 /// The result states returned by a node.
@@ -29,13 +29,13 @@ pub enum Status {
 
 /// The purest interface of a tree, used by the nodes to run their
 /// children. The nodes don't have access to children directly.
-pub trait Tree {
+pub trait Context {
+    /// Get the number of immediate children.
     fn children(&self) -> usize;
+
+    /// Run a child node.
     fn run(&self, index: usize) -> Result<Status, Error>;
 }
-
-/// Do we need this, yes, but it needs some more thinking.
-pub trait Context {}
 
 /// The error type.
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -52,7 +52,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///
     ///   self_id: The id of the current node being executed.
     ///   tree: The context in which this node is being ran.
-    fn tick(&mut self, tree: &dyn Tree, ctx: &mut dyn Context) -> Result<Status, Error>;
+    fn tick(&mut self, ctx: &dyn Context) -> Result<Status, Error>;
 
     // We probably want clone here, such that we can duplicate from the
     // ui.
