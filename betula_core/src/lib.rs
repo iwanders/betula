@@ -81,6 +81,52 @@ use std::rc::Rc;
 /// Function type for allocating storage on the blackboard.
 pub type BlackboardValueCreator = Box<dyn FnOnce() -> Box<dyn Any>>;
 
+pub trait BlackboardValue: std::fmt::Debug + std::any::Any + Clone {
+    /// Replaces the blackboard value with v.
+    fn set(&mut self, v: &dyn std::any::Any) -> Result<(), Error>;
+    fn get(&self, v: &mut dyn std::any::Any) -> Result<(), Error>;
+}
+
+impl<T> BlackboardValue for T
+where
+    T: std::fmt::Debug + std::any::Any + 'static + Sized + Copy,
+{
+    fn set(&mut self, v: &dyn std::any::Any) -> Result<(), Error> {
+        if Any::type_id(self) != Any::type_id(v) {
+            return Err(format!("cannot swap; types don't match").into());
+        }
+        // types match, lets do the thing.
+        let mut self_typed =
+            <dyn Any>::downcast_mut::<T>(self).ok_or("left hand downcast failed")?;
+        let mut other_typed = v.downcast_ref::<T>().ok_or("right hand downcast failed")?;
+        let _ = std::mem::replace(self_typed, other_typed.clone());
+        Ok(())
+    }
+    fn get(&self, v: &mut dyn std::any::Any) -> Result<(), Error> {
+        if Any::type_id(self) != Any::type_id(v) {
+            return Err(format!("cannot swap; types don't match").into());
+        }
+        // types match, lets do the thing.
+        let self_typed = <dyn Any>::downcast_ref::<T>(self).ok_or("left hand downcast failed")?;
+        let mut other_typed = v.downcast_mut::<T>().ok_or("right hand downcast failed")?;
+        let _ = std::mem::replace(other_typed, self_typed.clone());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn sequence_bbvalue() {
+        let mut z: Box<dyn BlackboardValue> = Box::new(5u32);
+    }
+}
+
+/// The blackboard is a bit clunky at the moment. I don't see a way to:
+///   * Avoid exposing Rc<RefCell<Box<dyn Any>>>
+///   * or avoid passing values as Box<dyn Any>, which would lead to many allocations.
+///
 /// Interface to a blackboard, this is only necessary during setup, it should
 /// return Rc<RefCell<Box<dyn Any>>> types.
 ///
@@ -111,8 +157,7 @@ pub type Provider<T> = Box<dyn ProviderTrait<ProviderItem = T>>;
 pub type Consumer<T> = Box<dyn ConsumerTrait<ConsumerItem = T>>;
 
 /// The boxed trait that nodes should use to provide and consume values from the blackboard.
-pub type ProviderConsumerBox<T> =
-    Box<dyn ProviderConsumerTrait<ProviderItem = T, ConsumerItem = T>>;
+pub type ProviderConsumer<T> = Box<dyn ProviderConsumerTrait<ProviderItem = T, ConsumerItem = T>>;
 
 /// Wrapper type to make it easier to setup the appropriate providers and
 /// consumers from the blackboard interface.
