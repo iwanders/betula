@@ -5,7 +5,7 @@ struct TreeContext<'a> {
     this_node: usize,
     tree: &'a BasicTree,
 }
-impl Context for TreeContext<'_> {
+impl RunContext for TreeContext<'_> {
     fn children(&self) -> usize {
         self.tree.children(NodeId(self.this_node)).len()
     }
@@ -68,6 +68,49 @@ impl BasicTree {
         };
 
         n.tick(&mut context)
+    }
+}
+
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
+// use std::cell::RefCell;
+
+use std::any::TypeId;
+pub struct BasicBlackboard {
+    values: HashMap<(TypeId, String), Rc<RefCell<Box<dyn std::any::Any>>>>,
+}
+
+struct BasicProvider<T> {
+    v: Rc<Cell<Box<T>>>,
+}
+impl<T> crate::Provider for BasicProvider<T> {
+    type ProviderItem = T;
+    fn set(&self, v: Self::ProviderItem) -> Result<Self::ProviderItem, Error> {
+        // let z = self.v.get();
+
+        Err("dlkjsfls".into())
+    }
+}
+
+impl crate::BlackboardContext for BasicBlackboard {
+    fn provides(
+        &mut self,
+        id: &TypeId,
+        key: &str,
+        default: crate::BlackboardValueCreator,
+    ) -> Box<dyn std::any::Any> {
+        let rc = self
+            .values
+            .entry((*id, key.to_string()))
+            .or_insert_with(|| Rc::new(RefCell::new(default())))
+            .clone();
+        Box::new(0)
+    }
+    fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any> {
+        // let cloned_rc = self.values.get(&(*id, key.to_string())).clone();
+        // Box::new(cloned_rc)
+        Box::new(0)
     }
 }
 
