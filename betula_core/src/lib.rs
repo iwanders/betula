@@ -10,6 +10,12 @@
 
     Thoughts:
         Would be nice if the node ids were stable...
+
+
+    The nodes can have state, the tree should use interior mutability.
+    This is fine, as the callstack descends down the tree it should never
+    encounter the same node twice, as that makes a loop and that sounds
+    bad.
 */
 
 pub mod basic;

@@ -1,8 +1,8 @@
 mod sequence;
 pub use sequence::Sequence;
 
-mod fallback;
-pub use fallback::Fallback;
+mod selector;
+pub use selector::Selector;
 
 mod failure;
 pub use failure::Failure;

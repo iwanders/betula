@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn fallback_success() {
         let mut tree = BasicTree::new();
-        let root = tree.add_node(Box::new(Fallback {}));
+        let root = tree.add_node(Box::new(Selector {}));
         let f1 = tree.add_node(Box::new(Failure {}));
         let s1 = tree.add_node(Box::new(Success {}));
         tree.add_relation(root, f1);
