@@ -16,12 +16,8 @@ pub mod basic;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{Context, Error, Node, NodeId, Status, Tree};
+    pub use crate::{Context, Error, Node, Status, Tree};
 }
-
-/// Node Id that's used to refer to nodes in a context.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
-pub struct NodeId(pub usize);
 
 /// The result states returned by a node.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
@@ -31,25 +27,11 @@ pub enum Status {
     Success,
 }
 
-/// The execution context passed to each tick.
+/// The purest interface of a tree, used by the nodes to run their
+/// children. The nodes don't have access to children directly.
 pub trait Tree {
-    /// Return a list of all node ids.
-    fn nodes(&self) -> Vec<NodeId>;
-
-    /// Add a node to the tree, returning the NodeId for the node that was
-    /// just added.
-    fn add_node(&mut self, node: Box<dyn Node>) -> NodeId;
-
-    /// Add a relation between a parent and a child.
-    fn add_relation(&mut self, parent: NodeId, child: NodeId);
-
-    /// Get the children of a particular node.
-    fn children(&self, id: NodeId) -> Vec<NodeId>;
-
-    /// Run a particular node by id, this will in turn run other nodes.
-    /// Nodes do NOT have direct access to other nodes, instead they must
-    /// call other nodes (including their children) through this method.
-    fn run(&self, id: NodeId) -> Result<Status, Error>;
+    fn children(&self) -> usize;
+    fn run(&self, index: usize) -> Result<Status, Error>;
 }
 
 /// Do we need this, yes, but it needs some more thinking.
@@ -70,12 +52,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///
     ///   self_id: The id of the current node being executed.
     ///   tree: The context in which this node is being ran.
-    fn tick(
-        &mut self,
-        self_id: NodeId,
-        tree: &dyn Tree,
-        ctx: &mut dyn Context,
-    ) -> Result<Status, Error>;
+    fn tick(&mut self, tree: &dyn Tree, ctx: &mut dyn Context) -> Result<Status, Error>;
 
     // We probably want clone here, such that we can duplicate from the
     // ui.

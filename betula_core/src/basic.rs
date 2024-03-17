@@ -1,8 +1,26 @@
 /// A simple implementation of the Tree.
 use crate::prelude::*;
 
+struct TreeInterface<'a> {
+    this_node: usize,
+    tree: &'a BasicTree,
+}
+impl Tree for TreeInterface<'_> {
+    fn children(&self) -> usize {
+        self.tree.children(NodeId(self.this_node)).len()
+    }
+    fn run(&self, index: usize) -> Result<Status, Error> {
+        let ids = self.tree.children(NodeId(self.this_node));
+        self.tree.run(ids[index])
+    }
+}
+
 struct BasicContext {}
 impl Context for BasicContext {}
+
+/// Node Id that's used to refer to nodes in a context.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+pub struct NodeId(pub usize);
 
 use std::cell::RefCell;
 #[derive(Debug)]
@@ -21,9 +39,7 @@ impl BasicTree {
     pub fn get_node(&self, id: NodeId) -> &RefCell<Box<dyn Node>> {
         &self.nodes[id.0]
     }
-}
 
-impl Tree for BasicTree {
     fn nodes(&self) -> Vec<NodeId> {
         self.nodes
             .iter()
@@ -48,8 +64,13 @@ impl Tree for BasicTree {
     }
 
     fn run(&self, id: NodeId) -> Result<Status, Error> {
-        let mut n = self.nodes[id.0].borrow_mut();
-        n.tick(id, self, &mut BasicContext {})
+        let mut n = self.nodes[id.0].try_borrow_mut()?;
+        let mut context = TreeInterface {
+            this_node: id.0,
+            tree: &self,
+        };
+
+        n.tick(&mut context, &mut BasicContext {})
     }
 }
 
