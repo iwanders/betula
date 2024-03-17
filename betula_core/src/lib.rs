@@ -58,7 +58,10 @@ pub trait Context {}
 /// The error type.
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
-pub trait Node: std::fmt::Debug {
+mod as_any;
+pub use as_any::AsAny;
+
+pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
     ///   The return of Result is only there to indicate failure that would halt
     ///   behaviour tree execution on the spot. `Status::Failure` should be propagated
