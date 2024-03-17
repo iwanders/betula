@@ -80,23 +80,26 @@ use std::any::Any;
 use std::any::TypeId;
 #[derive(Debug, Default)]
 pub struct BasicBlackboard {
-    values: HashMap<(TypeId, String), Rc<RefCell<Box<dyn Any>>>>,
+    values: HashMap<String, (TypeId, Rc<RefCell<Box<dyn Any>>>)>,
 }
 
-impl crate::BlackboardContext for BasicBlackboard {
+impl crate::BlackboardInterface for BasicBlackboard {
     fn provides(
         &mut self,
-        id: &TypeId,
+        id: TypeId,
         key: &str,
         default: crate::BlackboardValueCreator,
-    ) -> Rc<RefCell<Box<dyn Any>>> {
-        let rc = self
+    ) -> Result<Rc<RefCell<Box<dyn Any>>>, Error> {
+        let (typeid, rc) = self
             .values
-            .entry((*id, key.to_string()))
-            .or_insert_with(|| Rc::new(RefCell::new(default())))
+            .entry(key.to_string())
+            .or_insert_with(|| (id, Rc::new(RefCell::new(default()))))
             .clone();
-        // Box::new(0)
-        rc
+        if typeid != id {
+            Err(format!("type mismatch for {key}").into())
+        } else {
+            Ok(rc)
+        }
     }
     // fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any> {
     // let cloned_rc = self.values.get(&(*id, key.to_string())).clone();
@@ -135,8 +138,11 @@ mod tests {
     #[test]
     fn blackboard_provider() {
         let mut bb = BasicBlackboard::default();
-        let mut w = crate::BlackboardWrapper::new(&mut bb);
-        let p = w.provides::<u32, _>("value", || 3u32);
+        let mut w = crate::BlackboardContext::new(&mut bb);
+        let p = w.provides::<u32>("value", 3);
         println!("P: {p:?}");
+        assert!(p.is_ok());
+        let z = w.provides::<f32>("value", 3.3);
+        assert!(z.is_err());
     }
 }
