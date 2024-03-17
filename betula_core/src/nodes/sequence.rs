@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Debug, Copy, Clone)]
 pub struct Sequence {}
 impl Node for Sequence {
-    fn tick(&mut self, ctx: &dyn Context) -> Result<Status, Error> {
+    fn tick(&mut self, ctx: &dyn RunContext) -> Result<Status, Error> {
         for id in 0..ctx.children() {
             match ctx.run(id)? {
                 Status::Success => {}
