@@ -18,6 +18,9 @@ impl BasicTree {
             children: vec![],
         }
     }
+    pub fn get_node(&self, id: NodeId) -> &RefCell<Box<dyn Node>> {
+        &self.nodes[id.0]
+    }
 }
 
 impl Tree for BasicTree {

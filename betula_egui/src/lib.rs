@@ -6,6 +6,7 @@ use betula_core::NodeId;
 struct TreeNode {
     id: NodeId,
     children: Vec<NodeId>,
+    name: String,
 
     position: egui::Pos2,
 }
@@ -22,11 +23,16 @@ pub struct TreeView {
 impl Eq for TreeView {}
 
 impl TreeView {
-    pub fn update(&mut self, tree: &dyn betula_core::Tree) {
+    pub fn update(&mut self, tree: &betula_core::basic::BasicTree) {
+        use betula_core::AsAny;
+        use betula_core::Tree;
         self.nodes.clear();
         for id in tree.nodes() {
+            let node_lock = tree.get_node(id).borrow();
+            let name = (**node_lock).type_name().to_string();
             let n = TreeNode {
                 id,
+                name,
                 children: tree.children(id),
                 position: egui::Pos2::new(0.0, 120.0),
             };
@@ -84,7 +90,7 @@ impl TreeView {
                         .show(ui, |ui| {
                             ui.style_mut().wrap = Some(false);
                             // callback(ui, self)
-                            ui.add(Box::new(|ui: &mut egui::Ui| ui.button("right top ):")))
+                            ui.add(Box::new(|ui: &mut egui::Ui| ui.button(node.name.clone())))
                         });
                 })
                 .response

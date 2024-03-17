@@ -8,6 +8,8 @@ pub trait AsAny {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 
     fn as_any_box(self: Box<Self>) -> Box<dyn Any>;
+
+    fn type_name(&self) -> &'static str;
 }
 
 impl<T> AsAny for T
@@ -26,5 +28,9 @@ where
 
     fn as_any_box(self: Box<Self>) -> Box<dyn Any> {
         self
+    }
+
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<T>()
     }
 }
