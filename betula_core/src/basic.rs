@@ -83,7 +83,7 @@ use std::any::TypeId;
 pub struct BasicBlackboard {
     values: HashMap<String, (TypeId, Rc<RefCell<BlackboardValue>>)>,
 }
-//pub type BlackboardWrite = Box<dyn Fn(BlackboardValue) -> Result<(), Error>>;
+
 impl crate::BlackboardInterface for BasicBlackboard {
     fn provides(
         &mut self,
@@ -116,17 +116,25 @@ impl crate::BlackboardInterface for BasicBlackboard {
                 } else {
                     todo!()
                 }
-                // if let BlackboardValue::Big(newdata) = v {
-
-                // }
             }))
         }
     }
-    // fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any> {
-    // let cloned_rc = self.values.get(&(*id, key.to_string())).clone();
-    // Box::new(cloned_rc)
-    // Box::new(0)
-    // }
+
+    fn consumes(&mut self, id: &TypeId, key: &str) -> Result<crate::BlackboardRead, Error> {
+        let (typeid, rc) = self
+            .values
+            .get(key)
+            .ok_or_else(|| format!("key {key} not found"))?;
+        let v = rc.clone();
+        if typeid != id {
+            Err(format!("type mismatch for {key}").into())
+        } else {
+            Ok(Box::new(move || {
+                let locked = v.try_borrow_mut()?;
+                Ok(locked.clone())
+            }))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -166,5 +174,9 @@ mod tests {
         let z = w.provides::<f64>("value", 3.3);
         assert!(z.is_err());
         println!("BasicBlackboard: {bb:?}");
+        use crate::BlackboardInterface;
+        let r = bb.consumes(&TypeId::of::<i64>(), "value");
+        assert!(r.is_ok());
+        println!("value: {:?}", r.unwrap()());
     }
 }

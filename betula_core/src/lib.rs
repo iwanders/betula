@@ -81,10 +81,29 @@ use std::rc::Rc;
 /// Function type for allocating storage on the blackboard.
 pub type BlackboardValueCreator = Box<dyn FnOnce() -> BlackboardValue>;
 
-#[derive(Debug)]
+pub trait ClonableBlackboardValue: std::any::Any + std::fmt::Debug {
+    fn clone_boxed<'a>(&self) -> Box<dyn ClonableBlackboardValue>;
+}
+
+impl<T> ClonableBlackboardValue for T
+where
+    T: std::any::Any + Clone + 'static + std::fmt::Debug,
+{
+    fn clone_boxed(&self) -> Box<dyn ClonableBlackboardValue> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn ClonableBlackboardValue> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum BlackboardValue {
     Small((TypeId, [u8; 8])),
-    Big(Box<dyn std::any::Any>),
+    Big(Box<dyn ClonableBlackboardValue>),
 }
 
 impl From<i64> for BlackboardValue {
@@ -125,7 +144,7 @@ pub trait BlackboardInterface {
         default: BlackboardValueCreator,
     ) -> Result<BlackboardWrite, Error>;
 
-    // fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any>;
+    fn consumes(&mut self, id: &TypeId, key: &str) -> Result<BlackboardRead, Error>;
     // fn provides_consumes(&mut self, id: &TypeId, key: &str, default: BlackboardValueCreator) -> Box<dyn std::any::Any>;
 }
 
