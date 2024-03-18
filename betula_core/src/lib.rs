@@ -25,6 +25,7 @@
 */
 
 pub mod basic;
+pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
