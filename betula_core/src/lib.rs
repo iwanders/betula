@@ -111,6 +111,20 @@ impl From<i64> for BlackboardValue {
         BlackboardValue::Small((TypeId::of::<i64>(), v.to_ne_bytes()))
     }
 }
+impl TryInto<i64> for BlackboardValue {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+    fn try_into(self) -> Result<i64, <Self as TryInto<i64>>::Error> {
+        if let BlackboardValue::Small((tid, bytes)) = self {
+            if tid == TypeId::of::<i64>() {
+                Ok(i64::from_ne_bytes(bytes))
+            } else {
+                Err("incorrect type".into())
+            }
+        } else {
+            Err("not a small value".into())
+        }
+    }
+}
 
 impl From<f64> for BlackboardValue {
     fn from(v: f64) -> Self {
@@ -232,11 +246,48 @@ impl<'a> BlackboardContext<'a> {
             key: key.to_string(),
         }))
     }
-    // pub fn consumes<T: 'static >(&mut self, key: &str) -> Result<ConsumerRc<T>, Error> {
-    // let t = self.ctx.consumes(&TypeId::of::<T>(), key);
-    // let boxed_rc = t.downcast::<Box<ConsumerRc<T>>>().or_else(|_|Err("could not downcast"))?;
-    // Ok(**boxed_rc)
-    // }
+    // fn consumes(&mut self, id: &TypeId, key: &str) ->  Result<BlackboardRead, Error>;
+    pub fn consumes<T: 'static>(&mut self, key: &str) -> Result<Consumer<T>, Error>
+    where
+        BlackboardValue: TryInto<T>,
+    {
+        let reader = self.ctx.consumes(&TypeId::of::<T>(), key)?;
+
+        struct ConsumerFor<TT>
+        where
+            BlackboardValue: TryInto<TT>,
+        {
+            key: String,
+            type_name: String,
+            z: std::marker::PhantomData<TT>,
+            reader: BlackboardRead,
+        }
+        impl<TT: 'static> ConsumerTrait for ConsumerFor<TT>
+        where
+            BlackboardValue: TryInto<TT>,
+        {
+            type ConsumerItem = TT;
+            fn get(&self) -> Result<TT, Error> {
+                Ok((self.reader)()?.try_into().ok().expect("testing"))
+            }
+        }
+
+        impl<TT: 'static> std::fmt::Debug for ConsumerFor<TT>
+        where
+            BlackboardValue: TryInto<TT>,
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                write!(f, "Consumer::<{}>(\"{}\")", self.type_name, self.key)
+            }
+        }
+
+        Ok(Box::new(ConsumerFor::<T> {
+            reader,
+            z: std::marker::PhantomData,
+            type_name: std::any::type_name::<T>().to_string(),
+            key: key.to_string(),
+        }))
+    }
     // pub fn provides_consumes<T: 'static >(&mut self, key: &str, default: &dyn FnOnce(fn() -> T)) -> Result<ProviderConsumerRc<T>, Error> {
     // let t = self.ctx.provides_consumes(&TypeId::of::<T>(), key);
     // let boxed_rc = t.downcast::<Box<ProviderConsumerRc<T>>>().or_else(|_|Err("could not downcast"))?;

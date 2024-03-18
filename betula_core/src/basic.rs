@@ -173,10 +173,14 @@ mod tests {
         assert!(p.is_ok());
         let z = w.provides::<f64>("value", 3.3);
         assert!(z.is_err());
-        println!("BasicBlackboard: {bb:?}");
+        // println!("BasicBlackboard: {bb:?}");
         use crate::BlackboardInterface;
-        let r = bb.consumes(&TypeId::of::<i64>(), "value");
-        assert!(r.is_ok());
-        println!("value: {:?}", r.unwrap()());
+        // let r = bb.consumes(&TypeId::of::<i64>(), "value");
+        // assert!(r.is_ok());
+        // println!("value: {:?}", r.unwrap()());
+        let c = w.consumes::<i64>("value");
+        assert!(c.is_ok());
+        let z = (c.unwrap()).get();
+        println!("value: {:?}", z);
     }
 }
