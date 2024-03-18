@@ -77,19 +77,20 @@ use std::rc::Rc;
 // use std::cell::RefCell;
 use std::any::Any;
 
+use crate::BlackboardValue;
 use std::any::TypeId;
-#[derive(Debug, Default)]
+#[derive(Default, Debug)]
 pub struct BasicBlackboard {
-    values: HashMap<String, (TypeId, Rc<RefCell<Box<dyn Any>>>)>,
+    values: HashMap<String, (TypeId, Rc<RefCell<BlackboardValue>>)>,
 }
-
+//pub type BlackboardWrite = Box<dyn Fn(BlackboardValue) -> Result<(), Error>>;
 impl crate::BlackboardInterface for BasicBlackboard {
     fn provides(
         &mut self,
         id: TypeId,
         key: &str,
         default: crate::BlackboardValueCreator,
-    ) -> Result<Rc<RefCell<Box<dyn Any>>>, Error> {
+    ) -> Result<crate::BlackboardWrite, Error> {
         let (typeid, rc) = self
             .values
             .entry(key.to_string())
@@ -98,7 +99,27 @@ impl crate::BlackboardInterface for BasicBlackboard {
         if typeid != id {
             Err(format!("type mismatch for {key}").into())
         } else {
-            Ok(rc)
+            Ok(Box::new(move |v: BlackboardValue| {
+                let locked = rc.try_borrow_mut()?;
+                if let BlackboardValue::Small((typeid, data)) = v {
+                    if let BlackboardValue::Small((old_typeid, mut old_data)) = *locked {
+                        if typeid == old_typeid {
+                            // All is good, assign.
+                            old_data = data;
+                            Ok(())
+                        } else {
+                            Err("new data has different type id".into())
+                        }
+                    } else {
+                        Err("new data does not match type".into())
+                    }
+                } else {
+                    todo!()
+                }
+                // if let BlackboardValue::Big(newdata) = v {
+
+                // }
+            }))
         }
     }
     // fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any> {
@@ -139,10 +160,11 @@ mod tests {
     fn blackboard_provider() {
         let mut bb = BasicBlackboard::default();
         let mut w = crate::BlackboardContext::new(&mut bb);
-        let p = w.provides::<u32>("value", 3);
+        let p = w.provides::<i64>("value", 3);
         println!("P: {p:?}");
         assert!(p.is_ok());
-        let z = w.provides::<f32>("value", 3.3);
+        let z = w.provides::<f64>("value", 3.3);
         assert!(z.is_err());
+        println!("BasicBlackboard: {bb:?}");
     }
 }

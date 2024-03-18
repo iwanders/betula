@@ -63,7 +63,7 @@ use std::cell::RefCell;
 /// Provider trait for nodes that set values.
 pub trait ProviderTrait: std::fmt::Debug {
     type ProviderItem;
-    fn set(&self, v: Self::ProviderItem) -> Result<Self::ProviderItem, Error>;
+    fn set(&self, v: Self::ProviderItem) -> Result<(), Error>;
 }
 
 /// Consumer trait for nodes that get values.
@@ -79,49 +79,28 @@ use std::any::{Any, TypeId};
 use std::rc::Rc;
 
 /// Function type for allocating storage on the blackboard.
-pub type BlackboardValueCreator = Box<dyn FnOnce() -> Box<dyn Any>>;
+pub type BlackboardValueCreator = Box<dyn FnOnce() -> BlackboardValue>;
 
-pub trait BlackboardValue: std::fmt::Debug + std::any::Any + Clone {
-    /// Replaces the blackboard value with v.
-    fn set(&mut self, v: &dyn std::any::Any) -> Result<(), Error>;
-    fn get(&self, v: &mut dyn std::any::Any) -> Result<(), Error>;
+#[derive(Debug)]
+pub enum BlackboardValue {
+    Small((TypeId, [u8; 8])),
+    Big(Box<dyn std::any::Any>),
 }
 
-impl<T> BlackboardValue for T
-where
-    T: std::fmt::Debug + std::any::Any + 'static + Sized + Copy,
-{
-    fn set(&mut self, v: &dyn std::any::Any) -> Result<(), Error> {
-        if Any::type_id(self) != Any::type_id(v) {
-            return Err(format!("cannot swap; types don't match").into());
-        }
-        // types match, lets do the thing.
-        let mut self_typed =
-            <dyn Any>::downcast_mut::<T>(self).ok_or("left hand downcast failed")?;
-        let mut other_typed = v.downcast_ref::<T>().ok_or("right hand downcast failed")?;
-        let _ = std::mem::replace(self_typed, other_typed.clone());
-        Ok(())
-    }
-    fn get(&self, v: &mut dyn std::any::Any) -> Result<(), Error> {
-        if Any::type_id(self) != Any::type_id(v) {
-            return Err(format!("cannot swap; types don't match").into());
-        }
-        // types match, lets do the thing.
-        let self_typed = <dyn Any>::downcast_ref::<T>(self).ok_or("left hand downcast failed")?;
-        let mut other_typed = v.downcast_mut::<T>().ok_or("right hand downcast failed")?;
-        let _ = std::mem::replace(other_typed, self_typed.clone());
-        Ok(())
+impl From<i64> for BlackboardValue {
+    fn from(v: i64) -> Self {
+        BlackboardValue::Small((TypeId::of::<i64>(), v.to_ne_bytes()))
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn sequence_bbvalue() {
-        let mut z: Box<dyn BlackboardValue> = Box::new(5u32);
+impl From<f64> for BlackboardValue {
+    fn from(v: f64) -> Self {
+        BlackboardValue::Small((TypeId::of::<f64>(), v.to_ne_bytes()))
     }
 }
+
+pub type BlackboardRead = Box<dyn Fn() -> Result<BlackboardValue, Error>>;
+pub type BlackboardWrite = Box<dyn Fn(BlackboardValue) -> Result<(), Error>>;
 
 /// The blackboard is a bit clunky at the moment. I don't see a way to:
 ///   * Avoid exposing Rc<RefCell<Box<dyn Any>>>
@@ -144,7 +123,7 @@ pub trait BlackboardInterface {
         id: TypeId,
         key: &str,
         default: BlackboardValueCreator,
-    ) -> Result<Rc<RefCell<Box<dyn Any>>>, Error>;
+    ) -> Result<BlackboardWrite, Error>;
 
     // fn consumes(&mut self, id: &TypeId, key: &str) -> Box<dyn std::any::Any>;
     // fn provides_consumes(&mut self, id: &TypeId, key: &str, default: BlackboardValueCreator) -> Box<dyn std::any::Any>;
@@ -174,48 +153,61 @@ impl<'a> BlackboardContext<'a> {
         &self.ctx
     }
 
-    pub fn provides<T: 'static>(&mut self, key: &str, default: T) -> Result<Provider<T>, Error> {
-        self.provides_or_else::<T, _>(key, || default)
+    pub fn provides<T: 'static + std::convert::Into<BlackboardValue>>(
+        &mut self,
+        key: &str,
+        default: T,
+    ) -> Result<Provider<T>, Error>
+    where
+        BlackboardValue: From<T>,
+    {
+        self.provides_or_else::<T, _>(key, || default.into())
     }
 
-    pub fn provides_or_else<T: 'static, Z: FnOnce() -> T + 'static>(
+    pub fn provides_or_else<T: 'static, Z: FnOnce() -> BlackboardValue + 'static>(
         &mut self,
         key: &str,
         default: Z,
-    ) -> Result<Provider<T>, Error> {
-        let t = self
+    ) -> Result<Provider<T>, Error>
+    where
+        BlackboardValue: From<T>,
+    {
+        let writer = self
             .ctx
-            .provides(TypeId::of::<T>(), key, Box::new(|| Box::new(default)))?;
+            .provides(TypeId::of::<T>(), key, Box::new(default))?;
         // t gave back a Rc<RefCell<Box<dyn Any>>>
         // Now we need to make our Provider for this type.
-        struct ProviderFor<TT> {
+        struct ProviderFor<TT>
+        where
+            BlackboardValue: From<TT>,
+        {
             key: String,
             type_name: String,
             z: std::marker::PhantomData<TT>,
-            v: Rc<RefCell<Box<dyn Any>>>,
+            writer: BlackboardWrite,
         }
-        impl<TT: 'static> ProviderTrait for ProviderFor<TT> {
+        impl<TT: 'static> ProviderTrait for ProviderFor<TT>
+        where
+            BlackboardValue: From<TT>,
+        {
             type ProviderItem = TT;
-            fn set(&self, v: Self::ProviderItem) -> Result<Self::ProviderItem, Error> {
-                let mut mut_box = self
-                    .v
-                    .try_borrow_mut()
-                    .or_else(|_| Err("could not borrow mutably"))?;
-                let value = mut_box
-                    .downcast_mut::<Self::ProviderItem>()
-                    .ok_or("could not downcast")?;
-                Ok(std::mem::replace(value, v))
+            fn set(&self, v: Self::ProviderItem) -> Result<(), Error> {
+                let bb_value = v.into();
+                (self.writer)(bb_value)
             }
         }
 
-        impl<TT: 'static> std::fmt::Debug for ProviderFor<TT> {
+        impl<TT: 'static> std::fmt::Debug for ProviderFor<TT>
+        where
+            BlackboardValue: From<TT>,
+        {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
                 write!(f, "Provider::<{}>(\"{}\")", self.type_name, self.key)
             }
         }
 
         Ok(Box::new(ProviderFor::<T> {
-            v: t,
+            writer,
             z: std::marker::PhantomData,
             type_name: std::any::type_name::<T>().to_string(),
             key: key.to_string(),
