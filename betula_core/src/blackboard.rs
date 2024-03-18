@@ -14,22 +14,11 @@ where
     }
 
     fn equality(&self, other: &dyn Chalkable) -> bool {
-        println!(
-            "std::any::type_name::<T>().to_string(): {:?}",
-            std::any::type_name::<T>().to_string()
-        );
-        println!("TypeId::of::<T>(): {:?}", TypeId::of::<T>());
-        println!("self: {:?}", self.as_any_ref().type_id());
-        println!("other: {:?}", other.as_any_ref().type_id());
         if self.as_any_ref().type_id() != other.as_any_ref().type_id() {
-            dbg!();
             false
         } else {
-            dbg!();
             let left = (self as &dyn Any).downcast_ref::<T>();
             let right = other.as_any_ref().downcast_ref::<T>();
-            println!("left: {left:?}");
-            println!("right: {right:?}");
             left == right
         }
     }
@@ -60,10 +49,21 @@ mod tests {
         let a: Box<dyn Chalkable> = Box::new(3u8);
         let b: Box<dyn Chalkable> = Box::new(5u8);
         let c = a.clone();
-        println!("c: {c:?}");
-        // let a_eq_b = a == b;
+        println!("a: {a:?}");
+        println!("c cloned a: {c:?}");
+        assert!(a != b);
         // println!("a_eq_b: {a_eq_b:?}");
-        let a_eq_c = a == c;
-        println!("a_eq_c: {a_eq_c:?}");
+        assert!(a == c);
+
+        #[derive(Debug, Clone, PartialEq)]
+        struct Z(f32);
+        let a: Box<dyn Chalkable> = Box::new(Z(3.0f32));
+        let b: Box<dyn Chalkable> = Box::new(Z(5.0f32));
+        let c = a.clone();
+        println!("a: {a:?}");
+        println!("c cloned a: {c:?}");
+        assert!(a != b);
+        // println!("a_eq_b: {a_eq_b:?}");
+        assert!(a == c);
     }
 }
