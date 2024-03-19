@@ -29,9 +29,7 @@ pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{
-        blackboard::BlackboardSetup, Consumer, Error, Node, Provider, RunContext, Status,
-    };
+    pub use crate::{blackboard::Setup, Consumer, Error, Node, Provider, RunContext, Status};
 }
 
 mod as_any;
@@ -100,7 +98,7 @@ pub trait Node: std::fmt::Debug + AsAny {
 
     /// Setup method for the node to obtain providers and consumers from the
     /// blackboard.
-    fn setup(&mut self, _ctx: &mut dyn blackboard::BlackboardInterface) -> Result<(), Error> {
+    fn setup(&mut self, _ctx: &mut dyn blackboard::Interface) -> Result<(), Error> {
         Ok(())
     }
 }

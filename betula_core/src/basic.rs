@@ -77,23 +77,16 @@ use std::rc::Rc;
 use std::any::Any;
 
 // use crate::BlackboardValue;
-use crate::blackboard::{
-    BlackboardInterface, BlackboardRead, BlackboardValue, BlackboardValueCreator, BlackboardWrite,
-};
+use crate::blackboard::{Interface, Read, Value, ValueCreator, Write};
 
 use std::any::TypeId;
 #[derive(Default, Debug)]
 pub struct BasicBlackboard {
-    values: HashMap<String, (TypeId, Rc<RefCell<BlackboardValue>>)>,
+    values: HashMap<String, (TypeId, Rc<RefCell<Value>>)>,
 }
 use crate::as_any::AsAny;
-impl BlackboardInterface for BasicBlackboard {
-    fn writer(
-        &mut self,
-        id: TypeId,
-        key: &str,
-        default: BlackboardValueCreator,
-    ) -> Result<BlackboardWrite, Error> {
+impl Interface for BasicBlackboard {
+    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, Error> {
         let (typeid, rc) = self
             .values
             .entry(key.to_string())
@@ -114,7 +107,7 @@ impl BlackboardInterface for BasicBlackboard {
             )
             .into())
         } else {
-            Ok(Box::new(move |v: BlackboardValue| {
+            Ok(Box::new(move |v: Value| {
                 let mut locked = rc.try_borrow_mut()?;
                 if (**locked).type_id() != (*v).type_id() {
                     Err(format!(
@@ -131,7 +124,7 @@ impl BlackboardInterface for BasicBlackboard {
         }
     }
 
-    fn reader(&mut self, id: &TypeId, key: &str) -> Result<BlackboardRead, Error> {
+    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, Error> {
         let (typeid, rc) = self
             .values
             .get(key)

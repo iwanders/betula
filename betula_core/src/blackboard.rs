@@ -40,34 +40,29 @@ impl PartialEq<dyn Chalkable> for dyn Chalkable {
     }
 }
 
-pub type BlackboardValue = Box<dyn Chalkable>;
+pub type Value = Box<dyn Chalkable>;
 
 /// Function type for allocating storage on the blackboard.
-pub type BlackboardValueCreator = Box<dyn FnOnce() -> BlackboardValue>;
+pub type ValueCreator = Box<dyn FnOnce() -> Value>;
 
 /// Boxed function to read values from the blackboard.
-pub type BlackboardRead = Box<dyn Fn() -> Result<BlackboardValue, Error>>;
+pub type Read = Box<dyn Fn() -> Result<Value, Error>>;
 
 /// Boxed function to write values to the blackboard. Deliberately does NOT
 /// return the previous value to ensure purity.
-pub type BlackboardWrite = Box<dyn Fn(BlackboardValue) -> Result<(), Error>>;
+pub type Write = Box<dyn Fn(Value) -> Result<(), Error>>;
 
 use crate::{ConsumerTrait, ProviderTrait};
 
 /// The object safe blackboard interface, providing access to the getters and setters.
 /// Interation through BlackboardSetup is very much recommended.
-pub trait BlackboardInterface {
-    fn writer(
-        &mut self,
-        id: TypeId,
-        key: &str,
-        default: BlackboardValueCreator,
-    ) -> Result<BlackboardWrite, Error>;
+pub trait Interface {
+    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, Error>;
 
-    fn reader(&mut self, id: &TypeId, key: &str) -> Result<BlackboardRead, Error>;
+    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, Error>;
 }
 
-pub trait BlackboardSetup: BlackboardInterface {
+pub trait Setup: Interface {
     fn provides<T: 'static + Chalkable + Clone>(
         &mut self,
         key: &str,
@@ -76,21 +71,17 @@ pub trait BlackboardSetup: BlackboardInterface {
         self.provides_or_else::<T, _>(key, || Box::new(default))
     }
 
-    fn provides_or_else<
-        T: 'static + Chalkable + Clone,
-        Z: FnOnce() -> BlackboardValue + 'static,
-    >(
+    fn provides_or_else<T: 'static + Chalkable + Clone, Z: FnOnce() -> Value + 'static>(
         &mut self,
         key: &str,
         default_maker: Z,
     ) -> Result<Provider<T>, Error> {
-        let writer =
-            BlackboardInterface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
+        let writer = Interface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
         struct ProviderFor<TT> {
             key: String,
             type_name: String,
             z: std::marker::PhantomData<TT>,
-            writer: BlackboardWrite,
+            writer: Write,
         }
         impl<TT: 'static + Chalkable + Clone> ProviderTrait for ProviderFor<TT> {
             type ProviderItem = TT;
@@ -118,13 +109,13 @@ pub trait BlackboardSetup: BlackboardInterface {
         &mut self,
         key: &str,
     ) -> Result<Consumer<T>, Error> {
-        let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), key)?;
+        let reader = Interface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct ConsumerFor<TT> {
             key: String,
             type_name: String,
             z: std::marker::PhantomData<TT>,
-            reader: BlackboardRead,
+            reader: Read,
         }
         impl<TT: 'static + Chalkable + Clone> ConsumerTrait for ConsumerFor<TT> {
             type ConsumerItem = TT;
@@ -156,7 +147,7 @@ pub trait BlackboardSetup: BlackboardInterface {
     }
 }
 
-impl<T: BlackboardInterface> BlackboardSetup for T {}
+impl<T: Interface> Setup for T {}
 
 #[cfg(test)]
 mod tests {
