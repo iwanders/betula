@@ -71,67 +71,83 @@ impl BasicTree {
     }
 }
 
-use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 // use std::cell::RefCell;
 use std::any::Any;
 
-use crate::BlackboardValue;
+// use crate::BlackboardValue;
+use crate::blackboard::{
+    BlackboardInterface, BlackboardRead, BlackboardValue, BlackboardValueCreator, BlackboardWrite,
+};
+
 use std::any::TypeId;
 #[derive(Default, Debug)]
 pub struct BasicBlackboard {
     values: HashMap<String, (TypeId, Rc<RefCell<BlackboardValue>>)>,
 }
-
-impl crate::BlackboardInterface for BasicBlackboard {
-    fn provides(
+use crate::as_any::AsAny;
+impl BlackboardInterface for BasicBlackboard {
+    fn writer(
         &mut self,
         id: TypeId,
         key: &str,
-        default: crate::BlackboardValueCreator,
-    ) -> Result<crate::BlackboardWrite, Error> {
+        default: BlackboardValueCreator,
+    ) -> Result<BlackboardWrite, Error> {
         let (typeid, rc) = self
             .values
             .entry(key.to_string())
             .or_insert_with(|| (id, Rc::new(RefCell::new(default()))))
             .clone();
+        let temp_rc = rc.clone();
+        let current_type = {
+            let z = temp_rc
+                .try_borrow_mut()
+                .or_else(|_| Err(format!("{key} was already borrowed")))?;
+            (**z).type_name().to_string()
+        };
+        let owned_key = key.to_string();
         if typeid != id {
-            Err(format!("type mismatch for {key}").into())
+            Err(format!(
+                "new writer for '{key}', has wrong type: already got {}",
+                current_type
+            )
+            .into())
         } else {
             Ok(Box::new(move |v: BlackboardValue| {
-                let locked = rc.try_borrow_mut()?;
-                if let BlackboardValue::Small((typeid, data)) = v {
-                    if let BlackboardValue::Small((old_typeid, mut old_data)) = *locked {
-                        if typeid == old_typeid {
-                            // All is good, assign.
-                            old_data = data;
-                            Ok(())
-                        } else {
-                            Err("new data has different type id".into())
-                        }
-                    } else {
-                        Err("new data does not match type".into())
-                    }
+                let mut locked = rc.try_borrow_mut()?;
+                if (**locked).type_id() != (*v).type_id() {
+                    Err(format!(
+                        "assignment for '{owned_key}' is incorrect type {} expected {}",
+                        (**locked).type_name(),
+                        (*v).type_name()
+                    )
+                    .into())
                 } else {
-                    todo!()
+                    *locked = v;
+                    Ok(())
                 }
             }))
         }
     }
 
-    fn consumes(&mut self, id: &TypeId, key: &str) -> Result<crate::BlackboardRead, Error> {
+    fn reader(&mut self, id: &TypeId, key: &str) -> Result<BlackboardRead, Error> {
         let (typeid, rc) = self
             .values
             .get(key)
-            .ok_or_else(|| format!("key {key} not found"))?;
+            .ok_or_else(|| format!("key '{key}' not found"))?;
         let v = rc.clone();
         if typeid != id {
-            Err(format!("type mismatch for {key}").into())
+            Err(format!(
+                "new reader for '{key}' mismatches type: already got {}",
+                rc.type_name()
+            )
+            .into())
         } else {
             Ok(Box::new(move || {
                 let locked = v.try_borrow_mut()?;
-                Ok(locked.clone())
+                let cloned = (*locked).clone();
+                Ok(cloned)
             }))
         }
     }
@@ -167,20 +183,33 @@ mod tests {
     #[test]
     fn blackboard_provider() {
         let mut bb = BasicBlackboard::default();
-        let mut w = crate::BlackboardContext::new(&mut bb);
-        let p = w.provides::<i64>("value", 3);
+
+        // let mut w = crate::BlackboardContext::new(&mut bb);
+        let v_in = 3i64;
+        let p = bb.provides("value", v_in);
+        let c = bb.consumes::<i64>("value");
+        assert!(c.is_ok());
+        let c = c.unwrap();
+        let v = c.get();
+        println!("v: {v:?}");
+        assert!(v.is_ok());
+        let v = v.unwrap();
+        assert_eq!(v_in, v);
+
         println!("P: {p:?}");
         assert!(p.is_ok());
-        let z = w.provides::<f64>("value", 3.3);
+        let p = p.unwrap();
+        let res = p.set(5);
+        assert!(res.is_ok());
+        let z = bb.provides("value", 3.3f64);
+        println!("z: {z:?}");
         assert!(z.is_err());
         // println!("BasicBlackboard: {bb:?}");
-        use crate::BlackboardInterface;
         // let r = bb.consumes(&TypeId::of::<i64>(), "value");
         // assert!(r.is_ok());
         // println!("value: {:?}", r.unwrap()());
-        let c = w.consumes::<i64>("value");
-        assert!(c.is_ok());
-        let z = (c.unwrap()).get();
+        let c = bb.consumes::<i64>("value");
+        println!("c: {c:?}");
         println!("value: {:?}", z);
     }
 }
