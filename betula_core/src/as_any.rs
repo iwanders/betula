@@ -34,3 +34,10 @@ where
         std::any::type_name::<T>()
     }
 }
+// helper here to avoid .as_any_ref() everywhere, with blanket implementation.
+pub trait AsAnyHelper: AsAny {
+    fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        self.as_any_ref().downcast_ref()
+    }
+}
+impl<T: AsAny + ?Sized> AsAnyHelper for T {}
