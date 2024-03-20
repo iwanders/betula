@@ -126,7 +126,7 @@ pub trait Tree {
     /// Removes a node and any relations associated to it.
     fn remove_node(&mut self, id: NodeId) -> Result<(), Error>;
     /// Add a node to the tree.
-    fn add_node_boxed(&mut self, node: Box<dyn Node>) -> Result<NodeId, Error>;
+    fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, Error>;
 
     /// Obtain a list of the children of a particular node.
     fn children(&self, id: NodeId) -> Result<Vec<NodeId>, Error>;

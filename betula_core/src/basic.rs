@@ -43,7 +43,8 @@ impl Tree for BasicTree {
         self.nodes.keys().copied().collect()
     }
     fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node> {
-        self.nodes.get_mut(&id).map(|z| &mut **z.node.get_mut())
+        let m = self.nodes.get_mut(&id)?;
+        Some(&mut **m.node.get_mut())
     }
     fn remove_node(&mut self, id: NodeId) -> Result<(), Error> {
         for (_k, v) in self.nodes.iter_mut() {
@@ -55,16 +56,15 @@ impl Tree for BasicTree {
             .map(|_| ())
     }
 
-    fn add_node_boxed(&mut self, node: Box<dyn Node>) -> Result<NodeId, Error> {
-        let new_id = NodeId(crate::Uuid::new_v4());
+    fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, Error> {
         self.nodes.insert(
-            new_id,
+            id,
             BasicTreeNode {
                 node: node.into(),
                 children: vec![],
             },
         );
-        Ok(new_id)
+        Ok(id)
     }
 
     fn children(&self, id: NodeId) -> Result<Vec<NodeId>, Error> {
@@ -211,8 +211,8 @@ mod tests {
     #[test]
     fn sequence_fail() -> Result<(), Error> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(Box::new(Sequence {}))?;
-        let f1 = tree.add_node_boxed(Box::new(Failure {}))?;
+        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Sequence {}))?;
+        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Failure {}))?;
         tree.add_relation(root, 0, f1)?;
         let res = tree.execute(root)?;
         assert_eq!(res, Status::Failure);
@@ -222,9 +222,9 @@ mod tests {
     #[test]
     fn fallback_success() -> Result<(), Error> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(Box::new(Selector {}))?;
-        let f1 = tree.add_node_boxed(Box::new(Failure {}))?;
-        let s1 = tree.add_node_boxed(Box::new(Success {}))?;
+        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Selector {}))?;
+        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Failure {}))?;
+        let s1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Success {}))?;
         tree.add_relation(root, 0, f1)?;
         tree.add_relation(root, 1, s1)?;
         let res = tree.execute(root)?;
