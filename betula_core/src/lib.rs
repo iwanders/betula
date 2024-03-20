@@ -123,6 +123,17 @@ pub enum DirectionalPort {
     Provider(Port),
     ProviderConsumer(Port),
 }
+impl DirectionalPort {
+    pub fn consumer<T: 'static>(name: &str) -> Self {
+        DirectionalPort::Consumer(Port::new::<T>(name))
+    }
+    pub fn provider<T: 'static>(name: &str) -> Self {
+        DirectionalPort::Provider(Port::new::<T>(name))
+    }
+    pub fn provider_consumer<T: 'static>(name: &str) -> Self {
+        DirectionalPort::ProviderConsumer(Port::new::<T>(name))
+    }
+}
 
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
