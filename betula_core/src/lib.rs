@@ -29,7 +29,9 @@ pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{blackboard::Setup, Consumer, Error, Node, Provider, RunContext, Status};
+    pub use crate::{
+        blackboard::Setup, Consumer, Error, Node, NodeId, Provider, RunContext, Status, Tree,
+    };
 }
 
 mod as_any;
@@ -82,6 +84,7 @@ pub type Consumer<T> = Box<dyn ConsumerTrait<ConsumerItem = T>>;
 /// The boxed trait that nodes should use to provide and consume values from the blackboard.
 pub type ProviderConsumer<T> = Box<dyn ProviderConsumerTrait<ProviderItem = T, ConsumerItem = T>>;
 
+/// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
     ///   The return of Result is only there to indicate failure that would halt
@@ -93,12 +96,51 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///   tree: The context in which this node is being ran.
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<Status, Error>;
 
-    // We probably want clone here, such that we can duplicate from the
-    // ui.
-
     /// Setup method for the node to obtain providers and consumers from the
     /// blackboard.
     fn setup(&mut self, _ctx: &mut dyn blackboard::Interface) -> Result<(), Error> {
         Ok(())
     }
+}
+
+use uuid::Uuid;
+
+/// We're using UUIDs as NodeIds here, that way we can guarantee that they
+/// are stable, which helps a lot when manipulating the tree, internally
+/// the tree is free to use whatever ids it wants when actually executing it.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
+pub struct NodeId(pub Uuid);
+
+/// Trait which a tree must implement.
+///
+/// All tree's are directed graphs. There may be multiple disjoint trees
+/// present in one tree.
+pub trait Tree {
+    /// Return the ids present in this tree.
+    fn ids(&self) -> Vec<NodeId>;
+
+    /// Return a reference to a node.
+    // fn node_ref(&self, id: NodeId) -> Option<&dyn Node>;
+    /// Return a mutable reference to a node.
+    fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node>;
+    /// Removes a node and any relations associated to it.
+    fn remove_node(&mut self, id: NodeId) -> Result<(), Error>;
+    /// Add a node to the tree.
+    fn add_node_boxed(&mut self, node: Box<dyn Node>) -> Result<NodeId, Error>;
+
+    /// Obtain a list of the children of a particular node.
+    fn children(&self, id: NodeId) -> Result<Vec<NodeId>, Error>;
+
+    /// Add a relation between two nodes, specifying the insert position into the children
+    /// vector.
+    fn add_relation(&mut self, parent: NodeId, position: usize, child: NodeId)
+        -> Result<(), Error>;
+    /// Remove a relation between two nodes, specifying the parent and the child position to remove.
+    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), Error>;
+
+    /// Execute the tick, starting at the provided node.
+    fn execute(&self, id: NodeId) -> Result<Status, Error>;
+
+    /// Call setup on a particular node.
+    fn setup(&mut self, id: NodeId, ctx: &mut dyn blackboard::Interface) -> Result<(), Error>;
 }
