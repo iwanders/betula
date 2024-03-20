@@ -3,3 +3,6 @@ name = "betula_core"
 version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"
+
+[dependencies]
+uuid = {version = "1.8.0", features=["v4"]}
