@@ -1,82 +1,139 @@
 /// A simple implementation of the Tree.
 use crate::prelude::*;
+use std::collections::HashMap;
 
 struct TreeContext<'a> {
-    this_node: usize,
+    this_node: NodeId,
     tree: &'a BasicTree,
 }
 impl RunContext for TreeContext<'_> {
     fn children(&self) -> usize {
-        self.tree.children(NodeId(self.this_node)).len()
+        self.tree
+            .children(self.this_node)
+            .expect("node must exist in tree")
+            .len()
     }
     fn run(&self, index: usize) -> Result<Status, Error> {
-        let ids = self.tree.children(NodeId(self.this_node));
-        self.tree.run(ids[index])
+        let ids = self.tree.children(self.this_node)?;
+        self.tree.execute(ids[index])
     }
 }
 
-/// Node Id that's used to refer to nodes in a context.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
-pub struct NodeId(pub usize);
-
 use std::cell::RefCell;
 #[derive(Debug)]
+struct BasicTreeNode {
+    node: RefCell<Box<dyn Node>>,
+    children: Vec<NodeId>,
+}
+#[derive(Debug, Default)]
 pub struct BasicTree {
-    nodes: Vec<RefCell<Box<dyn Node>>>,
-    children: Vec<Vec<NodeId>>,
+    nodes: HashMap<NodeId, BasicTreeNode>,
 }
 
 impl BasicTree {
     pub fn new() -> Self {
         BasicTree {
-            nodes: vec![],
-            children: vec![],
+            nodes: HashMap::default(),
         }
     }
-    pub fn get_node(&self, id: NodeId) -> &RefCell<Box<dyn Node>> {
-        &self.nodes[id.0]
-    }
+}
 
-    pub fn nodes(&self) -> Vec<NodeId> {
+impl Tree for BasicTree {
+    fn ids(&self) -> Vec<NodeId> {
+        self.nodes.keys().copied().collect()
+    }
+    fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node> {
+        self.nodes.get_mut(&id).map(|z| &mut **z.node.get_mut())
+    }
+    fn remove_node(&mut self, id: NodeId) -> Result<(), Error> {
+        for (_k, v) in self.nodes.iter_mut() {
+            v.children.retain(|&x| x != id);
+        }
         self.nodes
-            .iter()
-            .enumerate()
-            .map(|(i, _)| NodeId(i))
-            .collect()
+            .remove(&id)
+            .ok_or_else(|| format!("id {id:?} is not present").into())
+            .map(|_| ())
     }
 
-    pub fn add_node(&mut self, node: Box<dyn Node>) -> NodeId {
-        let id = NodeId(self.nodes.len());
-        self.nodes.push(RefCell::new(node));
-        self.children.push(vec![]);
-        id
+    fn add_node_boxed(&mut self, node: Box<dyn Node>) -> Result<NodeId, Error> {
+        let new_id = NodeId(crate::Uuid::new_v4());
+        self.nodes.insert(
+            new_id,
+            BasicTreeNode {
+                node: node.into(),
+                children: vec![],
+            },
+        );
+        Ok(new_id)
     }
 
-    pub fn add_relation(&mut self, parent: NodeId, child: NodeId) {
-        self.children[parent.0].push(child);
+    fn children(&self, id: NodeId) -> Result<Vec<NodeId>, Error> {
+        self.nodes
+            .get(&id)
+            .ok_or_else(|| format!("node {id:?} is not present").into())
+            .map(|x| x.children.clone())
     }
 
-    pub fn children(&self, id: NodeId) -> Vec<NodeId> {
-        self.children[id.0].clone()
+    fn add_relation(
+        &mut self,
+        parent: NodeId,
+        position: usize,
+        child: NodeId,
+    ) -> Result<(), Error> {
+        let n = self
+            .nodes
+            .get_mut(&parent)
+            .ok_or_else(|| format!("node {parent:?} is not present").to_string())?;
+        if position > n.children.len() {
+            // insert would panic, lets raise an error
+            return Err(format!("position {position} is too large").into());
+        }
+        n.children.insert(position, child);
+        Ok(())
+    }
+    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), Error> {
+        let n = self
+            .nodes
+            .get_mut(&parent)
+            .ok_or_else(|| format!("node {parent:?} is not present").to_string())?;
+        if position >= n.children.len() {
+            // insert would panic, lets raise an error
+            return Err(format!("position {position} is too large").into());
+        }
+        n.children.remove(position);
+        Ok(())
     }
 
-    pub fn run(&self, id: NodeId) -> Result<Status, Error> {
-        let mut n = self.nodes[id.0].try_borrow_mut()?;
+    fn execute(&self, id: NodeId) -> Result<Status, Error> {
+        let mut n = self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
+            .node
+            .try_borrow_mut()?;
         let mut context = TreeContext {
-            this_node: id.0,
+            this_node: id,
             tree: &self,
         };
 
         n.tick(&mut context)
     }
+
+    /// Call setup on a particular node.
+    fn setup(&mut self, id: NodeId, ctx: &mut dyn Interface) -> Result<(), Error> {
+        let mut n = self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
+            .node
+            .try_borrow_mut()?;
+        n.setup(ctx)
+    }
 }
 
-use std::collections::HashMap;
-use std::rc::Rc;
-// use std::cell::RefCell;
 use std::any::Any;
+use std::rc::Rc;
 
-// use crate::BlackboardValue;
 use crate::blackboard::{Interface, Read, Value, ValueCreator, Write};
 
 use std::any::TypeId;
@@ -152,25 +209,27 @@ mod tests {
     use crate::nodes::*;
 
     #[test]
-    fn sequence_fail() {
+    fn sequence_fail() -> Result<(), Error> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node(Box::new(Sequence {}));
-        let f1 = tree.add_node(Box::new(Failure {}));
-        tree.add_relation(root, f1);
-        let res = tree.run(root);
-        assert_eq!(res.ok(), Some(Status::Failure));
+        let root = tree.add_node_boxed(Box::new(Sequence {}))?;
+        let f1 = tree.add_node_boxed(Box::new(Failure {}))?;
+        tree.add_relation(root, 0, f1)?;
+        let res = tree.execute(root)?;
+        assert_eq!(res, Status::Failure);
+        Ok(())
     }
 
     #[test]
-    fn fallback_success() {
+    fn fallback_success() -> Result<(), Error> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node(Box::new(Selector {}));
-        let f1 = tree.add_node(Box::new(Failure {}));
-        let s1 = tree.add_node(Box::new(Success {}));
-        tree.add_relation(root, f1);
-        tree.add_relation(root, s1);
-        let res = tree.run(root);
-        assert_eq!(res.ok(), Some(Status::Success));
+        let root = tree.add_node_boxed(Box::new(Selector {}))?;
+        let f1 = tree.add_node_boxed(Box::new(Failure {}))?;
+        let s1 = tree.add_node_boxed(Box::new(Success {}))?;
+        tree.add_relation(root, 0, f1)?;
+        tree.add_relation(root, 1, s1)?;
+        let res = tree.execute(root)?;
+        assert_eq!(res, Status::Success);
+        Ok(())
     }
 
     #[test]
