@@ -1,4 +1,5 @@
 use betula_core::basic::BasicTree;
+use betula_core::{nodes, NodeId, Uuid};
 use betula_egui::TreeView;
 use eframe::egui;
 
@@ -25,11 +26,17 @@ impl MyEguiApp {
         use betula_core::nodes;
         use betula_core::prelude::*;
         let mut bt = BasicTree::new();
-        let root = bt.add_node(Box::new(nodes::Fallback {}));
-        let f1 = bt.add_node(Box::new(nodes::Failure {}));
-        let s1 = bt.add_node(Box::new(nodes::Success {}));
-        bt.add_relation(root, f1);
-        bt.add_relation(root, s1);
+        let root = bt
+            .add_node_boxed(NodeId(Uuid::new_v4()), Box::new(nodes::Selector {}))
+            .unwrap();
+        let f1 = bt
+            .add_node_boxed(NodeId(Uuid::new_v4()), Box::new(nodes::Failure {}))
+            .unwrap();
+        let s1 = bt
+            .add_node_boxed(NodeId(Uuid::new_v4()), Box::new(nodes::Success {}))
+            .unwrap();
+        bt.add_relation(root, 0, f1);
+        bt.add_relation(root, 1, s1);
         // let res = bt.run(root);
         // assert_eq!(res.ok(), Some(Status::Success));
         let view = TreeView::default();

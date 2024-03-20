@@ -1,12 +1,13 @@
 use egui::emath::TSTransform;
 
+use betula_core::prelude::*;
 use betula_core::NodeId;
 
 #[derive(PartialEq, Clone)]
 struct TreeNode {
     id: NodeId,
     children: Vec<NodeId>,
-    name: String,
+    type_name: String,
 
     position: egui::Pos2,
 }
@@ -24,16 +25,17 @@ impl Eq for TreeView {}
 
 impl TreeView {
     pub fn update(&mut self, tree: &betula_core::basic::BasicTree) {
-        use betula_core::AsAny;
-        use betula_core::Tree;
         self.nodes.clear();
         for id in tree.nodes() {
-            let node_lock = tree.get_node(id).borrow();
-            let name = (**node_lock).type_name().to_string();
+            let children = tree.children(id).unwrap();
+            let node = tree.node_ref(id).unwrap();
+            let l = node.borrow();
+            use std::ops::Deref;
+            let type_name: String = (((*l).deref()).type_name()).to_string();
             let n = TreeNode {
                 id,
-                name,
-                children: tree.children(id),
+                type_name,
+                children,
                 position: egui::Pos2::new(0.0, 120.0),
             };
             self.nodes.push(n);
@@ -90,7 +92,9 @@ impl TreeView {
                         .show(ui, |ui| {
                             ui.style_mut().wrap = Some(false);
                             // callback(ui, self)
-                            ui.add(Box::new(|ui: &mut egui::Ui| ui.button(node.name.clone())))
+                            ui.add(Box::new(|ui: &mut egui::Ui| {
+                                ui.button(node.type_name.clone())
+                            }))
                         });
                 })
                 .response

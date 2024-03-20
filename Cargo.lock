@@ -453,6 +453,7 @@ dependencies = [
  "betula_core",
  "eframe",
  "egui",
+ "uuid",
 ]
 
 [[package]]

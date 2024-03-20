@@ -29,7 +29,7 @@ pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{blackboard::Setup, RunContext, Tree};
+    pub use crate::{blackboard::Setup, AsAny, RunContext, Tree};
 }
 // Consumer, Error, Node, NodeId, Provider, Status
 
@@ -163,7 +163,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     }
 }
 
-use uuid::Uuid;
+pub use uuid::Uuid;
 
 /// We're using UUIDs as NodeIds here, that way we can guarantee that they
 /// are stable, which helps a lot when manipulating the tree, internally
@@ -177,10 +177,10 @@ pub struct NodeId(pub Uuid);
 /// present in one tree.
 pub trait Tree {
     /// Return the ids present in this tree.
-    fn ids(&self) -> Vec<NodeId>;
+    fn nodes(&self) -> Vec<NodeId>;
 
     /// Return a reference to a node.
-    // fn node_ref(&self, id: NodeId) -> Option<&dyn Node>;
+    fn node_ref(&self, id: NodeId) -> Option<&std::cell::RefCell<Box<dyn Node>>>;
     /// Return a mutable reference to a node.
     fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node>;
     /// Removes a node and any relations associated to it.

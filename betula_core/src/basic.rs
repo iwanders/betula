@@ -41,8 +41,11 @@ impl BasicTree {
 }
 
 impl Tree for BasicTree {
-    fn ids(&self) -> Vec<NodeId> {
+    fn nodes(&self) -> Vec<NodeId> {
         self.nodes.keys().copied().collect()
+    }
+    fn node_ref(&self, id: NodeId) -> Option<&RefCell<Box<dyn Node>>> {
+        Some(&self.nodes.get(&id)?.node)
     }
     fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node> {
         let m = self.nodes.get_mut(&id)?;
