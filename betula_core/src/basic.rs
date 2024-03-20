@@ -122,14 +122,19 @@ impl Tree for BasicTree {
     }
 
     /// Call setup on a particular node.
-    fn setup(&mut self, id: NodeId, ctx: &mut dyn Interface) -> Result<(), Error> {
+    fn setup(
+        &mut self,
+        id: NodeId,
+        port: &crate::DirectionalPort,
+        ctx: &mut dyn Interface,
+    ) -> Result<(), Error> {
         let mut n = self
             .nodes
             .get(&id)
             .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
             .node
             .try_borrow_mut()?;
-        n.setup(ctx)
+        n.setup(port, ctx)
     }
 }
 

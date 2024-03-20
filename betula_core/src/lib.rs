@@ -83,6 +83,47 @@ pub type Consumer<T> = Box<dyn ConsumerTrait<ConsumerItem = T>>;
 /// The boxed trait that nodes should use to provide and consume values from the blackboard.
 pub type ProviderConsumer<T> = Box<dyn ProviderConsumerTrait<ProviderItem = T, ConsumerItem = T>>;
 
+#[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct Type {
+    id: std::any::TypeId,
+    type_name: &'static str,
+}
+impl Type {
+    pub fn new<T: 'static>() -> Self {
+        Type {
+            id: std::any::TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+}
+
+impl std::fmt::Debug for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{0}", self.type_name)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct Port {
+    pub data: Type,
+    pub name: String,
+}
+
+impl Port {
+    pub fn new<T: 'static>(name: &str) -> Self {
+        Port {
+            data: Type::new::<T>(),
+            name: name.to_string(),
+        }
+    }
+}
+
+pub enum DirectionalPort {
+    Consumer(Port),
+    Provider(Port),
+    ProviderConsumer(Port),
+}
+
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
@@ -97,8 +138,17 @@ pub trait Node: std::fmt::Debug + AsAny {
 
     /// Setup method for the node to obtain providers and consumers from the
     /// blackboard.
-    fn setup(&mut self, _ctx: &mut dyn blackboard::Interface) -> Result<(), Error> {
+    fn setup(
+        &mut self,
+        _port: &DirectionalPort,
+        _ctx: &mut dyn blackboard::Interface,
+    ) -> Result<(), Error> {
         Ok(())
+    }
+
+    /// Allow the node to express what ports it has.
+    fn ports(&self) -> Result<Vec<DirectionalPort>, Error> {
+        Ok(vec![])
     }
 }
 
@@ -141,5 +191,10 @@ pub trait Tree {
     fn execute(&self, id: NodeId) -> Result<Status, Error>;
 
     /// Call setup on a particular node.
-    fn setup(&mut self, id: NodeId, ctx: &mut dyn blackboard::Interface) -> Result<(), Error>;
+    fn setup(
+        &mut self,
+        id: NodeId,
+        port: &DirectionalPort,
+        ctx: &mut dyn blackboard::Interface,
+    ) -> Result<(), Error>;
 }
