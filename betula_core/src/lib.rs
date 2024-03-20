@@ -29,10 +29,9 @@ pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{
-        blackboard::Setup, Consumer, Error, Node, NodeId, Provider, RunContext, Status, Tree,
-    };
+    pub use crate::{blackboard::Setup, RunContext, Tree};
 }
+// Consumer, Error, Node, NodeId, Provider, Status
 
 mod as_any;
 pub use as_any::AsAny;
