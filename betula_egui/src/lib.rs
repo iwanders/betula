@@ -124,7 +124,7 @@ impl TreeView {
                                     egui::Stroke::new(1.0, egui::Color32::from_rgb(25, 200, 100));
                                 let fill =
                                     egui::Color32::from_rgb(50, 100, 150).linear_multiply(0.25);
-                                let points = [
+                                let mut points = [
                                     node.position,
                                     node.position + egui::Vec2::new(0.0, -5.0),
                                     self.nodes
@@ -137,9 +137,12 @@ impl TreeView {
                                         .expect("child should be present")
                                         .position,
                                 ];
+                                for p in points.iter_mut() {
+                                    *p = self.transform * *p;
+                                }
                                 println!("Points: {points:?}");
                                 let shape = egui::epaint::CubicBezierShape::from_points_stroke(
-                                    points, true, fill, stroke,
+                                    points, false, fill, stroke,
                                 );
                                 lines.push(egui::Shape::CubicBezier(shape));
                             }
