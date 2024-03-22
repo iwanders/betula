@@ -20,8 +20,17 @@
     Can we do something lazy? Where we only re-evaluate the parts of the
     tree that may have changed?
 
-    We may be able to do something like that if we consider time to be a
-    blackboard value?
+        We may be able to do something like that if we consider time to be a
+        blackboard value?
+        If nodes are pure functions, their return can't change if the inputs
+        are the same, if the inputs (blackboard & children) are identical,
+        we don't need to re-evaluate the parts. Which also means that
+        we only have to evaluate from the from the first ancestor for which
+        an input changed down. And we can stop executing if at any point we
+        reach the prior state.
+        If multiple trees share the same blackboard, we can always add a
+        tick value on the blackboard, nodes that want to execute each tick
+        can use the ticks as an input, and be guaranteed execution.
 */
 
 pub mod basic;
