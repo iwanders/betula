@@ -3,18 +3,20 @@ resolver = "2"
 
 members = [
     "betula_core",
+    "betula_common",
     "betula_egui",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html
-[profile.dev]
+#[profile.dev]
 # Enable some optimisations, but not all of it.
-opt-level = 2
+#opt-level = 2
 # Only using line numbers as debug information shaves off 10 seconds on linking the viewer.
-debug = 1
+#debug = 1
 # Disable lto, it's slow for development
-lto = false
+#lto = false
 
 [workspace.dependencies]
 betula_core = { version = "0.0.1", path = "betula_core", default-features = false }
 betula_egui = { version = "0.0.1", path = "betula_egui", default-features = false }
+betula_common = { version = "0.0.1", path = "betula_common", default-features = false }
