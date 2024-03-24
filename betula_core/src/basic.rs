@@ -129,7 +129,7 @@ impl Tree for BasicTree {
         &mut self,
         id: NodeId,
         port: &crate::DirectionalPort,
-        ctx: &mut dyn Interface,
+        ctx: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
         let mut n = self
             .nodes
@@ -144,7 +144,7 @@ impl Tree for BasicTree {
 use std::any::Any;
 use std::rc::Rc;
 
-use crate::blackboard::{Interface, Read, Value, ValueCreator, Write};
+use crate::blackboard::{BlackboardInterface, Read, Value, ValueCreator, Write};
 
 use std::any::TypeId;
 #[derive(Default, Debug)]
@@ -152,7 +152,7 @@ pub struct BasicBlackboard {
     values: HashMap<String, (TypeId, Rc<RefCell<Value>>)>,
 }
 use crate::as_any::AsAny;
-impl Interface for BasicBlackboard {
+impl BlackboardInterface for BasicBlackboard {
     fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, NodeError> {
         let (typeid, rc) = self
             .values

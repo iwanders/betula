@@ -56,13 +56,13 @@ use crate::{ConsumerTrait, ProviderTrait};
 
 /// The object safe blackboard interface, providing access to the getters and setters.
 /// Interation through BlackboardSetup is very much recommended.
-pub trait Interface {
+pub trait BlackboardInterface {
     fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, NodeError>;
 
     fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError>;
 }
 
-pub trait Setup: Interface {
+pub trait Setup: BlackboardInterface {
     fn provides<T: 'static + Chalkable + Clone>(
         &mut self,
         key: &str,
@@ -76,7 +76,8 @@ pub trait Setup: Interface {
         key: &str,
         default_maker: Z,
     ) -> Result<Provider<T>, NodeError> {
-        let writer = Interface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
+        let writer =
+            BlackboardInterface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
         struct ProviderFor<TT> {
             key: String,
             type_name: String,
@@ -109,7 +110,7 @@ pub trait Setup: Interface {
         &mut self,
         key: &str,
     ) -> Result<Consumer<T>, NodeError> {
-        let reader = Interface::reader(self, &TypeId::of::<T>(), key)?;
+        let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct ConsumerFor<TT> {
             key: String,
@@ -147,7 +148,8 @@ pub trait Setup: Interface {
     }
 }
 
-impl<T: Interface> Setup for T {}
+impl<T: BlackboardInterface> Setup for T {}
+impl Setup for dyn BlackboardInterface + '_ {}
 
 #[cfg(test)]
 mod tests {

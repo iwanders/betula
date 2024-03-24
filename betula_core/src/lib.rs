@@ -40,7 +40,7 @@ pub mod nodes;
 pub mod prelude {
     pub use crate::{blackboard::Setup, AsAny, RunContext, Tree};
 }
-// Consumer, Error, Node, NodeId, Provider, Status
+pub use blackboard::BlackboardInterface;
 
 mod as_any;
 pub use as_any::AsAny;
@@ -83,17 +83,56 @@ pub trait ConsumerTrait: std::fmt::Debug {
     fn get(&self) -> Result<Self::ConsumerItem, NodeError>;
 }
 
+#[derive(Debug)]
+struct DefaultProviderConsumer<T> {
+    z: std::marker::PhantomData<T>,
+}
+impl<T: std::fmt::Debug + 'static> ProviderTrait for DefaultProviderConsumer<T> {
+    type ProviderItem = T;
+    fn set(&self, _v: Self::ProviderItem) -> Result<(), NodeError> {
+        Err("provider is not initialised".into())
+    }
+}
+impl<T: std::fmt::Debug + 'static> ConsumerTrait for DefaultProviderConsumer<T> {
+    type ConsumerItem = T;
+    fn get(&self) -> Result<Self::ConsumerItem, NodeError> {
+        Err("consumer is not initialised".into())
+    }
+}
+
 /// Bidirectional trait for node sthat both read and write values.
 pub trait ProviderConsumerTrait: ProviderTrait + ConsumerTrait + std::fmt::Debug {}
+impl<T: std::fmt::Debug + 'static> ProviderConsumerTrait for DefaultProviderConsumer<T> {}
 
 /// The boxed trait that nodes should use to provide values to the blackboard.
 pub type Provider<T> = Box<dyn ProviderTrait<ProviderItem = T>>;
+impl<T: std::fmt::Debug + 'static> Default for Provider<T> {
+    fn default() -> Self {
+        Box::new(DefaultProviderConsumer::<T> {
+            z: std::marker::PhantomData,
+        })
+    }
+}
 
 /// The boxed trait that nodes should use to consume values from the blackboard.
 pub type Consumer<T> = Box<dyn ConsumerTrait<ConsumerItem = T>>;
+impl<T: std::fmt::Debug + 'static> Default for Consumer<T> {
+    fn default() -> Self {
+        Box::new(DefaultProviderConsumer::<T> {
+            z: std::marker::PhantomData,
+        })
+    }
+}
 
 /// The boxed trait that nodes should use to provide and consume values from the blackboard.
 pub type ProviderConsumer<T> = Box<dyn ProviderConsumerTrait<ProviderItem = T, ConsumerItem = T>>;
+impl<T: std::fmt::Debug + 'static> Default for ProviderConsumer<T> {
+    fn default() -> Self {
+        Box::new(DefaultProviderConsumer::<T> {
+            z: std::marker::PhantomData,
+        })
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Type {
@@ -145,6 +184,13 @@ impl DirectionalPort {
     pub fn provider_consumer<T: 'static>(name: &str) -> Self {
         DirectionalPort::ProviderConsumer(Port::new::<T>(name))
     }
+    pub fn name(&self) -> &str {
+        match self {
+            DirectionalPort::Consumer(v) => v.name.as_ref(),
+            DirectionalPort::Provider(v) => v.name.as_ref(),
+            DirectionalPort::ProviderConsumer(v) => v.name.as_ref(),
+        }
+    }
 }
 
 /// Trait that nodes must implement.
@@ -160,11 +206,11 @@ pub trait Node: std::fmt::Debug + AsAny {
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
 
     /// Setup method for the node to obtain providers and consumers from the
-    /// blackboard.
+    /// blackboard. Setup should happen mostly through the [`blackboard::Setup`] trait.
     fn setup(
         &mut self,
         _port: &DirectionalPort,
-        _ctx: &mut dyn blackboard::Interface,
+        _ctx: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
         Ok(())
     }
@@ -222,6 +268,6 @@ pub trait Tree {
         &mut self,
         id: NodeId,
         port: &DirectionalPort,
-        ctx: &mut dyn blackboard::Interface,
+        ctx: &mut dyn BlackboardInterface,
     ) -> Result<(), BetulaError>;
 }
