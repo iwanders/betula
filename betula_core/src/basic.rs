@@ -221,8 +221,8 @@ mod tests {
     #[test]
     fn sequence_fail() -> Result<(), Error> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Sequence {}))?;
-        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Failure {}))?;
+        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
+        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
         tree.add_relation(root, 0, f1)?;
         let res = tree.execute(root)?;
         assert_eq!(res, Status::Failure);
@@ -232,9 +232,9 @@ mod tests {
     #[test]
     fn fallback_success() -> Result<(), Error> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Selector {}))?;
-        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Failure {}))?;
-        let s1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(Success {}))?;
+        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SelectorNode {}))?;
+        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
+        let s1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SuccessNode {}))?;
         tree.add_relation(root, 0, f1)?;
         tree.add_relation(root, 1, s1)?;
         let res = tree.execute(root)?;

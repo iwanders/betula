@@ -2,8 +2,8 @@ use crate::prelude::*;
 use crate::{Error, Node, Status};
 
 #[derive(Debug, Copy, Clone)]
-pub struct Success {}
-impl Node for Success {
+pub struct SuccessNode {}
+impl Node for SuccessNode {
     fn tick(&mut self, _ctx: &dyn RunContext) -> Result<Status, Error> {
         Ok(Status::Success)
     }
