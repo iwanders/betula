@@ -1,5 +1,5 @@
 use crate::as_any::{AsAny, AsAnyHelper};
-use crate::{Consumer, Error, Provider};
+use crate::{Consumer, NodeError, Provider};
 use std::any::{Any, TypeId};
 
 /// Requirements for any value that is written to the blackboard.
@@ -46,20 +46,20 @@ pub type Value = Box<dyn Chalkable>;
 pub type ValueCreator = Box<dyn FnOnce() -> Value>;
 
 /// Boxed function to read values from the blackboard.
-pub type Read = Box<dyn Fn() -> Result<Value, Error>>;
+pub type Read = Box<dyn Fn() -> Result<Value, NodeError>>;
 
 /// Boxed function to write values to the blackboard. Deliberately does NOT
 /// return the previous value to ensure purity.
-pub type Write = Box<dyn Fn(Value) -> Result<(), Error>>;
+pub type Write = Box<dyn Fn(Value) -> Result<(), NodeError>>;
 
 use crate::{ConsumerTrait, ProviderTrait};
 
 /// The object safe blackboard interface, providing access to the getters and setters.
 /// Interation through BlackboardSetup is very much recommended.
 pub trait Interface {
-    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, Error>;
+    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, NodeError>;
 
-    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, Error>;
+    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError>;
 }
 
 pub trait Setup: Interface {
@@ -67,7 +67,7 @@ pub trait Setup: Interface {
         &mut self,
         key: &str,
         default: T,
-    ) -> Result<Provider<T>, Error> {
+    ) -> Result<Provider<T>, NodeError> {
         self.provides_or_else::<T, _>(key, || Box::new(default))
     }
 
@@ -75,7 +75,7 @@ pub trait Setup: Interface {
         &mut self,
         key: &str,
         default_maker: Z,
-    ) -> Result<Provider<T>, Error> {
+    ) -> Result<Provider<T>, NodeError> {
         let writer = Interface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
         struct ProviderFor<TT> {
             key: String,
@@ -85,7 +85,7 @@ pub trait Setup: Interface {
         }
         impl<TT: 'static + Chalkable + Clone> ProviderTrait for ProviderFor<TT> {
             type ProviderItem = TT;
-            fn set(&self, v: Self::ProviderItem) -> Result<(), Error> {
+            fn set(&self, v: Self::ProviderItem) -> Result<(), NodeError> {
                 let z = Box::new(v);
                 (self.writer)(z)
             }
@@ -108,7 +108,7 @@ pub trait Setup: Interface {
     fn consumes<T: 'static + Chalkable + Clone>(
         &mut self,
         key: &str,
-    ) -> Result<Consumer<T>, Error> {
+    ) -> Result<Consumer<T>, NodeError> {
         let reader = Interface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct ConsumerFor<TT> {
@@ -119,7 +119,7 @@ pub trait Setup: Interface {
         }
         impl<TT: 'static + Chalkable + Clone> ConsumerTrait for ConsumerFor<TT> {
             type ConsumerItem = TT;
-            fn get(&self) -> Result<TT, Error> {
+            fn get(&self) -> Result<TT, NodeError> {
                 let boxed_value = (self.reader)()?;
                 let v = (*boxed_value).downcast_ref::<TT>().ok_or_else(|| {
                     format!(

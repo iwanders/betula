@@ -2,7 +2,7 @@
 use crate::prelude::*;
 use std::collections::HashMap;
 
-use crate::{Error, Node, NodeId, Status};
+use crate::{BetulaError, Node, NodeError, NodeId, NodeStatus};
 
 struct TreeContext<'a> {
     this_node: NodeId,
@@ -15,7 +15,7 @@ impl RunContext for TreeContext<'_> {
             .expect("node must exist in tree")
             .len()
     }
-    fn run(&self, index: usize) -> Result<Status, Error> {
+    fn run(&self, index: usize) -> Result<NodeStatus, NodeError> {
         let ids = self.tree.children(self.this_node)?;
         self.tree.execute(ids[index])
     }
@@ -51,7 +51,7 @@ impl Tree for BasicTree {
         let m = self.nodes.get_mut(&id)?;
         Some(&mut **m.node.get_mut())
     }
-    fn remove_node(&mut self, id: NodeId) -> Result<(), Error> {
+    fn remove_node(&mut self, id: NodeId) -> Result<(), BetulaError> {
         for (_k, v) in self.nodes.iter_mut() {
             v.children.retain(|&x| x != id);
         }
@@ -61,7 +61,7 @@ impl Tree for BasicTree {
             .map(|_| ())
     }
 
-    fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, Error> {
+    fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, BetulaError> {
         self.nodes.insert(
             id,
             BasicTreeNode {
@@ -72,7 +72,7 @@ impl Tree for BasicTree {
         Ok(id)
     }
 
-    fn children(&self, id: NodeId) -> Result<Vec<NodeId>, Error> {
+    fn children(&self, id: NodeId) -> Result<Vec<NodeId>, BetulaError> {
         self.nodes
             .get(&id)
             .ok_or_else(|| format!("node {id:?} is not present").into())
@@ -84,7 +84,7 @@ impl Tree for BasicTree {
         parent: NodeId,
         position: usize,
         child: NodeId,
-    ) -> Result<(), Error> {
+    ) -> Result<(), BetulaError> {
         let n = self
             .nodes
             .get_mut(&parent)
@@ -96,7 +96,7 @@ impl Tree for BasicTree {
         n.children.insert(position, child);
         Ok(())
     }
-    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), Error> {
+    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), BetulaError> {
         let n = self
             .nodes
             .get_mut(&parent)
@@ -109,7 +109,7 @@ impl Tree for BasicTree {
         Ok(())
     }
 
-    fn execute(&self, id: NodeId) -> Result<Status, Error> {
+    fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError> {
         let mut n = self
             .nodes
             .get(&id)
@@ -130,7 +130,7 @@ impl Tree for BasicTree {
         id: NodeId,
         port: &crate::DirectionalPort,
         ctx: &mut dyn Interface,
-    ) -> Result<(), Error> {
+    ) -> Result<(), NodeError> {
         let mut n = self
             .nodes
             .get(&id)
@@ -153,7 +153,7 @@ pub struct BasicBlackboard {
 }
 use crate::as_any::AsAny;
 impl Interface for BasicBlackboard {
-    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, Error> {
+    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, NodeError> {
         let (typeid, rc) = self
             .values
             .entry(key.to_string())
@@ -191,7 +191,7 @@ impl Interface for BasicBlackboard {
         }
     }
 
-    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, Error> {
+    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError> {
         let (typeid, rc) = self
             .values
             .get(key)
@@ -219,18 +219,18 @@ mod tests {
     use crate::nodes::*;
 
     #[test]
-    fn sequence_fail() -> Result<(), Error> {
+    fn sequence_fail() -> Result<(), NodeError> {
         let mut tree = BasicTree::new();
         let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
         tree.add_relation(root, 0, f1)?;
         let res = tree.execute(root)?;
-        assert_eq!(res, Status::Failure);
+        assert_eq!(res, NodeStatus::Failure);
         Ok(())
     }
 
     #[test]
-    fn fallback_success() -> Result<(), Error> {
+    fn fallback_success() -> Result<(), NodeError> {
         let mut tree = BasicTree::new();
         let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SelectorNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
@@ -238,7 +238,7 @@ mod tests {
         tree.add_relation(root, 0, f1)?;
         tree.add_relation(root, 1, s1)?;
         let res = tree.execute(root)?;
-        assert_eq!(res, Status::Success);
+        assert_eq!(res, NodeStatus::Success);
         Ok(())
     }
 

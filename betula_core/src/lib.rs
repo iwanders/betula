@@ -47,7 +47,7 @@ pub use as_any::AsAny;
 
 /// The result states returned by a node.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
-pub enum Status {
+pub enum NodeStatus {
     Running,
     Failure,
     Success,
@@ -60,24 +60,27 @@ pub trait RunContext {
     fn children(&self) -> usize;
 
     /// Run a child node.
-    fn run(&self, index: usize) -> Result<Status, Error>;
+    fn run(&self, index: usize) -> Result<NodeStatus, NodeError>;
 }
 
 /// The error type.
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type BetulaError = Box<dyn std::error::Error + Send + Sync>;
+
+// Todo, put a node id in this?
+pub type NodeError = BetulaError;
 
 // Output and Input feels ambiguous, is that from the blackboard or from
 // the nodes?
 /// Provider trait for nodes that set values.
 pub trait ProviderTrait: std::fmt::Debug {
     type ProviderItem;
-    fn set(&self, v: Self::ProviderItem) -> Result<(), Error>;
+    fn set(&self, v: Self::ProviderItem) -> Result<(), NodeError>;
 }
 
 /// Consumer trait for nodes that get values.
 pub trait ConsumerTrait: std::fmt::Debug {
     type ConsumerItem;
-    fn get(&self) -> Result<Self::ConsumerItem, Error>;
+    fn get(&self) -> Result<Self::ConsumerItem, NodeError>;
 }
 
 /// Bidirectional trait for node sthat both read and write values.
@@ -154,7 +157,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///
     ///   self_id: The id of the current node being executed.
     ///   tree: The context in which this node is being ran.
-    fn tick(&mut self, ctx: &dyn RunContext) -> Result<Status, Error>;
+    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
 
     /// Setup method for the node to obtain providers and consumers from the
     /// blackboard.
@@ -162,12 +165,12 @@ pub trait Node: std::fmt::Debug + AsAny {
         &mut self,
         _port: &DirectionalPort,
         _ctx: &mut dyn blackboard::Interface,
-    ) -> Result<(), Error> {
+    ) -> Result<(), NodeError> {
         Ok(())
     }
 
     /// Allow the node to express what ports it has.
-    fn ports(&self) -> Result<Vec<DirectionalPort>, Error> {
+    fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
         Ok(vec![])
     }
 }
@@ -193,22 +196,26 @@ pub trait Tree {
     /// Return a mutable reference to a node.
     fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node>;
     /// Removes a node and any relations associated to it.
-    fn remove_node(&mut self, id: NodeId) -> Result<(), Error>;
+    fn remove_node(&mut self, id: NodeId) -> Result<(), BetulaError>;
     /// Add a node to the tree.
-    fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, Error>;
+    fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, BetulaError>;
 
     /// Obtain a list of the children of a particular node.
-    fn children(&self, id: NodeId) -> Result<Vec<NodeId>, Error>;
+    fn children(&self, id: NodeId) -> Result<Vec<NodeId>, BetulaError>;
 
     /// Add a relation between two nodes, specifying the insert position into the children
     /// vector.
-    fn add_relation(&mut self, parent: NodeId, position: usize, child: NodeId)
-        -> Result<(), Error>;
+    fn add_relation(
+        &mut self,
+        parent: NodeId,
+        position: usize,
+        child: NodeId,
+    ) -> Result<(), BetulaError>;
     /// Remove a relation between two nodes, specifying the parent and the child position to remove.
-    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), Error>;
+    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), BetulaError>;
 
     /// Execute the tick, starting at the provided node.
-    fn execute(&self, id: NodeId) -> Result<Status, Error>;
+    fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError>;
 
     /// Call setup on a particular node.
     fn setup(
@@ -216,5 +223,5 @@ pub trait Tree {
         id: NodeId,
         port: &DirectionalPort,
         ctx: &mut dyn blackboard::Interface,
-    ) -> Result<(), Error>;
+    ) -> Result<(), BetulaError>;
 }

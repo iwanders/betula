@@ -1,11 +1,11 @@
-mod sequence;
-pub use sequence::SequenceNode;
+mod sequence_node;
+pub use sequence_node::SequenceNode;
 
-mod selector;
-pub use selector::SelectorNode;
+mod selector_node;
+pub use selector_node::SelectorNode;
 
-mod failure;
-pub use failure::FailureNode;
+mod failure_node;
+pub use failure_node::FailureNode;
 
-mod success;
-pub use success::SuccessNode;
+mod success_node;
+pub use success_node::SuccessNode;

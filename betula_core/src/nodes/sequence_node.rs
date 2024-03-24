@@ -1,18 +1,18 @@
 use crate::prelude::*;
-use crate::{Error, Node, Status};
+use crate::{Node, NodeError, NodeStatus};
 
 #[derive(Debug, Copy, Clone)]
 pub struct SequenceNode {}
 impl Node for SequenceNode {
-    fn tick(&mut self, ctx: &dyn RunContext) -> Result<Status, Error> {
+    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
         for id in 0..ctx.children() {
             match ctx.run(id)? {
-                Status::Success => {}
+                NodeStatus::Success => {}
                 other => return Ok(other), // fail or running.
             }
         }
 
         // All children succeeded.
-        Ok(Status::Success)
+        Ok(NodeStatus::Success)
     }
 }
