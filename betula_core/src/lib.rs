@@ -38,15 +38,17 @@ pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{blackboard::Setup, AsAny, RunContext, Tree};
+    pub use crate::{as_any::AsAnyHelper, blackboard::Setup, AsAny, RunContext, Tree};
 }
 pub use blackboard::BlackboardInterface;
 
 mod as_any;
 pub use as_any::AsAny;
 
+use serde::{Deserialize, Serialize};
+
 /// The result states returned by a node.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum NodeStatus {
     Running,
     Failure,
@@ -226,7 +228,7 @@ pub use uuid::Uuid;
 /// We're using UUIDs as NodeIds here, that way we can guarantee that they
 /// are stable, which helps a lot when manipulating the tree, internally
 /// the tree is free to use whatever ids it wants when actually executing it.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct NodeId(pub Uuid);
 
 /// Trait which a tree must implement.

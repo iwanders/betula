@@ -1,8 +1,10 @@
 use betula_core::prelude::*;
 use betula_core::{BlackboardInterface, Consumer, DirectionalPort, Node, NodeError, NodeStatus};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct DelayNode {
+    #[serde(skip)]
     time: Consumer<f64>,
     last_time: f64,
     interval: f64,
