@@ -5,6 +5,11 @@ use betula_core::{BlackboardInterface, DirectionalPort, Node, NodeError, NodeSta
 pub struct TimeNode {
     time_provider: Provider<f64>,
 }
+impl TimeNode {
+    pub fn new() -> Self {
+        TimeNode::default()
+    }
+}
 
 impl Node for TimeNode {
     fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
