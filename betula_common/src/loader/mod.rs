@@ -37,10 +37,21 @@ trait NodeLoader {
         Ok(())
     }
 }
-trait AutoLoad {}
 
-impl<'a, T: Serialize + serde::de::DeserializeOwned + AutoLoad + betula_core::Node + 'static>
-    NodeLoader for T
+#[derive(Debug)]
+pub struct DefaultLoader<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> {
+    z: std::marker::PhantomData<T>,
+}
+impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> DefaultLoader<T> {
+    pub fn new() -> Self {
+        Self {
+            z: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> NodeLoader
+    for DefaultLoader<T>
 {
     fn load(
         &self,
@@ -66,7 +77,6 @@ mod test {
         last_time: f64,
         interval: f64,
     }
-    impl AutoLoad for DummyNode {}
     impl Node for DummyNode {
         fn tick(
             &mut self,
@@ -88,7 +98,7 @@ mod test {
 
         let yaml_deser = serde_yaml::Deserializer::from_str(&yaml);
         let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(yaml_deser));
-        let loader: Box<dyn NodeLoader> = Box::new(DummyNode::default());
+        let loader: Box<dyn NodeLoader> = Box::new(DefaultLoader::<DummyNode>::new());
 
         let boxed_node = loader.load(&mut erased)?;
 
