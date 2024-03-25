@@ -1,3 +1,4 @@
+use betula_core::prelude::*;
 use betula_core::BetulaError;
 use betula_core::{Node, NodeId};
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,7 @@ trait NodeLoader {
         &self,
         config: &mut dyn erased_serde::Deserializer,
     ) -> Result<Box<dyn Node>, BetulaError>;
-    fn store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serializer>, BetulaError>;
+    fn store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError>;
 
     fn reload(
         &self,
@@ -40,17 +41,17 @@ trait NodeLoader {
 
 #[derive(Debug)]
 pub struct DefaultLoader<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> {
-    z: std::marker::PhantomData<T>,
+    _z: std::marker::PhantomData<T>,
 }
 impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> DefaultLoader<T> {
     pub fn new() -> Self {
         Self {
-            z: std::marker::PhantomData,
+            _z: std::marker::PhantomData,
         }
     }
 }
 
-impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> NodeLoader
+impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static + Clone> NodeLoader
     for DefaultLoader<T>
 {
     fn load(
@@ -60,8 +61,9 @@ impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> N
         Ok(Box::new(erased_serde::deserialize::<T>(config)?))
     }
 
-    fn store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serializer>, BetulaError> {
-        Err("ldskjfldsf".into())
+    fn store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
+        let v = (*node).downcast_ref::<T>().ok_or("failed to cast")?;
+        Ok(Box::new((*v).clone()))
     }
 }
 
@@ -70,7 +72,7 @@ mod test {
     use super::*;
     use betula_core::prelude::*;
 
-    #[derive(Debug, Default, Serialize, Deserialize)]
+    #[derive(Debug, Default, Serialize, Deserialize, Clone)]
     pub struct DummyNode {
         #[serde(skip)]
         skipped: f32,
@@ -110,6 +112,11 @@ mod test {
         assert!(loaded_dummy.skipped == 0.0);
         assert!(loaded_dummy.last_time == 10.0);
         assert!(loaded_dummy.interval == 3.3);
+
+        let data = loader.store(&*boxed_node)?;
+        let yaml = serde_yaml::to_string(&data);
+        println!("as yaml: {yaml:?}");
+
         Ok(())
     }
 }
