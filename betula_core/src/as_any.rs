@@ -39,5 +39,8 @@ pub trait AsAnyHelper: AsAny {
     fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any_ref().downcast_ref()
     }
+    fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.as_any_mut().downcast_mut()
+    }
 }
 impl<T: AsAny + ?Sized> AsAnyHelper for T {}

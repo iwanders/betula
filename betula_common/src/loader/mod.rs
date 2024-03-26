@@ -24,19 +24,16 @@ struct TreeConfig {
 }
 
 trait NodeLoader {
-    fn load(
+    fn node_load(
         &self,
         config: &mut dyn erased_serde::Deserializer,
     ) -> Result<Box<dyn Node>, BetulaError>;
-    fn store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError>;
-
-    fn reload(
+    fn node_store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError>;
+    fn node_reload(
         &self,
         node: &mut dyn Node,
-        config: &dyn erased_serde::Deserializer,
-    ) -> Result<(), BetulaError> {
-        Ok(())
-    }
+        config: &mut dyn erased_serde::Deserializer,
+    ) -> Result<(), BetulaError>;
 }
 
 #[derive(Debug)]
@@ -54,16 +51,25 @@ impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> D
 impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static + Clone> NodeLoader
     for DefaultLoader<T>
 {
-    fn load(
+    fn node_load(
         &self,
         config: &mut dyn erased_serde::Deserializer,
     ) -> Result<Box<dyn Node>, BetulaError> {
         Ok(Box::new(erased_serde::deserialize::<T>(config)?))
     }
 
-    fn store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
+    fn node_store(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
         let v = (*node).downcast_ref::<T>().ok_or("failed to cast")?;
         Ok(Box::new((*v).clone()))
+    }
+    fn node_reload(
+        &self,
+        node: &mut dyn Node,
+        config: &mut dyn erased_serde::Deserializer,
+    ) -> Result<(), BetulaError> {
+        // Use this nifty hidden deserialize_in_place.
+        let v = (*node).downcast_mut::<T>().ok_or("failed to cast")?;
+        Ok(Deserialize::deserialize_in_place(config, v)?)
     }
 }
 
@@ -102,7 +108,7 @@ mod test {
         let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(yaml_deser));
         let loader: Box<dyn NodeLoader> = Box::new(DefaultLoader::<DummyNode>::new());
 
-        let boxed_node = loader.load(&mut erased)?;
+        let mut boxed_node = loader.node_load(&mut erased)?;
 
         // And cast it again:
         let loaded_dummy: &DummyNode = (*boxed_node)
@@ -113,10 +119,26 @@ mod test {
         assert!(loaded_dummy.last_time == 10.0);
         assert!(loaded_dummy.interval == 3.3);
 
-        let data = loader.store(&*boxed_node)?;
-        let yaml = serde_yaml::to_string(&data);
+        let data = loader.node_store(&*boxed_node)?;
+        let yaml_back = serde_yaml::to_string(&data)?;
         println!("as yaml: {yaml:?}");
 
+        assert!(yaml_back == yaml);
+
+        let mut c = d;
+        c.skipped = 5.5;
+        c.last_time = 12.0;
+        let yaml_str = serde_yaml::to_string(&c)?;
+        let yaml_deser = serde_yaml::Deserializer::from_str(&yaml_str);
+        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(yaml_deser));
+        loader.node_reload(&mut *boxed_node, &mut erased)?;
+        let loaded_dummy: &DummyNode = (*boxed_node)
+            .downcast_ref::<DummyNode>()
+            .ok_or("wrong type")?;
+        println!("loaded_dummy: {loaded_dummy:?}");
+        assert!(loaded_dummy.skipped == 0.0);
+        assert!(loaded_dummy.last_time == 12.0);
+        assert!(loaded_dummy.interval == 3.3);
         Ok(())
     }
 }
