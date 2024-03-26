@@ -1,20 +1,25 @@
 use betula_core::prelude::*;
-use betula_core::{BlackboardInterface, Consumer, DirectionalPort, Node, NodeError, NodeStatus};
+use betula_core::{
+    BlackboardInterface, Consumer, DirectionalPort, Node, NodeConfig, NodeError, NodeStatus,
+};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct DelayNodeConfig {
+    pub interval: f64,
+}
+
+#[derive(Debug, Default)]
 pub struct DelayNode {
-    #[serde(skip)]
     time: Consumer<f64>,
-    #[serde(skip)]
     last_time: f64,
-    interval: f64,
+    config: DelayNodeConfig,
 }
 
 impl DelayNode {
     pub fn new(interval: f64) -> Self {
         DelayNode {
-            interval,
+            config: DelayNodeConfig { interval },
             ..Default::default()
         }
     }
@@ -23,23 +28,33 @@ impl DelayNode {
 impl Node for DelayNode {
     fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
         let time = self.time.get()?;
-        if time < (self.last_time + self.interval) {
+        if time < (self.last_time + self.config.interval) {
             return Ok(NodeStatus::Running);
         }
         self.last_time = time;
         Ok(NodeStatus::Success)
     }
+
     fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
         Ok(vec![DirectionalPort::consumer::<f64>("time")])
     }
-    fn setup(
+
+    fn port_setup(
         &mut self,
         port: &DirectionalPort,
-        ctx: &mut dyn BlackboardInterface,
+        interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
-        let z = ctx.consumes::<f64>(port.name())?;
+        let z = interface.consumes::<f64>(port.name())?;
         self.time = z;
         Ok(())
+    }
+
+    fn get_config(&self) -> Result<Option<Box<dyn NodeConfig>>, NodeError> {
+        Ok(Some(Box::new(self.config.clone())))
+    }
+
+    fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
+        self.config.load_node_config(config)
     }
 }
 
@@ -62,7 +77,7 @@ mod tests {
         for p in ports {
             tree.node_mut(root)
                 .ok_or("node not found")?
-                .setup(&p, &mut bb)?;
+                .port_setup(&p, &mut bb)?;
         }
         assert!(tree.execute(root)? == NodeStatus::Running);
         time.set(2.0)?;

@@ -22,12 +22,12 @@ impl Node for TimeNode {
     fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
         Ok(vec![DirectionalPort::provider::<f64>("time")])
     }
-    fn setup(
+    fn port_setup(
         &mut self,
         port: &DirectionalPort,
-        ctx: &mut dyn BlackboardInterface,
+        interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
-        let z = ctx.provides::<f64>(port.name(), 0.0)?;
+        let z = interface.provides::<f64>(port.name(), 0.0)?;
         self.time_provider = z;
         Ok(())
     }
@@ -49,7 +49,7 @@ mod tests {
         for p in ports {
             tree.node_mut(root)
                 .ok_or("node not found")?
-                .setup(&p, &mut bb)?;
+                .port_setup(&p, &mut bb)?;
         }
         tree.execute(root)?;
 

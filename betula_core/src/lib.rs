@@ -38,7 +38,9 @@ pub mod blackboard;
 pub mod nodes;
 
 pub mod prelude {
-    pub use crate::{as_any::AsAnyHelper, blackboard::Setup, AsAny, RunContext, Tree};
+    pub use crate::{
+        as_any::AsAnyHelper, blackboard::Setup, AsAny, NodeConfigLoad, RunContext, Tree,
+    };
 }
 pub use blackboard::BlackboardInterface;
 
@@ -195,6 +197,37 @@ impl DirectionalPort {
     }
 }
 
+/// Trait the configuration types must implement.
+pub trait NodeConfig: std::fmt::Debug + AsAny {}
+impl<T: std::fmt::Debug + 'static> NodeConfig for T {}
+
+/// Helper trait to easily load types implementing clone.
+/// ```
+/// // Use like so:
+/// fn set_config(&mut self, config:  &dyn NodeConfig) -> Result<(), NodeError> {
+///     self.config.load_node_config(config)
+/// }
+/// ```
+pub trait NodeConfigLoad: NodeConfig {
+    fn load_node_config(&mut self, v: &dyn NodeConfig) -> Result<(), BetulaError>
+    where
+        Self: Sized + 'static + Clone,
+    {
+        use crate::as_any::AsAnyHelper;
+        let v = (*v).downcast_ref::<Self>().ok_or_else(|| {
+            format!(
+                "could not downcast {:?} to {:?}",
+                (*v).type_name(),
+                std::any::type_name::<Self>()
+            )
+        })?;
+        *self = v.clone();
+        Ok(())
+    }
+}
+impl<T: NodeConfig> NodeConfigLoad for T {}
+impl NodeConfigLoad for dyn NodeConfig + '_ {}
+
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
@@ -209,17 +242,30 @@ pub trait Node: std::fmt::Debug + AsAny {
 
     /// Setup method for the node to obtain providers and consumers from the
     /// blackboard. Setup should happen mostly through the [`blackboard::Setup`] trait.
-    fn setup(
+    /// The node should ONLY use the interface to register the specified port.
+    fn port_setup(
         &mut self,
-        _port: &DirectionalPort,
-        _ctx: &mut dyn BlackboardInterface,
+        port: &DirectionalPort,
+        interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
+        let _ = (port, interface);
         Ok(())
     }
 
     /// Allow the node to express what ports it has.
     fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
         Ok(vec![])
+    }
+
+    /// Get a clone of the current configuration if any.
+    fn get_config(&self) -> Result<Option<Box<dyn NodeConfig>>, NodeError> {
+        Ok(None)
+    }
+
+    /// Set the config to the one provided.
+    fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
+        let _ = config;
+        Ok(())
     }
 }
 
@@ -266,7 +312,7 @@ pub trait Tree {
     fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError>;
 
     /// Call setup on a particular node.
-    fn setup(
+    fn port_setup(
         &mut self,
         id: NodeId,
         port: &DirectionalPort,
