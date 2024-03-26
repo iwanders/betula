@@ -201,11 +201,10 @@ impl DirectionalPort {
 pub trait NodeConfig: std::fmt::Debug + AsAny {}
 impl<T: std::fmt::Debug + 'static> NodeConfig for T {}
 
-/// Helper trait to easily load types implementing clone.
-/// ```
-/// // Use like so:
+/// Helper trait to easily load types implementing clone, used in [`Node::set_config`]:
+/// ```ignore
 /// fn set_config(&mut self, config:  &dyn NodeConfig) -> Result<(), NodeError> {
-///     self.config.load_node_config(config)
+///    self.config.load_node_config(config)
 /// }
 /// ```
 pub trait NodeConfigLoad: NodeConfig {
