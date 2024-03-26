@@ -93,6 +93,14 @@ mod test {
         }
     }
 
+    #[derive(Serialize, Deserialize, Debug)]
+    struct StructWithYaml {
+        node_name: Option<String>,
+        node_type: String,
+        // Node config how?
+        config: serde_yaml::Value,
+    }
+
     #[test]
     fn test_things() -> Result<(), BetulaError> {
         let d = DummyNode {
@@ -138,6 +146,17 @@ mod test {
         assert!(loaded_dummy.skipped == 0.0);
         assert!(loaded_dummy.last_time == 12.0);
         assert!(loaded_dummy.interval == 3.3);
+
+        let config = serde_yaml::from_str("x: 1.0\ny: 2.0\n")?;
+        let z = StructWithYaml {
+            node_name: None,
+            node_type: "foo".to_owned(),
+            // Node config how?
+            config,
+        };
+        let yaml_str = serde_yaml::to_string(&z)?;
+        println!("as yaml: {yaml_str}");
+
         Ok(())
     }
 }
