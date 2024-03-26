@@ -76,7 +76,6 @@ impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static + 
 #[cfg(test)]
 mod test {
     use super::*;
-    use betula_core::prelude::*;
 
     #[derive(Debug, Default, Serialize, Deserialize, Clone)]
     pub struct DummyNode {

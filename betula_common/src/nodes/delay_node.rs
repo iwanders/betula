@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct DelayNode {
     #[serde(skip)]
     time: Consumer<f64>,
+    #[serde(skip)]
     last_time: f64,
     interval: f64,
 }
