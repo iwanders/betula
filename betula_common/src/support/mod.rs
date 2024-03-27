@@ -1,6 +1,6 @@
 use betula_core::prelude::*;
 use betula_core::BetulaError;
-use betula_core::Node;
+use betula_core::{Node, NodeConfig, NodeError};
 use serde::{Deserialize, Serialize};
 
 /// Trait to create nodes out of thin air.
@@ -59,13 +59,17 @@ impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static + 
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-    pub struct DummyNode {
+    #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
+    pub struct DummyConfig {
         #[serde(skip)]
         skipped: f32,
-        last_time: f64,
         interval: f64,
+    }
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+    pub struct DummyNode {
+        last_time: f64,
+        config: DummyConfig,
     }
     impl Node for DummyNode {
         fn tick(
@@ -73,6 +77,17 @@ mod test {
             _: &dyn betula_core::RunContext,
         ) -> Result<betula_core::NodeStatus, BetulaError> {
             todo!()
+        }
+
+        fn get_config(&self) -> Result<Option<Box<dyn NodeConfig>>, NodeError> {
+            Ok(Some(Box::new(self.config)))
+        }
+        fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
+            let v = (*config)
+                .downcast_ref::<DummyConfig>()
+                .ok_or("failed to cast")?;
+            self.config = *v;
+            Ok(())
         }
     }
 
@@ -87,9 +102,11 @@ mod test {
     #[test]
     fn test_things() -> Result<(), BetulaError> {
         let d = DummyNode {
-            skipped: 3.3,
+            config: DummyConfig {
+                skipped: 3.3,
+                interval: 3.3,
+            },
             last_time: 10.0,
-            interval: 3.3,
         };
         let yaml = serde_yaml::to_string(&d)?;
         println!("as yaml: {yaml:?}");
@@ -103,9 +120,9 @@ mod test {
             .downcast_ref::<DummyNode>()
             .ok_or("wrong type")?;
 
-        assert!(loaded_dummy.skipped == 0.0);
+        assert!(loaded_dummy.config.skipped == 0.0);
         assert!(loaded_dummy.last_time == 0.0);
-        assert!(loaded_dummy.interval == 0.0);
+        assert!(loaded_dummy.config.interval == 0.0);
 
         let loader: Box<dyn NodeConfigLoader> = Box::new(DefaultLoader::<DummyNode>::new());
         let mut boxed_node = factory.create()?;
@@ -116,9 +133,9 @@ mod test {
         let loaded_dummy: &DummyNode = (*boxed_node)
             .downcast_ref::<DummyNode>()
             .ok_or("wrong type")?;
-        assert!(loaded_dummy.skipped == 0.0);
+        assert!(loaded_dummy.config.skipped == 0.0);
         assert!(loaded_dummy.last_time == 10.0);
-        assert!(loaded_dummy.interval == 3.3);
+        assert!(loaded_dummy.config.interval == 3.3);
 
         let data = loader.get_config(&*boxed_node)?;
         let yaml_back = serde_yaml::to_string(&data)?;
@@ -127,7 +144,7 @@ mod test {
         assert!(yaml_back == yaml);
 
         let mut c = d;
-        c.skipped = 5.5;
+        c.config.skipped = 5.5;
         c.last_time = 12.0;
         let yaml_str = serde_yaml::to_string(&c)?;
         let yaml_deser = serde_yaml::Deserializer::from_str(&yaml_str);
@@ -137,9 +154,9 @@ mod test {
             .downcast_ref::<DummyNode>()
             .ok_or("wrong type")?;
         println!("loaded_dummy: {loaded_dummy:?}");
-        assert!(loaded_dummy.skipped == 0.0);
+        assert!(loaded_dummy.config.skipped == 0.0);
         assert!(loaded_dummy.last_time == 12.0);
-        assert!(loaded_dummy.interval == 3.3);
+        assert!(loaded_dummy.config.interval == 3.3);
 
         let config = serde_yaml::from_str("x: 1.0\ny: 2.0\n")?;
         let z = StructWithYaml {
