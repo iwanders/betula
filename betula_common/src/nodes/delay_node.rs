@@ -76,8 +76,9 @@ mod tests {
     fn test_blackboard_reqs() -> Result<(), NodeError> {
         use betula_core::{
             basic::{BasicBlackboard, BasicTree},
-            NodeId, Uuid,
+            NodeId,
         };
+        use uuid::Uuid;
         let mut tree = BasicTree::new();
         let mut bb = BasicBlackboard::default();
         let time = bb.provides::<f64>("time", 0.0)?;

@@ -53,8 +53,9 @@ mod tests {
     fn test_blackboard_reqs() -> Result<(), NodeError> {
         use betula_core::{
             basic::{BasicBlackboard, BasicTree},
-            NodeId, Uuid,
+            NodeId,
         };
+        use uuid::Uuid;
         let mut tree = BasicTree::new();
         let mut bb = BasicBlackboard::default();
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(TimeNode::default()))?;
