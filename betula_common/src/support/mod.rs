@@ -8,69 +8,90 @@ pub trait NodeFactory {
     fn create(&self) -> Result<Box<dyn Node>, BetulaError>;
 }
 
-/// Trait to facilitate
-trait NodeConfigLoader {
-    fn get_config(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError>;
-    fn set_config(
-        &self,
-        node: &mut dyn Node,
-        config: &mut dyn erased_serde::Deserializer,
-    ) -> Result<(), BetulaError>;
-}
-
+/// Default factory for nodes.
 #[derive(Debug)]
-pub struct DefaultLoader<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> {
+pub struct DefaultFactory<T: betula_core::Node + 'static + Default> {
     _z: std::marker::PhantomData<T>,
 }
-impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static> DefaultLoader<T> {
+impl<T: betula_core::Node + 'static + Default> DefaultFactory<T> {
     pub fn new() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
     }
 }
-
-impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static + Clone>
-    NodeConfigLoader for DefaultLoader<T>
-{
-    fn get_config(&self, node: &dyn Node) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
-        let v = (*node).downcast_ref::<T>().ok_or("failed to cast")?;
-        Ok(Box::new((*v).clone()))
-    }
-    fn set_config(
-        &self,
-        node: &mut dyn Node,
-        config: &mut dyn erased_serde::Deserializer,
-    ) -> Result<(), BetulaError> {
-        // Use this nifty hidden deserialize_in_place to avoid overwriting skipped values.
-        let v = (*node).downcast_mut::<T>().ok_or("failed to cast")?;
-        Ok(Deserialize::deserialize_in_place(config, v)?)
+impl<T: betula_core::Node + 'static + Default> NodeFactory for DefaultFactory<T> {
+    fn create(&self) -> Result<Box<dyn Node>, BetulaError> {
+        Ok(Box::new(T::default()))
     }
 }
 
-impl<T: Serialize + serde::de::DeserializeOwned + betula_core::Node + 'static + Default> NodeFactory
-    for DefaultLoader<T>
+/// Trait to facilitate serialization and deserialization of configs.
+trait ConfigConverter {
+    fn config_serialize(
+        &self,
+        config: &dyn NodeConfig,
+    ) -> Result<Box<dyn erased_serde::Serialize>, BetulaError>;
+    fn config_deserialize(
+        &self,
+        config: &mut dyn erased_serde::Deserializer,
+    ) -> Result<Box<dyn NodeConfig>, BetulaError>;
+}
+
+/// Default config converter
+#[derive(Debug)]
+pub struct DefaultConfigConverter<T: Serialize + serde::de::DeserializeOwned + 'static> {
+    _z: std::marker::PhantomData<T>,
+}
+impl<T: Serialize + serde::de::DeserializeOwned + 'static> DefaultConfigConverter<T> {
+    pub fn new() -> Self {
+        Self {
+            _z: std::marker::PhantomData,
+        }
+    }
+}
+impl<T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone> ConfigConverter
+    for DefaultConfigConverter<T>
 {
-    fn create(&self) -> Result<Box<dyn Node>, BetulaError> {
-        Ok(Box::new(T::default()))
+    fn config_serialize(
+        &self,
+        config: &dyn NodeConfig,
+    ) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
+        let v = (*config).downcast_ref::<T>().ok_or("failed to cast")?;
+        Ok(Box::new((*v).clone()))
+    }
+    fn config_deserialize(
+        &self,
+        config: &mut dyn erased_serde::Deserializer,
+    ) -> Result<Box<dyn NodeConfig>, BetulaError> {
+        Ok(Box::new(erased_serde::deserialize::<T>(config)?))
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct DummyConfig {
-        #[serde(skip)]
-        skipped: f32,
+        nonzero: f32,
         interval: f64,
     }
 
-    #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+    impl Default for DummyConfig {
+        fn default() -> Self {
+            Self {
+                nonzero: 1337.0,
+                interval: 0.5,
+            }
+        }
+    }
+
+    #[derive(Debug, Default)]
     pub struct DummyNode {
         last_time: f64,
         config: DummyConfig,
     }
+
     impl Node for DummyNode {
         fn tick(
             &mut self,
@@ -80,93 +101,82 @@ mod test {
         }
 
         fn get_config(&self) -> Result<Option<Box<dyn NodeConfig>>, NodeError> {
-            Ok(Some(Box::new(self.config)))
+            Ok(Some(Box::new(self.config.clone())))
         }
         fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
             let v = (*config)
                 .downcast_ref::<DummyConfig>()
                 .ok_or("failed to cast")?;
-            self.config = *v;
+            self.config = v.clone();
             Ok(())
         }
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
-    struct StructWithYaml {
-        node_name: Option<String>,
-        node_type: String,
-        // Node config how?
-        config: serde_yaml::Value,
-    }
-
     #[test]
     fn test_things() -> Result<(), BetulaError> {
-        let d = DummyNode {
-            config: DummyConfig {
-                skipped: 3.3,
-                interval: 3.3,
-            },
-            last_time: 10.0,
-        };
-        let yaml = serde_yaml::to_string(&d)?;
-        println!("as yaml: {yaml:?}");
-
-        let factory: Box<dyn NodeFactory> = Box::new(DefaultLoader::<DummyNode>::new());
-
-        let boxed_node = factory.create()?;
-
-        // And cast it again:
-        let loaded_dummy: &DummyNode = (*boxed_node)
-            .downcast_ref::<DummyNode>()
-            .ok_or("wrong type")?;
-
-        assert!(loaded_dummy.config.skipped == 0.0);
-        assert!(loaded_dummy.last_time == 0.0);
-        assert!(loaded_dummy.config.interval == 0.0);
-
-        let loader: Box<dyn NodeConfigLoader> = Box::new(DefaultLoader::<DummyNode>::new());
+        let factory: Box<dyn NodeFactory> = Box::new(DefaultFactory::<DummyNode>::new());
         let mut boxed_node = factory.create()?;
-        let yaml_deser = serde_yaml::Deserializer::from_str(&yaml);
-        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(yaml_deser));
-        let _ = loader.set_config(&mut *boxed_node, &mut erased)?;
+        {
+            let loaded_dummy: &DummyNode = (*boxed_node)
+                .downcast_ref::<DummyNode>()
+                .ok_or("wrong type")?;
+            assert!(loaded_dummy.config.nonzero == 1337.0);
+            assert!(loaded_dummy.config.interval == 0.5);
+            assert!(loaded_dummy.last_time == 0.0);
+        }
 
-        let loaded_dummy: &DummyNode = (*boxed_node)
-            .downcast_ref::<DummyNode>()
-            .ok_or("wrong type")?;
-        assert!(loaded_dummy.config.skipped == 0.0);
-        assert!(loaded_dummy.last_time == 10.0);
-        assert!(loaded_dummy.config.interval == 3.3);
+        // Lets make ourselves the config converter
+        let converter: Box<dyn ConfigConverter> =
+            Box::new(DefaultConfigConverter::<DummyConfig>::new());
 
-        let data = loader.get_config(&*boxed_node)?;
-        let yaml_back = serde_yaml::to_string(&data)?;
-        println!("as yaml: {yaml:?}");
+        let our_new_config: Box<dyn NodeConfig> = Box::new(DummyConfig {
+            nonzero: 5.3,
+            interval: 3.3,
+        });
 
-        assert!(yaml_back == yaml);
+        // Verify setting the config.
+        let _ = boxed_node.set_config(&*our_new_config)?;
+        {
+            let loaded_dummy: &DummyNode = (*boxed_node)
+                .downcast_ref::<DummyNode>()
+                .ok_or("wrong type")?;
+            assert_eq!(loaded_dummy.config.nonzero, 5.3);
+            assert_eq!(loaded_dummy.config.interval, 3.3);
+            assert_eq!(loaded_dummy.last_time, 0.0);
+        }
 
-        let mut c = d;
-        c.config.skipped = 5.5;
-        c.last_time = 12.0;
-        let yaml_str = serde_yaml::to_string(&c)?;
-        let yaml_deser = serde_yaml::Deserializer::from_str(&yaml_str);
-        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(yaml_deser));
-        loader.set_config(&mut *boxed_node, &mut erased)?;
-        let loaded_dummy: &DummyNode = (*boxed_node)
-            .downcast_ref::<DummyNode>()
-            .ok_or("wrong type")?;
-        println!("loaded_dummy: {loaded_dummy:?}");
-        assert!(loaded_dummy.config.skipped == 0.0);
-        assert!(loaded_dummy.last_time == 12.0);
-        assert!(loaded_dummy.config.interval == 3.3);
-
-        let config = serde_yaml::from_str("x: 1.0\ny: 2.0\n")?;
-        let z = StructWithYaml {
-            node_name: None,
-            node_type: "foo".to_owned(),
-            // Node config how?
-            config,
+        let our_newer_config_input = DummyConfig {
+            nonzero: 50.3,
+            interval: 30.3,
         };
-        let yaml_str = serde_yaml::to_string(&z)?;
-        println!("as yaml: {yaml_str}");
+        let our_newer_config: Box<dyn NodeConfig> = Box::new(our_newer_config_input.clone());
+
+        let serializable = converter.config_serialize(&*our_newer_config)?;
+        let config_json = serde_json::to_string(&serializable)?;
+        let input_config_json = serde_json::to_string(&our_newer_config_input)?;
+        assert_eq!(config_json, input_config_json);
+
+        // Convert the string back to a NodeConfig
+        let mut json_deser = serde_json::Deserializer::from_str(&config_json);
+        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(&mut json_deser));
+        let new_config = converter.config_deserialize(&mut *erased)?;
+        {
+            let config: &DummyConfig = (*new_config)
+                .downcast_ref::<DummyConfig>()
+                .ok_or("wrong type")?;
+            assert_eq!(config.nonzero, 50.3);
+            assert_eq!(config.interval, 30.3);
+        }
+
+        // Finally, load the config.
+        let _ = boxed_node.set_config(&*new_config)?;
+        {
+            let loaded_dummy: &DummyNode = (*boxed_node)
+                .downcast_ref::<DummyNode>()
+                .ok_or("wrong type")?;
+            assert_eq!(loaded_dummy.config.nonzero, 50.3);
+            assert_eq!(loaded_dummy.config.interval, 30.3);
+        }
 
         Ok(())
     }
