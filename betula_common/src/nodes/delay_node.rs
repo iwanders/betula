@@ -57,8 +57,15 @@ impl Node for DelayNode {
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
         self.config.load_node_config(config)
     }
-    fn node_type(&self) -> NodeType {
+    fn static_type() -> NodeType
+    where
+        Self: Sized,
+    {
         "common_delay".into()
+    }
+
+    fn node_type(&self) -> NodeType {
+        Self::static_type()
     }
 }
 

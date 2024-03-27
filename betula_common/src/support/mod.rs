@@ -1,33 +1,41 @@
 use betula_core::prelude::*;
 use betula_core::BetulaError;
-use betula_core::{Node, NodeConfig, NodeError};
-use serde::{Deserialize, Serialize};
+use betula_core::{Node, NodeConfig};
+use serde::Serialize;
 
 /// Trait to create nodes out of thin air.
-pub trait NodeFactory {
+pub trait NodeFactory: std::fmt::Debug {
     fn create(&self) -> Result<Box<dyn Node>, BetulaError>;
 }
 
+pub trait DefaultFactoryRequirements: betula_core::Node + 'static + Default {}
+impl<T> DefaultFactoryRequirements for T where T: betula_core::Node + 'static + Default {}
+
 /// Default factory for nodes.
-#[derive(Debug)]
-pub struct DefaultFactory<T: betula_core::Node + 'static + Default> {
+pub struct DefaultFactory<T: DefaultFactoryRequirements> {
     _z: std::marker::PhantomData<T>,
 }
-impl<T: betula_core::Node + 'static + Default> DefaultFactory<T> {
+impl<T: DefaultFactoryRequirements> std::fmt::Debug for DefaultFactory<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "DefaultFactory<{}>", std::any::type_name::<T>())
+    }
+}
+
+impl<T: DefaultFactoryRequirements> DefaultFactory<T> {
     pub fn new() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
     }
 }
-impl<T: betula_core::Node + 'static + Default> NodeFactory for DefaultFactory<T> {
+impl<T: DefaultFactoryRequirements> NodeFactory for DefaultFactory<T> {
     fn create(&self) -> Result<Box<dyn Node>, BetulaError> {
         Ok(Box::new(T::default()))
     }
 }
 
 /// Trait to facilitate serialization and deserialization of configs.
-trait ConfigConverter {
+pub trait ConfigConverter: std::fmt::Debug {
     fn config_serialize(
         &self,
         config: &dyn NodeConfig,
@@ -38,21 +46,37 @@ trait ConfigConverter {
     ) -> Result<Box<dyn NodeConfig>, BetulaError>;
 }
 
+pub trait DefaultConfigRequirements:
+    Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone
+{
+}
+impl<T> DefaultConfigRequirements for T where
+    T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone
+{
+}
+
 /// Default config converter
-#[derive(Debug)]
-pub struct DefaultConfigConverter<T: Serialize + serde::de::DeserializeOwned + 'static> {
+pub struct DefaultConfigConverter<T: DefaultConfigRequirements> {
     _z: std::marker::PhantomData<T>,
 }
-impl<T: Serialize + serde::de::DeserializeOwned + 'static> DefaultConfigConverter<T> {
+impl<T: DefaultConfigRequirements> std::fmt::Debug for DefaultConfigConverter<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(
+            fmt,
+            "DefaultConfigConverter<{}>",
+            std::any::type_name::<T>()
+        )
+    }
+}
+
+impl<T: DefaultConfigRequirements> DefaultConfigConverter<T> {
     pub fn new() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
     }
 }
-impl<T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone> ConfigConverter
-    for DefaultConfigConverter<T>
-{
+impl<T: DefaultConfigRequirements> ConfigConverter for DefaultConfigConverter<T> {
     fn config_serialize(
         &self,
         config: &dyn NodeConfig,
@@ -67,11 +91,12 @@ impl<T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Cl
         Ok(Box::new(erased_serde::deserialize::<T>(config)?))
     }
 }
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use betula_core::NodeType;
+    use betula_core::{NodeError, NodeType};
+    use serde::Deserialize;
+
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct DummyConfig {
         nonzero: f32,
@@ -111,8 +136,15 @@ mod test {
             self.config = v.clone();
             Ok(())
         }
-        fn node_type(&self) -> NodeType {
+        fn static_type() -> NodeType
+        where
+            Self: Sized,
+        {
             "dummy".into()
+        }
+
+        fn node_type(&self) -> NodeType {
+            Self::static_type()
         }
     }
 

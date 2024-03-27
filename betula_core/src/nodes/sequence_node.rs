@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::{Node, NodeError, NodeStatus, NodeType};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct SequenceNode {}
 impl Node for SequenceNode {
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
@@ -16,7 +16,14 @@ impl Node for SequenceNode {
         Ok(NodeStatus::Success)
     }
 
-    fn node_type(&self) -> NodeType {
+    fn static_type() -> NodeType
+    where
+        Self: Sized,
+    {
         "sequence".into()
+    }
+
+    fn node_type(&self) -> NodeType {
+        Self::static_type()
     }
 }

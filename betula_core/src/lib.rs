@@ -70,7 +70,7 @@ pub trait RunContext {
 /// The error type.
 pub type BetulaError = Box<dyn std::error::Error + Send + Sync>;
 
-// Todo, put a node id in this?
+/// Error type for results from node execution.
 pub type NodeError = BetulaError;
 
 // Output and Input feels ambiguous, is that from the blackboard or from
@@ -138,44 +138,52 @@ impl<T: std::fmt::Debug + 'static> Default for ProviderConsumer<T> {
     }
 }
 
+/// The type going across the port.
 #[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub struct Type {
+pub struct PortType {
     id: std::any::TypeId,
     type_name: &'static str,
 }
-impl Type {
+impl PortType {
     pub fn new<T: 'static>() -> Self {
-        Type {
+        PortType {
             id: std::any::TypeId::of::<T>(),
             type_name: std::any::type_name::<T>(),
         }
     }
 }
 
-impl std::fmt::Debug for Type {
+impl std::fmt::Debug for PortType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{0}", self.type_name)
     }
 }
 
+/// A port on a node with a name and type.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Port {
-    pub data: Type,
+    /// The type of the data.
+    pub data: PortType,
+    /// The name of the port.
     pub name: String,
 }
 
 impl Port {
     pub fn new<T: 'static>(name: &str) -> Self {
         Port {
-            data: Type::new::<T>(),
+            data: PortType::new::<T>(),
             name: name.to_string(),
         }
     }
 }
 
+/// A port with a directionality.
 pub enum DirectionalPort {
+    /// The port consumes the value.
     Consumer(Port),
+    /// The port provides the value.
     Provider(Port),
+    /// The port provides and consumes the value.
     ProviderConsumer(Port),
 }
 impl DirectionalPort {
@@ -227,13 +235,9 @@ pub trait NodeConfigLoad: NodeConfig {
 impl<T: NodeConfig> NodeConfigLoad for T {}
 impl NodeConfigLoad for dyn NodeConfig + '_ {}
 
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+/// The type of a particular node.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct NodeType(pub &'static str);
-impl NodeType {
-    pub fn from(s: &'static str) -> Self {
-        NodeType(s)
-    }
-}
 impl From<&'static str> for NodeType {
     fn from(v: &'static str) -> Self {
         NodeType(v)
@@ -280,12 +284,28 @@ pub trait Node: std::fmt::Debug + AsAny {
         Ok(())
     }
 
-    /// The human readable type of this node.
+    /// The human readable type of this node, must guarantee:
+    /// ```ignore
+    /// fn node_type(&self) -> NodeType {
+    ///    Self::static_type()
+    /// }
+    /// ```
     fn node_type(&self) -> NodeType;
+
+    /// Non object safe human readable type of this node.
+    ///
+    /// This is specified manually instead of [`std::any::type_name::<T>()`] because
+    /// this allows for nodes to be moved around in refactors, as well as it being
+    /// shorter than `betula_core::nodes::sequence_node::SequenceNode`.
+    fn static_type() -> NodeType
+    where
+        Self: Sized;
 }
 
-pub use uuid::Uuid;
+use uuid::Uuid;
 
+/// Node ids are represented as UUIDs.
+///
 /// We're using UUIDs as NodeIds here, that way we can guarantee that they
 /// are stable, which helps a lot when manipulating the tree, internally
 /// the tree is free to use whatever ids it wants when actually executing it.

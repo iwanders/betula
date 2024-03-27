@@ -33,8 +33,16 @@ impl Node for TimeNode {
         self.time_provider = z;
         Ok(())
     }
-    fn node_type(&self) -> NodeType {
+
+    fn static_type() -> NodeType
+    where
+        Self: Sized,
+    {
         "common_time".into()
+    }
+
+    fn node_type(&self) -> NodeType {
+        Self::static_type()
     }
 }
 
