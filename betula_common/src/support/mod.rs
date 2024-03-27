@@ -71,6 +71,7 @@ impl<T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Cl
 #[cfg(test)]
 mod test {
     use super::*;
+    use betula_core::NodeType;
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct DummyConfig {
         nonzero: f32,
@@ -109,6 +110,9 @@ mod test {
                 .ok_or("failed to cast")?;
             self.config = v.clone();
             Ok(())
+        }
+        fn node_type(&self) -> NodeType {
+            "dummy".into()
         }
     }
 

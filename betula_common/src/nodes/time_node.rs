@@ -1,5 +1,7 @@
 use betula_core::prelude::*;
-use betula_core::{BlackboardInterface, DirectionalPort, Node, NodeError, NodeStatus, Provider};
+use betula_core::{
+    BlackboardInterface, DirectionalPort, Node, NodeError, NodeStatus, NodeType, Provider,
+};
 
 #[derive(Debug, Default)]
 pub struct TimeNode {
@@ -30,6 +32,9 @@ impl Node for TimeNode {
         let z = interface.provides::<f64>(port.name(), 0.0)?;
         self.time_provider = z;
         Ok(())
+    }
+    fn node_type(&self) -> NodeType {
+        "common_time".into()
     }
 }
 

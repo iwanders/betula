@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::{Node, NodeError, NodeStatus};
+use crate::{Node, NodeError, NodeStatus, NodeType};
 
 #[derive(Debug, Copy, Clone)]
 pub struct SequenceNode {}
@@ -14,5 +14,9 @@ impl Node for SequenceNode {
 
         // All children succeeded.
         Ok(NodeStatus::Success)
+    }
+
+    fn node_type(&self) -> NodeType {
+        "sequence".into()
     }
 }

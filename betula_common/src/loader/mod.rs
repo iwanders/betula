@@ -9,7 +9,6 @@ type NodeConfig = serde_json::Value;
 #[derive(Serialize, Deserialize, Debug)]
 struct TreeNode {
     id: NodeId,
-    node_name: Option<String>,
     node_type: String,
     config: NodeConfig,
 }

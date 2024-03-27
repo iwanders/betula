@@ -1,6 +1,7 @@
 use betula_core::prelude::*;
 use betula_core::{
     BlackboardInterface, Consumer, DirectionalPort, Node, NodeConfig, NodeError, NodeStatus,
+    NodeType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -55,6 +56,9 @@ impl Node for DelayNode {
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
         self.config.load_node_config(config)
+    }
+    fn node_type(&self) -> NodeType {
+        "common_delay".into()
     }
 }
 

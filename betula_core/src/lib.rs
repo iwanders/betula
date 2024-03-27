@@ -138,7 +138,7 @@ impl<T: std::fmt::Debug + 'static> Default for ProviderConsumer<T> {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Type {
     id: std::any::TypeId,
     type_name: &'static str,
@@ -158,7 +158,7 @@ impl std::fmt::Debug for Type {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Port {
     pub data: Type,
     pub name: String,
@@ -227,6 +227,19 @@ pub trait NodeConfigLoad: NodeConfig {
 impl<T: NodeConfig> NodeConfigLoad for T {}
 impl NodeConfigLoad for dyn NodeConfig + '_ {}
 
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+pub struct NodeType(pub &'static str);
+impl NodeType {
+    pub fn from(s: &'static str) -> Self {
+        NodeType(s)
+    }
+}
+impl From<&'static str> for NodeType {
+    fn from(v: &'static str) -> Self {
+        NodeType(v)
+    }
+}
+
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
@@ -266,6 +279,9 @@ pub trait Node: std::fmt::Debug + AsAny {
         let _ = config;
         Ok(())
     }
+
+    /// The human readable type of this node.
+    fn node_type(&self) -> NodeType;
 }
 
 pub use uuid::Uuid;
