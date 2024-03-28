@@ -243,6 +243,11 @@ impl From<&'static str> for NodeType {
         NodeType(v)
     }
 }
+impl Into<String> for NodeType {
+    fn into(self) -> std::string::String {
+        self.0.to_owned()
+    }
+}
 
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
