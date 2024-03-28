@@ -236,16 +236,21 @@ impl<T: NodeConfig> NodeConfigLoad for T {}
 impl NodeConfigLoad for dyn NodeConfig + '_ {}
 
 /// The type of a particular node.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
-pub struct NodeType(pub &'static str);
-impl From<&'static str> for NodeType {
-    fn from(v: &'static str) -> Self {
-        NodeType(v)
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
+pub struct NodeType(pub String);
+impl From<&str> for NodeType {
+    fn from(v: &str) -> Self {
+        NodeType(v.to_owned())
+    }
+}
+impl From<String> for NodeType {
+    fn from(v: String) -> Self {
+        NodeType(v.clone())
     }
 }
 impl Into<String> for NodeType {
     fn into(self) -> std::string::String {
-        self.0.to_owned()
+        self.0.clone()
     }
 }
 

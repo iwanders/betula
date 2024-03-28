@@ -53,7 +53,7 @@ impl TreeConfig {
 
     pub fn add_factory(&mut self, node_type: NodeType, factory: Box<dyn NodeFactory>) {
         let entry = self.support.insert(
-            node_type,
+            node_type.clone(),
             TypeSupport {
                 factory,
                 config_converter: None,
@@ -166,7 +166,7 @@ impl TreeConfig {
             Config::V1(root) => {
                 // let mut relations = vec![];
                 for node in root.tree.nodes {
-                    let support = self.support.get(&node.node_type);
+                    let support = self.support.get(&node.node_type.into());
                 }
             }
         }
