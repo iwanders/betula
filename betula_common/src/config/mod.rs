@@ -1,6 +1,6 @@
 use betula_core::prelude::*;
 use betula_core::{BetulaError, NodeType};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::support::{
     ConfigConverter, DefaultConfigConverter, DefaultConfigRequirements, DefaultFactory,
@@ -24,6 +24,16 @@ mod v1 {
     pub struct TreeNodes {
         pub nodes: Vec<TreeNode>,
     }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Root {
+        pub tree: TreeNodes,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum Config {
+    V1(v1::Root),
 }
 
 use std::collections::HashMap;
@@ -131,7 +141,12 @@ impl TreeConfig {
             };
             nodes.push(this_node);
         }
-        Ok(TreeNodes { nodes }
+
+        let root = Root {
+            tree: TreeNodes { nodes },
+        };
+        let config = Config::V1(root);
+        Ok(config
             .serialize(serializer)
             .map_err(|e| S::Error::custom(format!("serialize failed with {e:?}")))?)
     }
@@ -139,8 +154,23 @@ impl TreeConfig {
         &self,
         tree: &mut dyn Tree,
         deserializer: D,
-    ) -> Result<(), BetulaError> {
-        let _ = (tree, deserializer);
+    ) -> Result<(), D::Error> {
+        use serde::de::Error;
+        let config: Config = Config::deserialize(deserializer)?;
+
+        // pub id: NodeId,
+        // pub node_type: String,
+        // pub config: Option<SerializableNodeConfig>,
+        // pub children: Vec<NodeId>,
+        match config {
+            Config::V1(root) => {
+                // let mut relations = vec![];
+                for node in root.tree.nodes {
+                    let support = self.support.get(&node.node_type);
+                }
+            }
+        }
+
         Ok(())
     }
 }
