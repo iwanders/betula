@@ -158,15 +158,51 @@ impl TreeConfig {
         use serde::de::Error;
         let config: Config = Config::deserialize(deserializer)?;
 
-        // pub id: NodeId,
-        // pub node_type: String,
-        // pub config: Option<SerializableNodeConfig>,
-        // pub children: Vec<NodeId>,
         match config {
             Config::V1(root) => {
-                // let mut relations = vec![];
+                let mut relations = vec![];
+                let mut new_nodes = vec![];
+
+                // First, deserialize everything.
                 for node in root.tree.nodes {
-                    let support = self.support.get(&node.node_type.into());
+                    let node_type = node.node_type.into();
+                    let support = self
+                        .support
+                        .get(&node_type)
+                        .ok_or(D::Error::custom(format!(
+                            "could not get support for {node_type:?}"
+                        )))?;
+                    let mut new_node = support
+                        .factory
+                        .create()
+                        .map_err(|e| D::Error::custom(format!("failed to construct node {e:?}")))?;
+                    if let Some(config) = node.config {
+                        if let Some(config_support) = support.config_converter.as_ref() {
+                            let mut erased =
+                                Box::new(<dyn erased_serde::Deserializer>::erase(config));
+                            let new_config = config_support
+                                .config_deserialize(&mut erased)
+                                .map_err(|e| {
+                                    D::Error::custom(format!("failed deserialize config {e:?}"))
+                                })?;
+                            new_node.set_config(&new_config).map_err(|e| {
+                                D::Error::custom(format!("failed set config {e:?}"))
+                            })?;
+                        }
+                    }
+                    new_nodes.push((node.id, new_node));
+                    relations.push((node.id, node.children));
+                }
+                // Serialization is all done, now add them to the tree.
+                for (node_id, node) in new_nodes {
+                    tree.add_node_boxed(node_id, node)
+                        .map_err(|e| D::Error::custom(format!("failed to add new node {e:?}")))?;
+                }
+                for (parent, children) in relations {
+                    for (i, child) in children.iter().enumerate() {
+                        tree.add_relation(parent, i, *child)
+                            .map_err(|e| D::Error::custom(format!("failed to relation {e:?}")))?;
+                    }
                 }
             }
         }
@@ -201,6 +237,8 @@ mod test {
         let mut tree_config = TreeConfig::new();
         tree_config.add_default::<betula_core::nodes::SequenceNode>();
         tree_config.add_default::<betula_core::nodes::SelectorNode>();
+        tree_config.add_default::<betula_core::nodes::FailureNode>();
+        tree_config.add_default::<betula_core::nodes::SuccessNode>();
         tree_config
             .add_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>()?;
         println!("loader: {tree_config:#?}");
@@ -222,6 +260,13 @@ mod test {
 
         let json_value = tree_config.serialize(&tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value}");
+
+        // lets try to rebuild the tree from that json value.
+        let mut new_tree = BasicTree::new();
+        tree_config.deserialize(&mut new_tree, json_value.clone())?;
+        println!("new_tree: {new_tree:#?}");
+        let and_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
+        assert_eq!(and_back, json_value);
 
         Ok(())
     }
