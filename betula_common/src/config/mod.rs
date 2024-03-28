@@ -209,11 +209,26 @@ impl TreeConfig {
 
         Ok(())
     }
+
+    // pub fn deserialize_default<'de, T: Tree + Default, D: serde::Deserializer<'de>, >(&self, deserializer: D) -> Result<T, D::Error> {
+    // let mut tree = T::default();
+    // self.deserialize(&mut tree, deserializer)?;
+    // Ok(tree)
+    // }
 }
 
-struct TreeSerializer<'a, 'b> {
-    tree: &'a dyn Tree,
+pub struct TreeSerializer<'a, 'b> {
     config_support: &'b TreeConfig,
+    tree: &'a dyn Tree,
+}
+
+impl<'a, 'b> TreeSerializer<'a, 'b> {
+    pub fn new(config_support: &'b TreeConfig, tree: &'a dyn Tree) -> Self {
+        Self {
+            tree,
+            config_support,
+        }
+    }
 }
 
 impl<'a, 'b> serde::Serialize for TreeSerializer<'a, 'b> {
@@ -251,10 +266,7 @@ mod test {
         tree.add_relation(root, 0, f1)?;
         tree.add_relation(root, 1, s1)?;
 
-        let obj = TreeSerializer {
-            tree: &tree,
-            config_support: &tree_config,
-        };
+        let obj = TreeSerializer::new(&tree_config, &tree);
         let config_json = serde_json::to_string(&obj)?;
         println!("config json: {config_json:?}");
 
@@ -267,6 +279,10 @@ mod test {
         println!("new_tree: {new_tree:#?}");
         let and_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
+
+        // let mut another_tree = tree_config.deserialize_default::<BasicTree,_>(json_value.clone())?;
+        // let and_another_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
+        // assert_eq!(and_another_back, json_value);
 
         Ok(())
     }
