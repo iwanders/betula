@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     BetulaError, Blackboard, BlackboardId, BlackboardPort, Node, NodeError, NodeId, NodePort,
-    NodeStatus, PortDirection,
+    NodeStatus,
 };
 
 struct TreeContext<'a> {
@@ -30,10 +30,15 @@ struct BasicTreeNode {
     node: RefCell<Box<dyn Node>>,
     children: Vec<NodeId>,
 }
+#[derive(Debug)]
+struct BasicBlackboardEntry {
+    blackboard: RefCell<Box<dyn Blackboard>>,
+    connections: Vec<(NodePort, BlackboardPort)>,
+}
 #[derive(Debug, Default)]
 pub struct BasicTree {
     nodes: HashMap<NodeId, BasicTreeNode>,
-    blackboards: HashMap<BlackboardId, std::cell::RefCell<Box<dyn Blackboard>>>,
+    blackboards: HashMap<BlackboardId, BasicBlackboardEntry>,
 }
 
 impl BasicTree {
@@ -135,11 +140,11 @@ impl Tree for BasicTree {
     }
 
     fn blackboard_ref(&self, id: BlackboardId) -> Option<&std::cell::RefCell<Box<dyn Blackboard>>> {
-        Some(self.blackboards.get(&id)?)
+        Some(&self.blackboards.get(&id)?.blackboard)
     }
     fn blackboard_mut(&mut self, id: BlackboardId) -> Option<&mut dyn Blackboard> {
         let m = self.blackboards.get_mut(&id)?;
-        Some(&mut **m.get_mut())
+        Some(&mut **m.blackboard.get_mut())
     }
 
     fn add_blackboard_boxed(
@@ -147,15 +152,25 @@ impl Tree for BasicTree {
         id: BlackboardId,
         blackboard: Box<dyn Blackboard>,
     ) -> Result<BlackboardId, BetulaError> {
-        self.blackboards.insert(id, blackboard.into());
+        self.blackboards.insert(
+            id,
+            BasicBlackboardEntry {
+                blackboard: blackboard.into(),
+                connections: vec![],
+            },
+        );
         Ok(id)
     }
     fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
-        self.blackboards.remove(&id).map(|v| v.into_inner());
-        todo!("clean up the connections first");
-        // for (_k, v) in self.nodes.iter_mut() {
-        // v.children.retain(|&x| x != id);
-        // }
+        // First, disconnect all connections.
+        let connections = self.blackboards.get(&id)?.connections.clone();
+        for (node_port, blackboard_port) in &connections {
+            let _ = self.disconnect_port(node_port, blackboard_port).ok()?;
+        }
+        // Then remove the blackboard and return.
+        self.blackboards
+            .remove(&id)
+            .map(|v| v.blackboard.into_inner())
     }
     fn connect_port_to_blackboard_port(
         &mut self,
@@ -167,7 +182,7 @@ impl Tree for BasicTree {
             .blackboards
             .get(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
-        let mut blackboard_mut = blackboard.try_borrow_mut()?;
+        let mut blackboard_mut = blackboard.blackboard.try_borrow_mut()?;
         let node_id = node_port.node();
         let node = self
             .nodes
@@ -213,6 +228,7 @@ impl Tree for BasicTree {
         node_port: &NodePort,
         blackboard_port: &BlackboardPort,
     ) -> Result<(), BetulaError> {
+        let _ = blackboard_port;
         let node_id = node_port.node();
         let node = self
             .nodes
@@ -220,30 +236,27 @@ impl Tree for BasicTree {
             .ok_or_else(|| format!("node {node_id:?} does not exist").to_string())?;
         let mut node_mut = node.node.try_borrow_mut()?;
 
-        struct Remapper<'a> {
-            new_name: &'a str,
-        }
-        impl<'a> BlackboardInterface for Remapper<'a> {
+        struct Disconnecter {}
+        impl BlackboardInterface for Disconnecter {
             fn writer(
                 &mut self,
                 id: TypeId,
                 key: &str,
                 default: ValueCreator,
             ) -> Result<Write, NodeError> {
+                let _ = (id, key, default);
                 let v = |_| Err(format!("writing to disconnected port").into());
                 Ok(Box::new(v))
             }
 
             fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError> {
-                let _ = key;
+                let _ = (id, key);
                 let v = || Err(format!("reading from disconnected port").into());
                 Ok(Box::new(v))
             }
         }
-        let blackboard_name = blackboard_port.name();
-        let mut remapped_interface = Remapper {
-            new_name: &blackboard_name,
-        };
+
+        let mut remapped_interface = Disconnecter {};
         node_mut.port_setup(
             &node_port.name(),
             node_port.direction,
@@ -252,7 +265,11 @@ impl Tree for BasicTree {
     }
 
     fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)> {
-        todo!()
+        let mut v = vec![];
+        for (_key, blackboard_entry) in &self.blackboards {
+            v.extend(blackboard_entry.connections.clone())
+        }
+        v
     }
 }
 
