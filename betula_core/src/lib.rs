@@ -60,8 +60,11 @@ pub mod nodes;
 
 pub mod prelude {
     pub use crate::{
-        as_any::AsAnyHelper, blackboard::Chalkable, blackboard::Setup, AsAny, NodeConfigLoad,
-        RunContext, Tree,
+        blackboard::Setup,
+        NodeConfigLoad,
+        RunContext,
+        Tree,
+        // as_any::AsAnyHelper,AsAny, blackboard::Chalkable // enabling this causes... equality to start failing?
     };
 }
 pub use blackboard::BlackboardInterface;

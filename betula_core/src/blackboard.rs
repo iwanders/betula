@@ -18,12 +18,8 @@ where
     }
 
     fn equality(&self, other: &dyn Chalkable) -> bool {
-        println!("eq: {self:?}, {other:?}");
-        println!(
-            "eq: {:?}   {:?}",
-            self.as_any_ref().type_id(),
-            other.as_any_ref().type_id()
-        );
+        // println!("eq: {self:?}, {other:?}");
+        // println!("eq: {:?}   {:?}", self.as_any_ref().type_id(), other.as_any_ref().type_id());
         if self.as_any_ref().type_id() != other.as_any_ref().type_id() {
             false
         } else {
@@ -34,7 +30,7 @@ where
             }
             let left = left.unwrap();
             let right = right.unwrap();
-            println!("leftright: {left:?}, {right:?}");
+            // println!("leftright: {left:?}, {right:?}");
             std::cmp::PartialEq::eq(left, right)
         }
     }

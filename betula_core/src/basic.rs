@@ -519,6 +519,7 @@ mod tests {
 
     #[test]
     fn test_input_output() -> Result<(), NodeError> {
+        use crate::blackboard::Chalkable;
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
         let o1 = tree.add_node_boxed(
