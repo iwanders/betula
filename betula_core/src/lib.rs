@@ -60,7 +60,8 @@ pub mod nodes;
 
 pub mod prelude {
     pub use crate::{
-        as_any::AsAnyHelper, blackboard::Setup, AsAny, NodeConfigLoad, RunContext, Tree,
+        as_any::AsAnyHelper, blackboard::Chalkable, blackboard::Setup, AsAny, NodeConfigLoad,
+        RunContext, Tree,
     };
 }
 pub use blackboard::BlackboardInterface;
@@ -197,9 +198,9 @@ impl std::fmt::Debug for PortType {
 /// output by the specified name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum PortDirection {
-    /// The port consumes the value.
+    /// The port consumes the value, it is an input to the node.
     Input,
-    /// The port provides the value.
+    /// The port provides the value, it is an output from the node.
     Output,
 }
 
@@ -226,6 +227,14 @@ impl Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Output,
             name: name.clone(),
+        }
+    }
+
+    pub fn into_node_port(self, node: NodeId) -> NodePort {
+        NodePort {
+            node,
+            direction: self.direction,
+            name: self.name,
         }
     }
 
@@ -486,5 +495,20 @@ pub trait Tree {
         blackboard_port: &BlackboardPort,
     ) -> Result<(), BetulaError>;
 
+    /// List all port connections.
     fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)>;
+
+    /// List all ports of a node
+    fn node_ports(&self, node: NodeId) -> Result<Vec<NodePort>, NodeError> {
+        let node_ref = self
+            .node_ref(node)
+            .ok_or_else(|| format!("could not find {node:?}"))?;
+        let borrow = node_ref.try_borrow()?;
+        let node_ports = borrow
+            .ports()?
+            .drain(..)
+            .map(|z| z.clone().into_node_port(node))
+            .collect::<Vec<_>>();
+        Ok(node_ports)
+    }
 }

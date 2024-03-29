@@ -1,10 +1,10 @@
-/// A simple implementation of the Tree.
+// A simple implementation of the Tree.
 use crate::prelude::*;
 use std::collections::HashMap;
 
 use crate::{
     BetulaError, Blackboard, BlackboardId, BlackboardPort, Node, NodeError, NodeId, NodePort,
-    NodeStatus,
+    NodeStatus, PortName,
 };
 
 struct TreeContext<'a> {
@@ -344,6 +344,42 @@ impl BlackboardInterface for BasicBlackboard {
         }
     }
 }
+impl Blackboard for BasicBlackboard {
+    fn ports(&self) -> Vec<PortName> {
+        self.values
+            .keys()
+            .map(|v| PortName(v.clone()))
+            .collect::<Vec<_>>()
+    }
+
+    fn clear(&mut self) {
+        self.values.clear()
+    }
+
+    fn get(&self, port: &PortName) -> Option<Value> {
+        self.values.get(&port.0).map(|x| x.1.borrow().clone_boxed())
+    }
+
+    fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError> {
+        let new_value_type = (*value).type_id();
+        let old_value_type = self.values.get(&port.0).map(|x| (*x).type_id());
+        if let Some(old_value_type) = old_value_type {
+            if new_value_type != old_value_type {
+                return Err("different type already on blackboard".into());
+            }
+        }
+        match self.values.entry(port.0.clone()) {
+            std::collections::hash_map::Entry::Occupied(e) => {
+                *(e.get().1.try_borrow_mut()?) = value;
+            }
+            std::collections::hash_map::Entry::Vacant(v) => {
+                v.insert((new_value_type, Rc::new(RefCell::new(value))));
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -380,8 +416,8 @@ mod tests {
 
         // let mut w = crate::BlackboardContext::new(&mut bb);
         let v_in = 3i64;
-        let p = bb.provides("value", v_in);
-        let c = bb.consumes::<i64>("value");
+        let p = bb.output("value", v_in);
+        let c = bb.input::<i64>("value");
         assert!(c.is_ok());
         let c = c.unwrap();
         let v = c.get();
@@ -395,15 +431,130 @@ mod tests {
         let p = p.unwrap();
         let res = p.set(5);
         assert!(res.is_ok());
-        let z = bb.provides("value", 3.3f64);
+        let z = bb.output("value", 3.3f64);
         println!("z: {z:?}");
         assert!(z.is_err());
         // println!("BasicBlackboard: {bb:?}");
         // let r = bb.consumes(&TypeId::of::<i64>(), "value");
         // assert!(r.is_ok());
         // println!("value: {:?}", r.unwrap()());
-        let c = bb.consumes::<i64>("value");
+        let c = bb.input::<i64>("value");
         println!("c: {c:?}");
         println!("value: {:?}", z);
+    }
+
+    use crate::{Input, NodeType, Output, Port, PortDirection, PortName};
+
+    #[derive(Debug, Default)]
+    pub struct OutputNode {
+        a_output: Output<f64>,
+    }
+    impl Node for OutputNode {
+        fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+            self.a_output.set(3.3f64)?;
+            Ok(NodeStatus::Success)
+        }
+        fn ports(&self) -> Result<Vec<Port>, NodeError> {
+            Ok(vec![Port::output::<f64>(&"a".into())])
+        }
+        fn port_setup(
+            &mut self,
+            port: &PortName,
+            direction: PortDirection,
+            interface: &mut dyn BlackboardInterface,
+        ) -> Result<(), NodeError> {
+            let z = interface.output::<f64>(&port, 0.0)?;
+            self.a_output = z;
+            Ok(())
+        }
+
+        fn static_type() -> NodeType
+        where
+            Self: Sized,
+        {
+            "output_node".into()
+        }
+
+        fn node_type(&self) -> NodeType {
+            Self::static_type()
+        }
+    }
+    #[derive(Debug, Default)]
+    pub struct InputNode {
+        a_input: Input<f64>,
+    }
+    impl Node for InputNode {
+        fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+            let value = self.a_input.get()?;
+            if value != 0.0 {
+                Ok(NodeStatus::Success)
+            } else {
+                Ok(NodeStatus::Failure)
+            }
+        }
+        fn ports(&self) -> Result<Vec<Port>, NodeError> {
+            Ok(vec![Port::input::<f64>(&"a".into())])
+        }
+        fn port_setup(
+            &mut self,
+            port: &PortName,
+            direction: PortDirection,
+            interface: &mut dyn BlackboardInterface,
+        ) -> Result<(), NodeError> {
+            self.a_input = interface.input::<f64>(&port)?;
+            Ok(())
+        }
+
+        fn static_type() -> NodeType
+        where
+            Self: Sized,
+        {
+            "input_node".into()
+        }
+
+        fn node_type(&self) -> NodeType {
+            Self::static_type()
+        }
+    }
+
+    #[test]
+    fn test_input_output() -> Result<(), NodeError> {
+        let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
+        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
+        let o1 = tree.add_node_boxed(
+            NodeId(crate::Uuid::new_v4()),
+            Box::new(OutputNode::default()),
+        )?;
+        let i1 = tree.add_node_boxed(
+            NodeId(crate::Uuid::new_v4()),
+            Box::new(InputNode::default()),
+        )?;
+        tree.add_relation(root, 0, o1)?;
+        tree.add_relation(root, 1, i1)?;
+
+        // Add the blackboard.
+        let bb = tree.add_blackboard_boxed(
+            BlackboardId(crate::Uuid::new_v4()),
+            Box::new(BasicBlackboard::default()),
+        )?;
+
+        let output_ports = tree.node_ports(o1)?;
+        tree.connect_port_to_blackboard(&output_ports[0], bb)?;
+        let input_ports = tree.node_ports(i1)?;
+        tree.connect_port_to_blackboard(&input_ports[0], bb)?;
+
+        let res = tree.execute(root)?;
+        assert_eq!(res, NodeStatus::Success);
+
+        // get the value from the blackboard.
+        let bbref = tree.blackboard_ref(bb).unwrap();
+        let entries = bbref.borrow().ports();
+        assert_eq!(entries.len(), 1);
+        let value = bbref.borrow().get(&entries[0]);
+        println!("Value: {value:?}, {}", value.type_name());
+        let expected: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
+        println!("expected: {expected:?}, {}", expected.type_name());
+        assert_eq!(value, expected);
+        Ok(())
     }
 }

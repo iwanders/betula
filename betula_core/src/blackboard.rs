@@ -18,12 +18,24 @@ where
     }
 
     fn equality(&self, other: &dyn Chalkable) -> bool {
+        println!("eq: {self:?}, {other:?}");
+        println!(
+            "eq: {:?}   {:?}",
+            self.as_any_ref().type_id(),
+            other.as_any_ref().type_id()
+        );
         if self.as_any_ref().type_id() != other.as_any_ref().type_id() {
             false
         } else {
             let left = self.downcast_ref::<T>();
             let right = other.downcast_ref::<T>();
-            left == right
+            if left.is_none() || right.is_none() {
+                return false;
+            }
+            let left = left.unwrap();
+            let right = right.unwrap();
+            println!("leftright: {left:?}, {right:?}");
+            std::cmp::PartialEq::eq(left, right)
         }
     }
 }
@@ -34,9 +46,9 @@ impl Clone for Box<dyn Chalkable> {
     }
 }
 
-impl PartialEq<dyn Chalkable> for dyn Chalkable {
-    fn eq(&self, rhs: &(dyn Chalkable + 'static)) -> bool {
-        self.equality(rhs)
+impl PartialEq<Box<dyn Chalkable>> for Box<dyn Chalkable> {
+    fn eq(&self, rhs: &Box<dyn Chalkable>) -> bool {
+        (**self).equality(&**rhs)
     }
 }
 
@@ -70,15 +82,15 @@ pub trait Blackboard: std::fmt::Debug + AsAny + BlackboardInterface {
 }
 
 pub trait Setup: BlackboardInterface {
-    fn provides<T: 'static + Chalkable + Clone>(
+    fn output<T: 'static + Chalkable + Clone>(
         &mut self,
         key: &str,
         default: T,
     ) -> Result<Output<T>, NodeError> {
-        self.provides_or_else::<T, _>(key, || Box::new(default))
+        self.output_or_else::<T, _>(key, || Box::new(default))
     }
 
-    fn provides_or_else<T: 'static + Chalkable + Clone, Z: FnOnce() -> Value + 'static>(
+    fn output_or_else<T: 'static + Chalkable + Clone, Z: FnOnce() -> Value + 'static>(
         &mut self,
         key: &str,
         default_maker: Z,
@@ -113,10 +125,7 @@ pub trait Setup: BlackboardInterface {
         }))
     }
 
-    fn consumes<T: 'static + Chalkable + Clone>(
-        &mut self,
-        key: &str,
-    ) -> Result<Input<T>, NodeError> {
+    fn input<T: 'static + Chalkable + Clone>(&mut self, key: &str) -> Result<Input<T>, NodeError> {
         let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct InputFor<TT> {
@@ -183,5 +192,11 @@ mod tests {
         assert!(a != b);
         // println!("a_eq_b: {a_eq_b:?}");
         assert!(a == c);
+
+        assert!(std::cmp::PartialEq::eq(&3.3f64, &3.3f64));
+
+        let a: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
+        let b: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
+        assert!(a == b);
     }
 }
