@@ -1,5 +1,5 @@
 use crate::as_any::{AsAny, AsAnyHelper};
-use crate::{Input, NodeError, Output};
+use crate::{BetulaError, Input, NodeError, Output, PortName};
 use std::any::{Any, TypeId};
 
 /// Requirements for any value that is written to the blackboard.
@@ -62,7 +62,12 @@ pub trait BlackboardInterface {
     fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError>;
 }
 
-pub trait Blackboard: std::fmt::Debug + AsAny {}
+pub trait Blackboard: std::fmt::Debug + AsAny + BlackboardInterface {
+    fn ports(&self) -> Vec<PortName>;
+    fn clear(&mut self);
+    fn get(&self, port: &PortName) -> Option<Value>;
+    fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError>;
+}
 
 pub trait Setup: BlackboardInterface {
     fn provides<T: 'static + Chalkable + Clone>(

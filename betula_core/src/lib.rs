@@ -195,7 +195,7 @@ impl std::fmt::Debug for PortType {
 ///
 /// Input ports on a node take inputs by this name. Output ports provide an
 /// output by the specified name.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum PortDirection {
     /// The port consumes the value.
     Input,
@@ -243,7 +243,7 @@ use crate::blackboard::Blackboard;
 
 /// An untyped identifier for a node's port.
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-struct NodePort {
+pub struct NodePort {
     node: NodeId,
     direction: PortDirection,
     name: PortName,
@@ -269,7 +269,7 @@ impl NodePort {
 
 /// An untyped identifier for a node's output port.
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-struct BlackboardPort {
+pub struct BlackboardPort {
     blackboard: BlackboardId,
     name: PortName,
 }
@@ -354,10 +354,11 @@ pub trait Node: std::fmt::Debug + AsAny {
     /// The node should ONLY use the interface to register the specified port.
     fn port_setup(
         &mut self,
-        port: &Port,
+        port: &PortName,
+        direction: PortDirection,
         interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
-        let _ = (port, interface);
+        let _ = (port, direction, interface);
         Ok(())
     }
 
@@ -419,7 +420,7 @@ pub trait Tree {
     /// Return a mutable reference to a node.
     fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node>;
     /// Removes a node and any relations associated to it.
-    fn remove_node(&mut self, id: NodeId) -> Result<(), BetulaError>;
+    fn remove_node(&mut self, id: NodeId) -> Result<Box<dyn Node>, BetulaError>;
     /// Add a node to the tree.
     fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, BetulaError>;
 
@@ -440,14 +441,6 @@ pub trait Tree {
     /// Execute the tick, starting at the provided node.
     fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError>;
 
-    /// Call setup on a particular node.
-    fn port_setup(
-        &mut self,
-        id: NodeId,
-        port: &Port,
-        ctx: &mut dyn BlackboardInterface,
-    ) -> Result<(), BetulaError>;
-
     /// Get a list of the blackboard ids.
     fn blackboards(&self) -> Vec<BlackboardId>;
 
@@ -462,14 +455,10 @@ pub trait Tree {
         &mut self,
         id: BlackboardId,
         blackboard: Box<dyn Blackboard>,
-    ) -> Result<(), BetulaError> {
-        Ok(())
-    }
+    ) -> Result<BlackboardId, BetulaError>;
 
     /// Remove a blackboard by the specified id.
-    fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
-        None
-    }
+    fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>>;
 
     /// Connect an input or an output port to a blackboard using the port's name.
     fn connect_port_to_blackboard(
@@ -488,20 +477,14 @@ pub trait Tree {
         &mut self,
         node_port: &NodePort,
         blackboard_port: &BlackboardPort,
-    ) -> Result<(), BetulaError> {
-        Ok(())
-    }
+    ) -> Result<(), BetulaError>;
 
     /// Disconnect a connection between a node's port and a blackboard's port.
     fn disconnect_port(
         &mut self,
         node_port: &NodePort,
         blackboard_port: &BlackboardPort,
-    ) -> Result<(), BetulaError> {
-        Ok(())
-    }
+    ) -> Result<(), BetulaError>;
 
-    fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)> {
-        vec![]
-    }
+    fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)>;
 }
