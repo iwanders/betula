@@ -47,6 +47,8 @@ pub use blackboard::BlackboardInterface;
 mod as_any;
 pub use as_any::AsAny;
 
+use uuid::Uuid;
+
 use serde::{Deserialize, Serialize};
 
 /// The result states returned by a node.
@@ -104,10 +106,6 @@ impl<T: std::fmt::Debug + 'static> ConsumerTrait for DefaultProviderConsumer<T> 
     }
 }
 
-/// Bidirectional trait for node sthat both read and write values.
-pub trait ProviderConsumerTrait: ProviderTrait + ConsumerTrait + std::fmt::Debug {}
-impl<T: std::fmt::Debug + 'static> ProviderConsumerTrait for DefaultProviderConsumer<T> {}
-
 /// The boxed trait that nodes should use to provide values to the blackboard.
 pub type Provider<T> = Box<dyn ProviderTrait<ProviderItem = T>>;
 impl<T: std::fmt::Debug + 'static> Default for Provider<T> {
@@ -128,13 +126,28 @@ impl<T: std::fmt::Debug + 'static> Default for Consumer<T> {
     }
 }
 
-/// The boxed trait that nodes should use to provide and consume values from the blackboard.
-pub type ProviderConsumer<T> = Box<dyn ProviderConsumerTrait<ProviderItem = T, ConsumerItem = T>>;
-impl<T: std::fmt::Debug + 'static> Default for ProviderConsumer<T> {
-    fn default() -> Self {
-        Box::new(DefaultProviderConsumer::<T> {
-            z: std::marker::PhantomData,
-        })
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
+pub struct PortName(pub String);
+impl From<&str> for PortName {
+    fn from(v: &str) -> Self {
+        PortName(v.to_owned())
+    }
+}
+impl std::ops::Deref for PortName {
+    type Target = str;
+    fn deref(&self) -> &<Self as std::ops::Deref>::Target {
+        self.0.as_ref()
+    }
+}
+
+impl From<String> for PortName {
+    fn from(v: String) -> Self {
+        PortName(v.clone())
+    }
+}
+impl Into<String> for PortName {
+    fn into(self) -> std::string::String {
+        self.0.clone()
     }
 }
 
@@ -163,16 +176,16 @@ impl std::fmt::Debug for PortType {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Port {
     /// The type of the data.
-    pub data: PortType,
+    pub port_type: PortType,
     /// The name of the port.
-    pub name: String,
+    pub name: PortName,
 }
 
 impl Port {
     pub fn new<T: 'static>(name: &str) -> Self {
         Port {
-            data: PortType::new::<T>(),
-            name: name.to_string(),
+            port_type: PortType::new::<T>(),
+            name: name.into(),
         }
     }
 }
@@ -183,8 +196,6 @@ pub enum DirectionalPort {
     Consumer(Port),
     /// The port provides the value.
     Provider(Port),
-    /// The port provides and consumes the value.
-    ProviderConsumer(Port),
 }
 impl DirectionalPort {
     pub fn consumer<T: 'static>(name: &str) -> Self {
@@ -193,14 +204,10 @@ impl DirectionalPort {
     pub fn provider<T: 'static>(name: &str) -> Self {
         DirectionalPort::Provider(Port::new::<T>(name))
     }
-    pub fn provider_consumer<T: 'static>(name: &str) -> Self {
-        DirectionalPort::ProviderConsumer(Port::new::<T>(name))
-    }
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> PortName {
         match self {
-            DirectionalPort::Consumer(v) => v.name.as_ref(),
-            DirectionalPort::Provider(v) => v.name.as_ref(),
-            DirectionalPort::ProviderConsumer(v) => v.name.as_ref(),
+            DirectionalPort::Consumer(v) => v.name.clone(),
+            DirectionalPort::Provider(v) => v.name.clone(),
         }
     }
 }
@@ -312,7 +319,8 @@ pub trait Node: std::fmt::Debug + AsAny {
         Self: Sized;
 }
 
-use uuid::Uuid;
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
+pub struct BlackboardId(pub Uuid);
 
 /// Node ids are represented as UUIDs.
 ///
@@ -363,4 +371,6 @@ pub trait Tree {
         port: &DirectionalPort,
         ctx: &mut dyn BlackboardInterface,
     ) -> Result<(), BetulaError>;
+
+    // fn add_blackboard_boxed(&mut self, id: BlackboardId, blackboard: Box<dyn Blackboard>) -> Result<(), BetulaError>;
 }

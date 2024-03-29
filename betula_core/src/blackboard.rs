@@ -62,6 +62,8 @@ pub trait BlackboardInterface {
     fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError>;
 }
 
+pub trait Blackboard: std::fmt::Debug + AsAny {}
+
 pub trait Setup: BlackboardInterface {
     fn provides<T: 'static + Chalkable + Clone>(
         &mut self,
