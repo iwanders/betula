@@ -259,30 +259,32 @@ mod test {
         println!("loader: {tree_config:#?}");
 
         // Lets make a new tree.
-        let mut tree = BasicTree::new();
+        let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode {}))?;
         let s1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SuccessNode {}))?;
         tree.add_relation(root, 0, f1)?;
         tree.add_relation(root, 1, s1)?;
 
-        let obj = TreeSerializer::new(&tree_config, &tree);
+        let obj = TreeSerializer::new(&tree_config, &*tree);
         let config_json = serde_json::to_string(&obj)?;
         println!("config json: {config_json:?}");
 
-        let json_value = tree_config.serialize(&tree, serde_json::value::Serializer)?;
+        let json_value = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value}");
 
         // lets try to rebuild the tree from that json value.
-        let mut new_tree = BasicTree::new();
-        tree_config.deserialize(&mut new_tree, json_value.clone())?;
+        let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
+        tree_config.deserialize(&mut *new_tree, json_value.clone())?;
         println!("new_tree: {new_tree:#?}");
-        let and_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
+        let and_back = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
 
         // let mut another_tree = tree_config.deserialize_default::<BasicTree,_>(json_value.clone())?;
         // let and_another_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
         // assert_eq!(and_another_back, json_value);
+
+        // Lets add a blackboard.
 
         Ok(())
     }

@@ -91,6 +91,65 @@ impl<T: DefaultConfigRequirements> ConfigConverter for DefaultConfigConverter<T>
         Ok(Box::new(erased_serde::deserialize::<T>(config)?))
     }
 }
+use betula_core::blackboard::Chalkable;
+
+/// Trait to facilitate serialization and deserialization of blackboard values.
+pub trait ValueConverter: std::fmt::Debug {
+    fn value_serialize(
+        &self,
+        config: &dyn Chalkable,
+    ) -> Result<Box<dyn erased_serde::Serialize>, BetulaError>;
+    fn value_deserialize(
+        &self,
+        config: &mut dyn erased_serde::Deserializer,
+    ) -> Result<Box<dyn Chalkable>, BetulaError>;
+}
+
+pub trait DefaultValueRequirements:
+    Serialize + serde::de::DeserializeOwned + 'static + Chalkable + Clone
+{
+}
+impl<T> DefaultValueRequirements for T where
+    T: Serialize + serde::de::DeserializeOwned + 'static + Chalkable + Clone
+{
+}
+
+/// Default value converter
+pub struct DefaultValueConverter<T: DefaultValueRequirements> {
+    _z: std::marker::PhantomData<T>,
+}
+impl<T: DefaultValueRequirements> std::fmt::Debug for DefaultValueConverter<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "DefaultValueConverter<{}>", std::any::type_name::<T>())
+    }
+}
+
+impl<T: DefaultValueRequirements> DefaultValueConverter<T> {
+    pub fn new() -> Self {
+        Self {
+            _z: std::marker::PhantomData,
+        }
+    }
+}
+impl<T: DefaultValueRequirements> ValueConverter for DefaultValueConverter<T> {
+    fn value_serialize(
+        &self,
+        value: &dyn Chalkable,
+    ) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
+        let v = (*value)
+            .downcast_ref::<T>()
+            .ok_or("failed to cast")?
+            .clone();
+        Ok(Box::new(v.clone()))
+    }
+    fn value_deserialize(
+        &self,
+        value: &mut dyn erased_serde::Deserializer,
+    ) -> Result<Box<dyn Chalkable>, BetulaError> {
+        Ok(Box::new(erased_serde::deserialize::<T>(value)?))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
