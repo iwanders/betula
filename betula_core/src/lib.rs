@@ -1,6 +1,30 @@
-/*
-    All behaviour tree execution is single threaded.
+/*!
 
+The core traits and requirements for a Betula Behaviour Tree.
+
+All behaviour tree execution is single threaded.
+
+
+The nodes can have state, the tree should use interior mutability.
+This is fine, as the callstack descends down the tree it should never
+encounter the same node twice, as that makes a loop, loops in a behaviour
+tree don't really make sense.
+
+On blackboards:
+* Nodes may have inputs and outputs.
+* Nodes may consume data (input).
+* Nodes may provide data (output).
+* An output may be connected to multiple inputs.
+* Name remaps happen at the input side. Such that one output
+  can still be uniquely referred to, but write to one blackboard under
+  different names.
+* Input and outputs cannot write to each other directly, they MUST pass
+  through a blackboard. This allows the tree to track writes and decide if
+  parts of the tree must be re-evaluated.
+
+*/
+
+/*
     Classical:
         Control flow (internal nodes):
             fallback, sequence, parallel, decorator
@@ -11,11 +35,6 @@
     Thoughts:
         Would be nice if the node ids were stable...
 
-
-    The nodes can have state, the tree should use interior mutability.
-    This is fine, as the callstack descends down the tree it should never
-    encounter the same node twice, as that makes a loop and that sounds
-    bad.
 
     Can we do something lazy? Where we only re-evaluate the parts of the
     tree that may have changed?
@@ -427,6 +446,7 @@ pub trait Tree {
     fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
         None
     }
+
     fn add_port_remap(
         &mut self,
         node_port: &NodePort,
