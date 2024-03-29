@@ -86,12 +86,13 @@ impl TreeConfig {
 
     pub fn add_default_with_config<N: DefaultFactoryRequirements, C: DefaultConfigRequirements>(
         &mut self,
-    ) -> Result<(), BetulaError> {
+    ) {
         self.add_factory(N::static_type(), Box::new(DefaultFactory::<N>::new()));
         self.add_config_converter(
             &N::static_type(),
             Box::new(DefaultConfigConverter::<C>::new()),
         )
+        .expect("cannot fail, key was added line above");
     }
 
     pub fn serialize<S: serde::Serializer>(
@@ -243,9 +244,9 @@ impl<'a, 'b> serde::Serialize for TreeSerializer<'a, 'b> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use betula_core::basic::BasicTree;
+    use betula_core::basic::{BasicBlackboard, BasicTree};
     use betula_core::nodes::{FailureNode, SelectorNode, SuccessNode};
-    use betula_core::NodeId;
+    use betula_core::{BlackboardId, NodeId};
     use uuid::Uuid;
     #[test]
     fn test_config() -> Result<(), BetulaError> {
@@ -255,7 +256,7 @@ mod test {
         tree_config.add_default::<betula_core::nodes::FailureNode>();
         tree_config.add_default::<betula_core::nodes::SuccessNode>();
         tree_config
-            .add_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>()?;
+            .add_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>();
         println!("loader: {tree_config:#?}");
 
         // Lets make a new tree.
@@ -284,7 +285,53 @@ mod test {
         // let and_another_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
         // assert_eq!(and_another_back, json_value);
 
-        // Lets add a blackboard.
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_blackboard() -> Result<(), BetulaError> {
+        let mut tree_config = TreeConfig::new();
+        tree_config.add_default::<betula_core::nodes::SequenceNode>();
+        tree_config.add_default::<betula_core::nodes::SelectorNode>();
+        tree_config.add_default::<betula_core::nodes::FailureNode>();
+        tree_config.add_default::<betula_core::nodes::SuccessNode>();
+        tree_config
+            .add_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>();
+        tree_config.add_default::<crate::nodes::TimeNode>();
+
+        let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
+        let root = tree.add_node_boxed(
+            NodeId(Uuid::new_v4()),
+            Box::new(betula_core::nodes::SequenceNode {}),
+        )?;
+        let time_node = tree.add_node_boxed(
+            NodeId(Uuid::new_v4()),
+            Box::new(crate::nodes::TimeNode::default()),
+        )?;
+        let delay_node = tree.add_node_boxed(
+            NodeId(Uuid::new_v4()),
+            Box::new(crate::nodes::DelayNode::default()),
+        )?;
+        tree.add_relation(root, 0, time_node)?;
+        tree.add_relation(root, 1, delay_node)?;
+
+        // Add the blackboard.
+        let bb = tree.add_blackboard_boxed(
+            BlackboardId(Uuid::new_v4()),
+            Box::new(BasicBlackboard::default()),
+        )?;
+
+        let output_ports = tree.node_ports(time_node)?;
+        tree.connect_port_to_blackboard(&output_ports[0], bb)?;
+        let input_ports = tree.node_ports(delay_node)?;
+        tree.connect_port_to_blackboard(&input_ports[0], bb)?;
+
+        let obj = TreeSerializer::new(&tree_config, &*tree);
+        let config_json = serde_json::to_string(&obj)?;
+        println!("config json: {config_json:?}");
+
+        let json_value = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
+        println!("json_value: {json_value}");
 
         Ok(())
     }
