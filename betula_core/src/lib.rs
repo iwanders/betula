@@ -96,50 +96,50 @@ pub type NodeError = BetulaError;
 
 // Output and Input feels ambiguous, is that from the blackboard or from
 // the nodes?
-/// Provider trait for nodes that set values.
-pub trait ProviderTrait: std::fmt::Debug {
-    type ProviderItem;
-    fn set(&self, v: Self::ProviderItem) -> Result<(), NodeError>;
+/// Output trait for nodes that set values.
+pub trait OutputTrait: std::fmt::Debug {
+    type OutputItem;
+    fn set(&self, v: Self::OutputItem) -> Result<(), NodeError>;
 }
 
-/// Consumer trait for nodes that get values.
-pub trait ConsumerTrait: std::fmt::Debug {
-    type ConsumerItem;
-    fn get(&self) -> Result<Self::ConsumerItem, NodeError>;
+/// Input trait for nodes that get values.
+pub trait InputTrait: std::fmt::Debug {
+    type InputItem;
+    fn get(&self) -> Result<Self::InputItem, NodeError>;
 }
 
 #[derive(Debug)]
-struct DefaultProviderConsumer<T> {
+struct DefaultOutputInput<T> {
     z: std::marker::PhantomData<T>,
 }
-impl<T: std::fmt::Debug + 'static> ProviderTrait for DefaultProviderConsumer<T> {
-    type ProviderItem = T;
-    fn set(&self, _v: Self::ProviderItem) -> Result<(), NodeError> {
-        Err("provider is not initialised".into())
+impl<T: std::fmt::Debug + 'static> OutputTrait for DefaultOutputInput<T> {
+    type OutputItem = T;
+    fn set(&self, _v: Self::OutputItem) -> Result<(), NodeError> {
+        Err("output is not initialised".into())
     }
 }
-impl<T: std::fmt::Debug + 'static> ConsumerTrait for DefaultProviderConsumer<T> {
-    type ConsumerItem = T;
-    fn get(&self) -> Result<Self::ConsumerItem, NodeError> {
-        Err("consumer is not initialised".into())
+impl<T: std::fmt::Debug + 'static> InputTrait for DefaultOutputInput<T> {
+    type InputItem = T;
+    fn get(&self) -> Result<Self::InputItem, NodeError> {
+        Err("input is not initialised".into())
     }
 }
 
 /// The boxed trait that nodes should use to provide values to the blackboard.
-pub type Provider<T> = Box<dyn ProviderTrait<ProviderItem = T>>;
-impl<T: std::fmt::Debug + 'static> Default for Provider<T> {
+pub type Output<T> = Box<dyn OutputTrait<OutputItem = T>>;
+impl<T: std::fmt::Debug + 'static> Default for Output<T> {
     fn default() -> Self {
-        Box::new(DefaultProviderConsumer::<T> {
+        Box::new(DefaultOutputInput::<T> {
             z: std::marker::PhantomData,
         })
     }
 }
 
 /// The boxed trait that nodes should use to consume values from the blackboard.
-pub type Consumer<T> = Box<dyn ConsumerTrait<ConsumerItem = T>>;
-impl<T: std::fmt::Debug + 'static> Default for Consumer<T> {
+pub type Input<T> = Box<dyn InputTrait<InputItem = T>>;
+impl<T: std::fmt::Debug + 'static> Default for Input<T> {
     fn default() -> Self {
-        Box::new(DefaultProviderConsumer::<T> {
+        Box::new(DefaultOutputInput::<T> {
             z: std::marker::PhantomData,
         })
     }
@@ -193,14 +193,14 @@ impl std::fmt::Debug for PortType {
 
 /// A port with a directionality.
 ///
-/// Consumer ports on a node take inputs by this name. Provider ports provide an
+/// Input ports on a node take inputs by this name. Output ports provide an
 /// output by the specified name.
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum PortDirection {
     /// The port consumes the value.
-    Consumer,
+    Input,
     /// The port provides the value.
-    Provider,
+    Output,
 }
 
 /// A port for a node.
@@ -214,17 +214,17 @@ pub struct Port {
 }
 
 impl Port {
-    pub fn consumer<T: 'static>(name: &PortName) -> Self {
+    pub fn input<T: 'static>(name: &PortName) -> Self {
         Port {
             port_type: PortType::new::<T>(),
-            direction: PortDirection::Consumer,
+            direction: PortDirection::Input,
             name: name.clone(),
         }
     }
-    pub fn provider<T: 'static>(name: &PortName) -> Self {
+    pub fn output<T: 'static>(name: &PortName) -> Self {
         Port {
             port_type: PortType::new::<T>(),
-            direction: PortDirection::Provider,
+            direction: PortDirection::Output,
             name: name.clone(),
         }
     }
@@ -251,17 +251,17 @@ struct NodePort {
     name: PortName,
 }
 impl NodePort {
-    pub fn consumer(node: NodeId, name: &PortName) -> Self {
+    pub fn input(node: NodeId, name: &PortName) -> Self {
         NodePort {
             node,
-            direction: PortDirection::Consumer,
+            direction: PortDirection::Input,
             name: name.clone(),
         }
     }
-    pub fn provider(node: NodeId, name: &PortName) -> Self {
+    pub fn output(node: NodeId, name: &PortName) -> Self {
         NodePort {
             node,
-            direction: PortDirection::Provider,
+            direction: PortDirection::Output,
             name: name.clone(),
         }
     }
@@ -337,7 +337,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///   tree: The context in which this node is being ran.
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
 
-    /// Setup method for the node to obtain providers and consumers from the
+    /// Setup method for the node to obtain outputs and inputs from the
     /// blackboard. Setup should happen mostly through the [`blackboard::Setup`] trait.
     /// The node should ONLY use the interface to register the specified port.
     fn port_setup(

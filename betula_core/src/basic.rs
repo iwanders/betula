@@ -243,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn blackboard_provider() {
+    fn blackboard_output() {
         let mut bb = BasicBlackboard::default();
 
         // let mut w = crate::BlackboardContext::new(&mut bb);
