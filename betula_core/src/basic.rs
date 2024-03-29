@@ -555,7 +555,7 @@ mod tests {
         println!("Value: {value:?}, {}", value.type_name());
         let expected: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
         println!("expected: {expected:?}, {}", expected.type_name());
-        assert_eq!(value, expected);
+        assert!(value.unwrap().is_equal(&*expected.unwrap()));
         Ok(())
     }
 }

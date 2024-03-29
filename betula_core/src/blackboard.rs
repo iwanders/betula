@@ -6,7 +6,7 @@ use std::any::{Any, TypeId};
 /// Clone, std::any::Any, std::fmt::Debug, std::cmp::PartialEq
 pub trait Chalkable: std::fmt::Debug + crate::AsAny {
     fn clone_boxed(&self) -> Box<dyn Chalkable>;
-    fn equality(&self, other: &dyn Chalkable) -> bool;
+    fn is_equal(&self, other: &dyn Chalkable) -> bool;
 }
 
 impl<T> Chalkable for T
@@ -17,7 +17,7 @@ where
         Box::new(self.clone())
     }
 
-    fn equality(&self, other: &dyn Chalkable) -> bool {
+    fn is_equal(&self, other: &dyn Chalkable) -> bool {
         // println!("eq: {self:?}, {other:?}");
         // println!("eq: {:?}   {:?}", self.as_any_ref().type_id(), other.as_any_ref().type_id());
         if self.as_any_ref().type_id() != other.as_any_ref().type_id() {
@@ -42,11 +42,12 @@ impl Clone for Box<dyn Chalkable> {
     }
 }
 
-impl PartialEq<Box<dyn Chalkable>> for Box<dyn Chalkable> {
-    fn eq(&self, rhs: &Box<dyn Chalkable>) -> bool {
-        (**self).equality(&**rhs)
-    }
-}
+// Disable this for now, it feels fragile.
+// impl PartialEq<Box<dyn Chalkable>> for Box<dyn Chalkable> {
+// fn eq(&self, rhs: &Box<dyn Chalkable> ) -> bool {
+// (**self).is_equal(&**rhs)
+// }
+// }
 
 pub type Value = Box<dyn Chalkable>;
 
@@ -174,9 +175,9 @@ mod tests {
         let c = a.clone();
         println!("a: {a:?}");
         println!("c cloned a: {c:?}");
-        assert!(a != b);
+        assert!(!a.is_equal(&*b));
         // println!("a_eq_b: {a_eq_b:?}");
-        assert!(a == c);
+        assert!(a.is_equal(&*c));
 
         #[derive(Debug, Clone, PartialEq)]
         struct Z(f32);
@@ -185,14 +186,15 @@ mod tests {
         let c = a.clone();
         println!("a: {a:?}");
         println!("c cloned a: {c:?}");
-        assert!(a != b);
+        assert!(!a.is_equal(&*b));
         // println!("a_eq_b: {a_eq_b:?}");
-        assert!(a == c);
+        assert!(a.is_equal(&*c));
 
         assert!(std::cmp::PartialEq::eq(&3.3f64, &3.3f64));
 
-        let a: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
-        let b: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
-        assert!(a == b);
+        let a: Box<dyn Chalkable> = Box::new(3.3f64);
+        let b: Box<dyn Chalkable> = Box::new(3.3f64);
+
+        assert!(a.is_equal(&*b));
     }
 }
