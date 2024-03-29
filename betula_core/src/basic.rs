@@ -191,21 +191,21 @@ impl Tree for BasicTree {
         let mut node_mut = node.node.try_borrow_mut()?;
 
         struct Remapper<'a, 'b> {
-            new_name: &'a str,
+            new_name: &'a PortName,
             blackboard: &'b mut dyn Blackboard,
         }
         impl<'a, 'b> BlackboardInterface for Remapper<'a, 'b> {
             fn writer(
                 &mut self,
                 id: TypeId,
-                key: &str,
+                key: &PortName,
                 default: ValueCreator,
             ) -> Result<Write, NodeError> {
                 let _ = key;
                 self.blackboard.writer(id, self.new_name, default)
             }
 
-            fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError> {
+            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
                 let _ = key;
                 self.blackboard.reader(id, self.new_name)
             }
@@ -241,7 +241,7 @@ impl Tree for BasicTree {
             fn writer(
                 &mut self,
                 id: TypeId,
-                key: &str,
+                key: &PortName,
                 default: ValueCreator,
             ) -> Result<Write, NodeError> {
                 let _ = (id, key, default);
@@ -249,7 +249,7 @@ impl Tree for BasicTree {
                 Ok(Box::new(v))
             }
 
-            fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError> {
+            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
                 let _ = (id, key);
                 let v = || Err(format!("reading from disconnected port").into());
                 Ok(Box::new(v))
@@ -281,27 +281,32 @@ use crate::blackboard::{BlackboardInterface, Read, Value, ValueCreator, Write};
 use std::any::TypeId;
 #[derive(Default, Debug)]
 pub struct BasicBlackboard {
-    values: HashMap<String, (TypeId, Rc<RefCell<Value>>)>,
+    values: HashMap<PortName, (TypeId, Rc<RefCell<Value>>)>,
 }
 use crate::as_any::AsAny;
 impl BlackboardInterface for BasicBlackboard {
-    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, NodeError> {
+    fn writer(
+        &mut self,
+        id: TypeId,
+        key: &PortName,
+        default: ValueCreator,
+    ) -> Result<Write, NodeError> {
         let (typeid, rc) = self
             .values
-            .entry(key.to_string())
+            .entry(key.clone())
             .or_insert_with(|| (id, Rc::new(RefCell::new(default()))))
             .clone();
         let temp_rc = rc.clone();
         let current_type = {
             let z = temp_rc
                 .try_borrow_mut()
-                .or_else(|_| Err(format!("{key} was already borrowed")))?;
+                .or_else(|_| Err(format!("{key:?} was already borrowed")))?;
             (**z).type_name().to_string()
         };
         let owned_key = key.to_string();
         if typeid != id {
             Err(format!(
-                "new writer for '{key}', has wrong type: already got {}",
+                "new writer for '{key:?}', has wrong type: already got {}",
                 current_type
             )
             .into())
@@ -310,7 +315,7 @@ impl BlackboardInterface for BasicBlackboard {
                 let mut locked = rc.try_borrow_mut()?;
                 if (**locked).type_id() != (*v).type_id() {
                     Err(format!(
-                        "assignment for '{owned_key}' is incorrect type {} expected {}",
+                        "assignment for '{owned_key:?}' is incorrect type {} expected {}",
                         (**locked).type_name(),
                         (*v).type_name()
                     )
@@ -323,15 +328,15 @@ impl BlackboardInterface for BasicBlackboard {
         }
     }
 
-    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError> {
+    fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
         let (typeid, rc) = self
             .values
             .get(key)
-            .ok_or_else(|| format!("key '{key}' not found"))?;
+            .ok_or_else(|| format!("key '{key:?}' not found"))?;
         let v = rc.clone();
         if typeid != id {
             Err(format!(
-                "new reader for '{key}' mismatches type: already got {}",
+                "new reader for '{key:?}' mismatches type: already got {}",
                 rc.type_name()
             )
             .into())
@@ -346,10 +351,7 @@ impl BlackboardInterface for BasicBlackboard {
 }
 impl Blackboard for BasicBlackboard {
     fn ports(&self) -> Vec<PortName> {
-        self.values
-            .keys()
-            .map(|v| PortName(v.clone()))
-            .collect::<Vec<_>>()
+        self.values.keys().map(|v| v.clone()).collect::<Vec<_>>()
     }
 
     fn clear(&mut self) {
@@ -357,18 +359,18 @@ impl Blackboard for BasicBlackboard {
     }
 
     fn get(&self, port: &PortName) -> Option<Value> {
-        self.values.get(&port.0).map(|x| x.1.borrow().clone_boxed())
+        self.values.get(&port).map(|x| x.1.borrow().clone_boxed())
     }
 
     fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError> {
         let new_value_type = (*value).type_id();
-        let old_value_type = self.values.get(&port.0).map(|x| (*x).type_id());
+        let old_value_type = self.values.get(&port).map(|x| (*x).type_id());
         if let Some(old_value_type) = old_value_type {
             if new_value_type != old_value_type {
                 return Err("different type already on blackboard".into());
             }
         }
-        match self.values.entry(port.0.clone()) {
+        match self.values.entry(port.clone()) {
             std::collections::hash_map::Entry::Occupied(e) => {
                 *(e.get().1.try_borrow_mut()?) = value;
             }
@@ -416,8 +418,8 @@ mod tests {
 
         // let mut w = crate::BlackboardContext::new(&mut bb);
         let v_in = 3i64;
-        let p = bb.output("value", v_in);
-        let c = bb.input::<i64>("value");
+        let p = bb.output(&"value".into(), v_in);
+        let c = bb.input::<i64>(&"value".into());
         assert!(c.is_ok());
         let c = c.unwrap();
         let v = c.get();
@@ -431,14 +433,14 @@ mod tests {
         let p = p.unwrap();
         let res = p.set(5);
         assert!(res.is_ok());
-        let z = bb.output("value", 3.3f64);
+        let z = bb.output(&"value".into(), 3.3f64);
         println!("z: {z:?}");
         assert!(z.is_err());
         // println!("BasicBlackboard: {bb:?}");
         // let r = bb.consumes(&TypeId::of::<i64>(), "value");
         // assert!(r.is_ok());
         // println!("value: {:?}", r.unwrap()());
-        let c = bb.input::<i64>("value");
+        let c = bb.input::<i64>(&"value".into());
         println!("c: {c:?}");
         println!("value: {:?}", z);
     }
@@ -519,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_input_output() -> Result<(), NodeError> {
-        use crate::blackboard::Chalkable;
+        // use crate::blackboard::Chalkable;
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
         let o1 = tree.add_node_boxed(
@@ -553,7 +555,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
         let value = bbref.borrow().get(&entries[0]);
         println!("Value: {value:?}, {}", value.type_name());
-        let expected: Option<Box<dyn Chalkable>> = Some(Box::new(3.3f64));
+        let expected: Option<Box<dyn crate::blackboard::Chalkable>> = Some(Box::new(3.3f64));
         println!("expected: {expected:?}, {}", expected.type_name());
         assert!(value.unwrap().is_equal(&*expected.unwrap()));
         Ok(())

@@ -66,9 +66,14 @@ use crate::{InputTrait, OutputTrait};
 /// The object safe blackboard interface, providing access to the getters and setters.
 /// Interation through BlackboardSetup is very much recommended.
 pub trait BlackboardInterface {
-    fn writer(&mut self, id: TypeId, key: &str, default: ValueCreator) -> Result<Write, NodeError>;
+    fn writer(
+        &mut self,
+        id: TypeId,
+        key: &PortName,
+        default: ValueCreator,
+    ) -> Result<Write, NodeError>;
 
-    fn reader(&mut self, id: &TypeId, key: &str) -> Result<Read, NodeError>;
+    fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError>;
 }
 
 pub trait Blackboard: std::fmt::Debug + AsAny + BlackboardInterface {
@@ -81,7 +86,7 @@ pub trait Blackboard: std::fmt::Debug + AsAny + BlackboardInterface {
 pub trait Setup: BlackboardInterface {
     fn output<T: 'static + Chalkable + Clone>(
         &mut self,
-        key: &str,
+        key: &PortName,
         default: T,
     ) -> Result<Output<T>, NodeError> {
         self.output_or_else::<T, _>(key, || Box::new(default))
@@ -89,13 +94,13 @@ pub trait Setup: BlackboardInterface {
 
     fn output_or_else<T: 'static + Chalkable + Clone, Z: FnOnce() -> Value + 'static>(
         &mut self,
-        key: &str,
+        key: &PortName,
         default_maker: Z,
     ) -> Result<Output<T>, NodeError> {
         let writer =
             BlackboardInterface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
         struct OutputFor<TT> {
-            key: String,
+            key: PortName,
             type_name: String,
             z: std::marker::PhantomData<TT>,
             writer: Write,
@@ -110,7 +115,7 @@ pub trait Setup: BlackboardInterface {
 
         impl<TT: 'static + Chalkable + Clone> std::fmt::Debug for OutputFor<TT> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                write!(f, "Output::<{}>(\"{}\")", self.type_name, self.key)
+                write!(f, "Output::<{}>(\"{:?}\")", self.type_name, self.key)
             }
         }
 
@@ -118,15 +123,18 @@ pub trait Setup: BlackboardInterface {
             writer,
             z: std::marker::PhantomData,
             type_name: std::any::type_name::<T>().to_string(),
-            key: key.to_string(),
+            key: key.clone(),
         }))
     }
 
-    fn input<T: 'static + Chalkable + Clone>(&mut self, key: &str) -> Result<Input<T>, NodeError> {
+    fn input<T: 'static + Chalkable + Clone>(
+        &mut self,
+        key: &PortName,
+    ) -> Result<Input<T>, NodeError> {
         let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct InputFor<TT> {
-            key: String,
+            key: PortName,
             type_name: String,
             z: std::marker::PhantomData<TT>,
             reader: Read,
@@ -148,7 +156,7 @@ pub trait Setup: BlackboardInterface {
 
         impl<TT: 'static + Chalkable + Clone> std::fmt::Debug for InputFor<TT> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                write!(f, "Input::<{}>(\"{}\")", self.type_name, self.key)
+                write!(f, "Input::<{}>(\"{:?}\")", self.type_name, self.key)
             }
         }
 
@@ -156,7 +164,7 @@ pub trait Setup: BlackboardInterface {
             reader,
             z: std::marker::PhantomData,
             type_name: std::any::type_name::<T>().to_string(),
-            key: key.to_string(),
+            key: key.clone(),
         }))
     }
 }
