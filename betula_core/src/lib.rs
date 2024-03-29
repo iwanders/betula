@@ -245,12 +245,14 @@ use crate::blackboard::Blackboard;
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 struct NodePort {
     node: NodeId,
+    direction: PortDirection,
     name: PortName,
 }
 impl NodePort {
-    pub fn new(node: NodeId, name: &PortName) -> Self {
+    pub fn new(node: NodeId, name: &PortName, direction: PortDirection) -> Self {
         NodePort {
             node,
+            direction,
             name: name.clone(),
         }
     }
@@ -259,6 +261,9 @@ impl NodePort {
     }
     pub fn name(&self) -> PortName {
         self.name.clone()
+    }
+    pub fn direction(&self) -> PortDirection {
+        self.direction.clone()
     }
 }
 
@@ -443,6 +448,16 @@ pub trait Tree {
         ctx: &mut dyn BlackboardInterface,
     ) -> Result<(), BetulaError>;
 
+    /// Get a list of the blackboard ids.
+    fn blackboards(&self) -> Vec<BlackboardId>;
+
+    /// Return a reference to a blackboard.
+    fn blackboard_ref(&self, id: BlackboardId) -> Option<&std::cell::RefCell<Box<dyn Blackboard>>>;
+
+    /// Return a mutable reference to a blackboard.
+    fn blackboard_mut(&mut self, id: BlackboardId) -> Option<&mut dyn Blackboard>;
+
+    /// Add a new blackboard to the tree.
     fn add_blackboard_boxed(
         &mut self,
         id: BlackboardId,
@@ -451,22 +466,25 @@ pub trait Tree {
         Ok(())
     }
 
+    /// Remove a blackboard by the specified id.
     fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
         None
     }
 
-    // From node to blackboard.
-    fn node_to_blackboard(
+    /// Connect an input or an output port to a blackboard using the port's name.
+    fn connect_port_to_blackboard(
         &mut self,
         node_port: &NodePort,
         blackboard: BlackboardId,
     ) -> Result<(), BetulaError> {
-        self.node_to_blackboard_port(
+        self.connect_port_to_blackboard_port(
             node_port,
             &BlackboardPort::new(blackboard, &node_port.name()),
         )
     }
-    fn node_to_blackboard_port(
+
+    /// Connect an input or an output to a blackboard, using the specified blackboard port name.
+    fn connect_port_to_blackboard_port(
         &mut self,
         node_port: &NodePort,
         blackboard_port: &BlackboardPort,
@@ -474,31 +492,16 @@ pub trait Tree {
         Ok(())
     }
 
-    // From blackboard to node.
-
-    fn blackboard_to_node(
-        &mut self,
-        blackboard: BlackboardId,
-        node_port: &NodePort,
-    ) -> Result<(), BetulaError> {
-        self.blackboard_to_node_port(
-            &BlackboardPort::new(blackboard, &node_port.name()),
-            node_port,
-        )
-    }
-    fn blackboard_to_node_port(
-        &mut self,
-        blackboard_port: &BlackboardPort,
-        node_port: &NodePort,
-    ) -> Result<(), BetulaError> {
-        Ok(())
-    }
-
+    /// Disconnect a connection between a node's port and a blackboard's port.
     fn disconnect_port(
         &mut self,
         node_port: &NodePort,
         blackboard_port: &BlackboardPort,
     ) -> Result<(), BetulaError> {
         Ok(())
+    }
+
+    fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)> {
+        vec![]
     }
 }
