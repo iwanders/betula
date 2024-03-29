@@ -2,8 +2,11 @@
 
 The core traits and requirements for a Betula Behaviour Tree.
 
-All behaviour tree execution is single threaded.
+The [`Tree`] holds two fundamental types:
+* [`Node`] these are the nodes making up the behaviour tree.
+* [`Blackboard`] these are blackboards that nodes interface with for data.
 
+All behaviour tree execution is single threaded.
 
 The nodes can have state, the tree should use interior mutability.
 This is fine, as the callstack descends down the tree it should never
@@ -11,10 +14,9 @@ encounter the same node twice, as that makes a loop, loops in a behaviour
 tree don't really make sense.
 
 On blackboards:
-* Nodes may have inputs and outputs.
-* Nodes may consume data (input).
-* Nodes may provide data (output).
-* An output may be connected to multiple inputs.
+* Blackboards are key-value stores.
+* Nodes may consume data, these are inputs.
+* Nodes may provide data, these are outputs.
 * Name remaps happen at the input side. Such that one output
   can still be uniquely referred to, but write to one blackboard under
   different names.
@@ -94,8 +96,6 @@ pub type BetulaError = Box<dyn std::error::Error + Send + Sync>;
 /// Error type for results from node execution.
 pub type NodeError = BetulaError;
 
-// Output and Input feels ambiguous, is that from the blackboard or from
-// the nodes?
 /// Output trait for nodes that set values.
 pub trait OutputTrait: std::fmt::Debug {
     type OutputItem;
@@ -241,35 +241,42 @@ impl Port {
 }
 use crate::blackboard::Blackboard;
 
-/// A uniquely identified port on a node.
-///
-/// Uses the name before remapping, which is guaranteed to be unique.
+/// An untyped identifier for a node's port.
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 struct NodePort {
     node: NodeId,
-    direction: PortDirection,
     name: PortName,
 }
 impl NodePort {
-    pub fn input(node: NodeId, name: &PortName) -> Self {
+    pub fn new(node: NodeId, name: &PortName) -> Self {
         NodePort {
             node,
-            direction: PortDirection::Input,
-            name: name.clone(),
-        }
-    }
-    pub fn output(node: NodeId, name: &PortName) -> Self {
-        NodePort {
-            node,
-            direction: PortDirection::Output,
             name: name.clone(),
         }
     }
     pub fn node(&self) -> NodeId {
         self.node.clone()
     }
-    pub fn direction(&self) -> PortDirection {
-        self.direction.clone()
+    pub fn name(&self) -> PortName {
+        self.name.clone()
+    }
+}
+
+/// An untyped identifier for a node's output port.
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+struct BlackboardPort {
+    blackboard: BlackboardId,
+    name: PortName,
+}
+impl BlackboardPort {
+    pub fn new(blackboard: BlackboardId, name: &PortName) -> Self {
+        BlackboardPort {
+            blackboard,
+            name: name.clone(),
+        }
+    }
+    pub fn blackboard(&self) -> BlackboardId {
+        self.blackboard.clone()
     }
     pub fn name(&self) -> PortName {
         self.name.clone()
@@ -443,21 +450,55 @@ pub trait Tree {
     ) -> Result<(), BetulaError> {
         Ok(())
     }
+
     fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
         None
     }
 
-    fn add_port_remap(
+    // From node to blackboard.
+    fn node_to_blackboard(
         &mut self,
         node_port: &NodePort,
-        new_name: &PortName,
+        blackboard: BlackboardId,
+    ) -> Result<(), BetulaError> {
+        self.node_to_blackboard_port(
+            node_port,
+            &BlackboardPort::new(blackboard, &node_port.name()),
+        )
+    }
+    fn node_to_blackboard_port(
+        &mut self,
+        node_port: &NodePort,
+        blackboard_port: &BlackboardPort,
     ) -> Result<(), BetulaError> {
         Ok(())
     }
-    fn connect_port(&mut self, node_port: &NodePort, id: BlackboardId) -> Result<(), BetulaError> {
+
+    // From blackboard to node.
+
+    fn blackboard_to_node(
+        &mut self,
+        blackboard: BlackboardId,
+        node_port: &NodePort,
+    ) -> Result<(), BetulaError> {
+        self.blackboard_to_node_port(
+            &BlackboardPort::new(blackboard, &node_port.name()),
+            node_port,
+        )
+    }
+    fn blackboard_to_node_port(
+        &mut self,
+        blackboard_port: &BlackboardPort,
+        node_port: &NodePort,
+    ) -> Result<(), BetulaError> {
         Ok(())
     }
-    fn disconnect_port(&mut self, node_port: &NodePort) -> Result<(), BetulaError> {
+
+    fn disconnect_port(
+        &mut self,
+        node_port: &NodePort,
+        blackboard_port: &BlackboardPort,
+    ) -> Result<(), BetulaError> {
         Ok(())
     }
 }
