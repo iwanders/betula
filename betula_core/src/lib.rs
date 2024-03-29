@@ -168,7 +168,6 @@ impl From<String> for PortName {
         PortName(v.clone())
     }
 }
-
 impl Into<String> for PortName {
     fn into(self) -> std::string::String {
         self.0.clone()
@@ -219,18 +218,18 @@ pub struct Port {
 }
 
 impl Port {
-    pub fn input<T: 'static>(name: &str) -> Self {
+    pub fn input<T: 'static>(name: &PortName) -> Self {
         Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Input,
-            name: name.into(),
+            name: name.clone(),
         }
     }
-    pub fn output<T: 'static>(name: &str) -> Self {
+    pub fn output<T: 'static>(name: &PortName) -> Self {
         Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Output,
-            name: name.into(),
+            name: name.clone(),
         }
     }
 

@@ -86,7 +86,7 @@ pub trait Blackboard: std::fmt::Debug + AsAny + BlackboardInterface {
 pub trait Setup: BlackboardInterface {
     fn output<T: 'static + Chalkable + Clone>(
         &mut self,
-        key: &str,
+        key: &PortName,
         default: T,
     ) -> Result<Output<T>, NodeError> {
         self.output_or_else::<T, _>(key, || Box::new(default))
@@ -94,15 +94,11 @@ pub trait Setup: BlackboardInterface {
 
     fn output_or_else<T: 'static + Chalkable + Clone, Z: FnOnce() -> Value + 'static>(
         &mut self,
-        key: &str,
+        key: &PortName,
         default_maker: Z,
     ) -> Result<Output<T>, NodeError> {
-        let writer = BlackboardInterface::writer(
-            self,
-            TypeId::of::<T>(),
-            &key.into(),
-            Box::new(default_maker),
-        )?;
+        let writer =
+            BlackboardInterface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
         struct OutputFor<TT> {
             key: PortName,
             type_name: String,
@@ -127,12 +123,15 @@ pub trait Setup: BlackboardInterface {
             writer,
             z: std::marker::PhantomData,
             type_name: std::any::type_name::<T>().to_string(),
-            key: key.into(),
+            key: key.clone(),
         }))
     }
 
-    fn input<T: 'static + Chalkable + Clone>(&mut self, key: &str) -> Result<Input<T>, NodeError> {
-        let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), &key.into())?;
+    fn input<T: 'static + Chalkable + Clone>(
+        &mut self,
+        key: &PortName,
+    ) -> Result<Input<T>, NodeError> {
+        let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct InputFor<TT> {
             key: PortName,
@@ -165,7 +164,7 @@ pub trait Setup: BlackboardInterface {
             reader,
             z: std::marker::PhantomData,
             type_name: std::any::type_name::<T>().to_string(),
-            key: key.into(),
+            key: key.clone(),
         }))
     }
 }
