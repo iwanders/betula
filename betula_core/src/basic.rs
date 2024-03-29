@@ -128,7 +128,7 @@ impl Tree for BasicTree {
     fn port_setup(
         &mut self,
         id: NodeId,
-        port: &crate::DirectionalPort,
+        port: &crate::Port,
         interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
         let mut n = self

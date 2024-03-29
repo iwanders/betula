@@ -1,7 +1,5 @@
 use betula_core::prelude::*;
-use betula_core::{
-    BlackboardInterface, DirectionalPort, Node, NodeError, NodeStatus, NodeType, Provider,
-};
+use betula_core::{BlackboardInterface, Node, NodeError, NodeStatus, NodeType, Port, Provider};
 
 #[derive(Debug, Default)]
 pub struct TimeNode {
@@ -21,15 +19,15 @@ impl Node for TimeNode {
         self.time_provider.set(since_the_epoch.as_secs_f64())?;
         Ok(NodeStatus::Success)
     }
-    fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
-        Ok(vec![DirectionalPort::provider::<f64>("time")])
+    fn ports(&self) -> Result<Vec<Port>, NodeError> {
+        Ok(vec![Port::provider::<f64>(&"time".into())])
     }
     fn port_setup(
         &mut self,
-        port: &DirectionalPort,
+        port: &Port,
         interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
-        let z = interface.provides::<f64>(port.name(), 0.0)?;
+        let z = interface.provides::<f64>(&port.name(), 0.0)?;
         self.time_provider = z;
         Ok(())
     }

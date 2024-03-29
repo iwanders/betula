@@ -1,7 +1,6 @@
 use betula_core::prelude::*;
 use betula_core::{
-    BlackboardInterface, Consumer, DirectionalPort, Node, NodeConfig, NodeError, NodeStatus,
-    NodeType,
+    BlackboardInterface, Consumer, Node, NodeConfig, NodeError, NodeStatus, NodeType, Port,
 };
 use serde::{Deserialize, Serialize};
 
@@ -36,16 +35,16 @@ impl Node for DelayNode {
         Ok(NodeStatus::Success)
     }
 
-    fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
-        Ok(vec![DirectionalPort::consumer::<f64>("time")])
+    fn ports(&self) -> Result<Vec<Port>, NodeError> {
+        Ok(vec![Port::consumer::<f64>(&"time".into())])
     }
 
     fn port_setup(
         &mut self,
-        port: &DirectionalPort,
+        port: &Port,
         interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
-        let z = interface.consumes::<f64>(port.name())?;
+        let z = interface.consumes::<f64>(&port.name())?;
         self.time = z;
         Ok(())
     }

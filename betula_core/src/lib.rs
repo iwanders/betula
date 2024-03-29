@@ -172,43 +172,88 @@ impl std::fmt::Debug for PortType {
     }
 }
 
-/// A port on a node with a name and type.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+/// A port with a directionality.
+///
+/// Consumer ports on a node take inputs by this name. Provider ports provide an
+/// output by the specified name.
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum PortDirection {
+    /// The port consumes the value.
+    Consumer,
+    /// The port provides the value.
+    Provider,
+}
+
+/// A port for a node.
+///
+/// Ports have a name, direction and type.
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Port {
-    /// The type of the data.
-    pub port_type: PortType,
-    /// The name of the port.
-    pub name: PortName,
+    port_type: PortType,
+    direction: PortDirection,
+    name: PortName,
 }
 
 impl Port {
-    pub fn new<T: 'static>(name: &str) -> Self {
+    pub fn consumer<T: 'static>(name: &PortName) -> Self {
         Port {
             port_type: PortType::new::<T>(),
-            name: name.into(),
+            direction: PortDirection::Consumer,
+            name: name.clone(),
         }
     }
-}
-
-/// A port with a directionality.
-pub enum DirectionalPort {
-    /// The port consumes the value.
-    Consumer(Port),
-    /// The port provides the value.
-    Provider(Port),
-}
-impl DirectionalPort {
-    pub fn consumer<T: 'static>(name: &str) -> Self {
-        DirectionalPort::Consumer(Port::new::<T>(name))
+    pub fn provider<T: 'static>(name: &PortName) -> Self {
+        Port {
+            port_type: PortType::new::<T>(),
+            direction: PortDirection::Provider,
+            name: name.clone(),
+        }
     }
-    pub fn provider<T: 'static>(name: &str) -> Self {
-        DirectionalPort::Provider(Port::new::<T>(name))
+
+    pub fn port_type(&self) -> PortType {
+        self.port_type.clone()
+    }
+    pub fn direction(&self) -> PortDirection {
+        self.direction.clone()
     }
     pub fn name(&self) -> PortName {
-        match self {
-            DirectionalPort::Consumer(v) => v.name.clone(),
-            DirectionalPort::Provider(v) => v.name.clone(),
+        self.name.clone()
+    }
+}
+use crate::blackboard::Blackboard;
+
+/// A uniquely identified port on a node.
+///
+/// Uses the name before remapping, which is guaranteed to be unique.
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+struct NodePort {
+    node: NodeId,
+    direction: PortDirection,
+    name: PortName,
+}
+impl NodePort {
+    pub fn consumer(node: NodeId, name: &PortName) -> Self {
+        NodePort {
+            node,
+            direction: PortDirection::Consumer,
+            name: name.clone(),
         }
+    }
+    pub fn provider(node: NodeId, name: &PortName) -> Self {
+        NodePort {
+            node,
+            direction: PortDirection::Provider,
+            name: name.clone(),
+        }
+    }
+    pub fn node(&self) -> NodeId {
+        self.node.clone()
+    }
+    pub fn direction(&self) -> PortDirection {
+        self.direction.clone()
+    }
+    pub fn name(&self) -> PortName {
+        self.name.clone()
     }
 }
 
@@ -278,7 +323,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     /// The node should ONLY use the interface to register the specified port.
     fn port_setup(
         &mut self,
-        port: &DirectionalPort,
+        port: &Port,
         interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
         let _ = (port, interface);
@@ -286,7 +331,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     }
 
     /// Allow the node to express what ports it has.
-    fn ports(&self) -> Result<Vec<DirectionalPort>, NodeError> {
+    fn ports(&self) -> Result<Vec<Port>, NodeError> {
         Ok(vec![])
     }
 
@@ -368,9 +413,31 @@ pub trait Tree {
     fn port_setup(
         &mut self,
         id: NodeId,
-        port: &DirectionalPort,
+        port: &Port,
         ctx: &mut dyn BlackboardInterface,
     ) -> Result<(), BetulaError>;
 
-    // fn add_blackboard_boxed(&mut self, id: BlackboardId, blackboard: Box<dyn Blackboard>) -> Result<(), BetulaError>;
+    fn add_blackboard_boxed(
+        &mut self,
+        id: BlackboardId,
+        blackboard: Box<dyn Blackboard>,
+    ) -> Result<(), BetulaError> {
+        Ok(())
+    }
+    fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
+        None
+    }
+    fn add_port_remap(
+        &mut self,
+        node_port: &NodePort,
+        new_name: &PortName,
+    ) -> Result<(), BetulaError> {
+        Ok(())
+    }
+    fn connect_port(&mut self, node_port: &NodePort, id: BlackboardId) -> Result<(), BetulaError> {
+        Ok(())
+    }
+    fn disconnect_port(&mut self, node_port: &NodePort) -> Result<(), BetulaError> {
+        Ok(())
+    }
 }
