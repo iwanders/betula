@@ -60,11 +60,12 @@ pub mod nodes;
 
 pub mod prelude {
     pub use crate::{
+        as_any::AsAnyHelper,
+        //blackboard::Chalkable
         blackboard::Setup,
         NodeConfigLoad,
         RunContext,
         Tree,
-        // as_any::AsAnyHelper,AsAny, blackboard::Chalkable // enabling this causes... equality to start failing?
     };
 }
 pub use blackboard::BlackboardInterface;
@@ -218,18 +219,18 @@ pub struct Port {
 }
 
 impl Port {
-    pub fn input<T: 'static>(name: &PortName) -> Self {
+    pub fn input<T: 'static>(name: &str) -> Self {
         Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Input,
-            name: name.clone(),
+            name: name.into(),
         }
     }
-    pub fn output<T: 'static>(name: &PortName) -> Self {
+    pub fn output<T: 'static>(name: &str) -> Self {
         Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Output,
-            name: name.clone(),
+            name: name.into(),
         }
     }
 

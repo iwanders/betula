@@ -1,6 +1,7 @@
 use betula_core::prelude::*;
 use betula_core::{
     BlackboardInterface, Input, Node, NodeConfig, NodeError, NodeStatus, NodeType, Port,
+    PortDirection, PortName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -36,16 +37,17 @@ impl Node for DelayNode {
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
-        Ok(vec![Port::input::<f64>(&"time".into())])
+        Ok(vec![Port::input::<f64>("time")])
     }
 
     fn port_setup(
         &mut self,
-        port: &Port,
+        port: &PortName,
+        direction: PortDirection,
         interface: &mut dyn BlackboardInterface,
     ) -> Result<(), NodeError> {
-        let z = interface.consumes::<f64>(&port.name())?;
-        self.time = z;
+        let _ = direction;
+        self.time = interface.input::<f64>(port)?;
         Ok(())
     }
 
@@ -80,15 +82,17 @@ mod tests {
         use uuid::Uuid;
         let mut tree = BasicTree::new();
         let mut bb = BasicBlackboard::default();
-        let time = bb.provides::<f64>("time", 0.0)?;
+        let time = bb.output::<f64>(&"time".into(), 0.0)?;
         time.set(1.0)?;
 
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(DelayNode::new(5.0)))?;
         let ports = tree.node_mut(root).ok_or("node not found")?.ports()?;
         for p in ports {
-            tree.node_mut(root)
-                .ok_or("node not found")?
-                .port_setup(&p, &mut bb)?;
+            tree.node_mut(root).ok_or("node not found")?.port_setup(
+                &p.name(),
+                PortDirection::Input,
+                &mut bb,
+            )?;
         }
         assert!(tree.execute(root)? == NodeStatus::Running);
         time.set(2.0)?;

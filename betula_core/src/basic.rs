@@ -457,7 +457,7 @@ mod tests {
             Ok(NodeStatus::Success)
         }
         fn ports(&self) -> Result<Vec<Port>, NodeError> {
-            Ok(vec![Port::output::<f64>(&"a".into())])
+            Ok(vec![Port::output::<f64>("a")])
         }
         fn port_setup(
             &mut self,
@@ -465,6 +465,7 @@ mod tests {
             direction: PortDirection,
             interface: &mut dyn BlackboardInterface,
         ) -> Result<(), NodeError> {
+            let _ = direction;
             let z = interface.output::<f64>(&port, 0.0)?;
             self.a_output = z;
             Ok(())
@@ -495,7 +496,7 @@ mod tests {
             }
         }
         fn ports(&self) -> Result<Vec<Port>, NodeError> {
-            Ok(vec![Port::input::<f64>(&"a".into())])
+            Ok(vec![Port::input::<f64>("a")])
         }
         fn port_setup(
             &mut self,
@@ -503,6 +504,7 @@ mod tests {
             direction: PortDirection,
             interface: &mut dyn BlackboardInterface,
         ) -> Result<(), NodeError> {
+            let _ = direction;
             self.a_input = interface.input::<f64>(&port)?;
             Ok(())
         }
