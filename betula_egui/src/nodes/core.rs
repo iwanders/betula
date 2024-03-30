@@ -1,4 +1,4 @@
-use crate::NodeUi;
+use crate::{NodeUi, ViewerNode};
 use betula_core::{nodes, Node, NodeType};
 
 impl NodeUi for nodes::SequenceNode {

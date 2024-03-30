@@ -56,7 +56,7 @@ use betula_core::Tree;
 
 impl InteractionCommand {
     pub fn execute(
-        self,
+        &self,
         tree_support: &TreeSupport,
         tree: &mut dyn Tree,
     ) -> Result<Vec<InteractionEvent>, BetulaError> {

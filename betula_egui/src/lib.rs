@@ -38,8 +38,12 @@ To tree:
 
 // use betula_core::prelude::*;
 // , NodeType
-use betula_core::{BlackboardId, Node, NodeId, NodeType, Port};
+use betula_core::{
+    BetulaError, BlackboardId, Node, NodeId, NodeStatus, NodeType, Port, RunContext,
+};
 use serde::{Deserialize, Serialize};
+
+use uuid::Uuid;
 
 pub mod nodes;
 
@@ -81,16 +85,16 @@ pub trait NodeUi {
     fn child_constraints(&self, node: &mut ViewerNode) -> std::ops::Range<usize> {
         0..usize::MAX
     }
-    fn ports(&self, node: &mut ViewerNode) -> Vec<Port> {
+    fn ports(&self, node: &ViewerNode) -> Vec<Port> {
         vec![]
     }
-    fn ui_title(&self, node: &mut ViewerNode) -> String {
+    fn ui_title(&self, node: &ViewerNode) -> String {
         self.name()
     }
-    fn has_config(&self, node: &mut ViewerNode) -> bool {
+    fn has_config(&self, node: &ViewerNode) -> bool {
         false
     }
-    fn ui_config(&self, node: &mut ViewerNode, ui: &mut Ui, scale: f32) {}
+    fn ui_config(&self, node: &ViewerNode, ui: &mut Ui, scale: f32) {}
 }
 
 use std::collections::HashMap;
@@ -129,14 +133,28 @@ impl BetulaViewer {
 use egui::{Color32, Ui};
 
 impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
-    fn title(&mut self, _: &BetulaViewerNode) -> std::string::String {
-        todo!()
+    fn title(&mut self, node: &BetulaViewerNode) -> std::string::String {
+        match node {
+            BetulaViewerNode::Node(node) => {
+                // Grab the type support for this node.
+                if let Some(node_type) = &node.node_type {
+                    if let Some(support) = self.ui_support.node_support.get(node_type) {
+                        support.ui_title(node)
+                    } else {
+                        format!("{node_type:?}")
+                    }
+                } else {
+                    "Pending...".to_owned()
+                }
+            }
+            _ => todo!(),
+        }
     }
     fn outputs(&mut self, _: &BetulaViewerNode) -> usize {
-        todo!()
+        0
     }
     fn inputs(&mut self, _: &BetulaViewerNode) -> usize {
-        todo!()
+        0
     }
     fn show_input(
         &mut self,
@@ -185,7 +203,21 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             let support = self.ui_support.get_node_support(&node_type);
             if let Some(support) = support {
                 if ui.button(support.name()).clicked() {
-                    // snarl.insert_node(pos, DemoNode::String("".to_owned()));
+                    use betula_common::control::AddNodeCommand;
+                    let id = NodeId(Uuid::new_v4());
+                    let add_cmd = AddNodeCommand { id, node_type };
+                    if let Ok(_) = self
+                        .client
+                        .send_command(betula_common::control::InteractionCommand::AddNode(add_cmd))
+                    {
+                        snarl.insert_node(
+                            pos,
+                            BetulaViewerNode::Node(ViewerNode {
+                                id,
+                                node_type: None,
+                            }),
+                        );
+                    }
                     ui.close_menu();
                 }
             }
