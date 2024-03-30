@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     BetulaError, Blackboard, BlackboardId, BlackboardPort, Node, NodeError, NodeId, NodePort,
-    NodeStatus, PortName,
+    NodeStatus, PortConnection, PortName,
 };
 
 struct TreeContext<'a> {
@@ -33,7 +33,7 @@ struct BasicTreeNode {
 #[derive(Debug)]
 struct BasicBlackboardEntry {
     blackboard: RefCell<Box<dyn Blackboard>>,
-    connections: Vec<(NodePort, BlackboardPort)>,
+    connections: Vec<PortConnection>,
 }
 #[derive(Debug, Default)]
 pub struct BasicTree {
@@ -164,26 +164,24 @@ impl Tree for BasicTree {
     fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
         // First, disconnect all connections.
         let connections = self.blackboards.get(&id)?.connections.clone();
-        for (node_port, blackboard_port) in &connections {
-            let _ = self.disconnect_port(node_port, blackboard_port).ok()?;
+        for connection in &connections {
+            let _ = self.disconnect_port(&connection).ok()?;
         }
         // Then remove the blackboard and return.
         self.blackboards
             .remove(&id)
             .map(|v| v.blackboard.into_inner())
     }
-    fn connect_port_to_blackboard_port(
-        &mut self,
-        node_port: &NodePort,
-        blackboard_port: &BlackboardPort,
-    ) -> Result<(), BetulaError> {
-        let blackboard_id = blackboard_port.blackboard();
+    fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
+        // node_port: &NodePort,
+        // blackboard_port: &BlackboardPort,
+        let blackboard_id = connection.blackboard.blackboard();
         let blackboard = self
             .blackboards
             .get(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
         let mut blackboard_mut = blackboard.blackboard.try_borrow_mut()?;
-        let node_id = node_port.node();
+        let node_id = connection.node.node();
         let node = self
             .nodes
             .get(&node_id)
@@ -210,26 +208,21 @@ impl Tree for BasicTree {
                 self.blackboard.reader(id, self.new_name)
             }
         }
-        let blackboard_name = blackboard_port.name();
+        let blackboard_name = connection.blackboard.name();
         let mut remapped_interface = Remapper {
             new_name: &blackboard_name,
             blackboard: &mut **blackboard_mut,
         };
 
         node_mut.port_setup(
-            &node_port.name(),
-            node_port.direction,
+            &connection.node.name(),
+            connection.node.direction,
             &mut remapped_interface,
         )
     }
 
-    fn disconnect_port(
-        &mut self,
-        node_port: &NodePort,
-        blackboard_port: &BlackboardPort,
-    ) -> Result<(), BetulaError> {
-        let _ = blackboard_port;
-        let node_id = node_port.node();
+    fn disconnect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
+        let node_id = connection.node.node();
         let node = self
             .nodes
             .get(&node_id)
@@ -258,13 +251,13 @@ impl Tree for BasicTree {
 
         let mut remapped_interface = Disconnecter {};
         node_mut.port_setup(
-            &node_port.name(),
-            node_port.direction,
+            &connection.node.name(),
+            connection.node.direction,
             &mut remapped_interface,
         )
     }
 
-    fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)> {
+    fn port_connections(&self) -> Vec<PortConnection> {
         let mut v = vec![];
         for (_key, blackboard_entry) in &self.blackboards {
             v.extend(blackboard_entry.connections.clone())

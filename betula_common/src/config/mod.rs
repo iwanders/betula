@@ -8,16 +8,30 @@ use crate::support::{
 };
 
 mod v1 {
-    use betula_core::NodeId;
+    use betula_core::{BlackboardId, NodeId, PortConnection};
     use serde::{Deserialize, Serialize};
-    pub type SerializableNodeConfig = serde_json::Value;
+    use std::collections::HashMap;
+    pub type SerializableValue = serde_json::Value;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct TreeNode {
         pub id: NodeId,
         pub node_type: String,
-        pub config: Option<SerializableNodeConfig>,
+        pub config: Option<SerializableValue>,
         pub children: Vec<NodeId>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct TypedValue {
+        pub type_id: String,
+        pub data: SerializableValue,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Blackboard {
+        pub id: BlackboardId,
+        pub values: HashMap<String, TypedValue>,
+        pub connections: Vec<PortConnection>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -28,6 +42,7 @@ mod v1 {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Root {
         pub tree: TreeNodes,
+        pub blackboards: Vec<Blackboard>,
     }
 }
 
@@ -103,6 +118,7 @@ impl TreeConfig {
         let mut nodes = vec![];
         use serde::ser::Error;
         use v1::*;
+
         for id in tree.nodes() {
             let tree_node = tree
                 .node_ref(id)
@@ -112,7 +128,7 @@ impl TreeConfig {
                 .get_config()
                 .map_err(|e| S::Error::custom(format!("could not get config {e:?}")))?;
             let node_type = tree_node.node_type();
-            let config: Option<SerializableNodeConfig> = if let Some(config) = config {
+            let config: Option<SerializableValue> = if let Some(config) = config {
                 let converter = self.support.get(&node_type);
                 let converter = converter
                     .map(|v| v.config_converter.as_ref())
@@ -143,8 +159,14 @@ impl TreeConfig {
             nodes.push(this_node);
         }
 
+        let mut blackboards = vec![];
+        for id in tree.blackboards() {
+            todo!();
+        }
+
         let root = Root {
             tree: TreeNodes { nodes },
+            blackboards,
         };
         let config = Config::V1(root);
         Ok(config

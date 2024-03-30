@@ -200,7 +200,7 @@ impl std::fmt::Debug for PortType {
 ///
 /// Input ports on a node take inputs by this name. Output ports provide an
 /// output by the specified name.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum PortDirection {
     /// The port consumes the value, it is an input to the node.
     Input,
@@ -211,7 +211,7 @@ pub enum PortDirection {
 /// A port for a node.
 ///
 /// Ports have a name, direction and type.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Port {
     port_type: PortType,
     direction: PortDirection,
@@ -255,7 +255,7 @@ impl Port {
 use crate::blackboard::Blackboard;
 
 /// An untyped identifier for a node's port.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct NodePort {
     node: NodeId,
     direction: PortDirection,
@@ -281,7 +281,7 @@ impl NodePort {
 }
 
 /// An untyped identifier for a node's output port.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct BlackboardPort {
     blackboard: BlackboardId,
     name: PortName,
@@ -409,6 +409,17 @@ pub trait Node: std::fmt::Debug + AsAny {
         Self: Sized;
 }
 
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
+pub struct PortConnection {
+    pub node: NodePort,
+    pub blackboard: BlackboardPort,
+}
+impl PortConnection {
+    pub fn new(node: NodePort, blackboard: BlackboardPort) -> Self {
+        Self { node, blackboard }
+    }
+}
+
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct BlackboardId(pub Uuid);
 
@@ -479,28 +490,20 @@ pub trait Tree: std::fmt::Debug + AsAny {
         node_port: &NodePort,
         blackboard: BlackboardId,
     ) -> Result<(), BetulaError> {
-        self.connect_port_to_blackboard_port(
-            node_port,
-            &BlackboardPort::new(blackboard, &node_port.name()),
-        )
+        self.connect_port(&PortConnection::new(
+            node_port.clone(),
+            BlackboardPort::new(blackboard, &node_port.name()),
+        ))
     }
 
     /// Connect an input or an output to a blackboard, using the specified blackboard port name.
-    fn connect_port_to_blackboard_port(
-        &mut self,
-        node_port: &NodePort,
-        blackboard_port: &BlackboardPort,
-    ) -> Result<(), BetulaError>;
+    fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError>;
 
     /// Disconnect a connection between a node's port and a blackboard's port.
-    fn disconnect_port(
-        &mut self,
-        node_port: &NodePort,
-        blackboard_port: &BlackboardPort,
-    ) -> Result<(), BetulaError>;
+    fn disconnect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError>;
 
     /// List all port connections.
-    fn port_connections(&self) -> Vec<(NodePort, BlackboardPort)>;
+    fn port_connections(&self) -> Vec<PortConnection>;
 
     /// List all ports of a node
     fn node_ports(&self, node: NodeId) -> Result<Vec<NodePort>, NodeError> {
