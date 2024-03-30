@@ -38,23 +38,28 @@ To tree:
 
 // use betula_core::prelude::*;
 // , NodeType
-use betula_core::{BlackboardId, NodeId};
+use betula_core::{BlackboardId, Node, NodeId, NodeType, Port};
 use serde::{Deserialize, Serialize};
+
+pub mod nodes;
 
 use egui_snarl::{
     ui::{PinInfo, SnarlStyle, SnarlViewer},
     InPin, NodeId as SnarlNodeId, OutPin, Snarl,
 };
 
-use betula_common::control::TreeClient;
+use betula_common::{control::TreeClient, TreeSupport};
 
 #[derive(Clone, Serialize, Deserialize)]
-struct ViewerNode {
+pub struct ViewerNode {
     id: NodeId,
+
+    #[serde(skip)]
+    node_type: Option<NodeType>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct ViewerBlackboard {
+pub struct ViewerBlackboard {
     id: BlackboardId,
     // Full, or just a single?
 }
@@ -68,11 +73,56 @@ pub enum BetulaViewerNode {
 pub struct BetulaViewer {
     // Some ui support... for stuff like configs.
     client: Box<dyn TreeClient>,
+    ui_support: UiSupport,
+}
+
+pub trait NodeUi {
+    fn name(&self) -> String;
+    fn child_constraints(&self, node: &mut ViewerNode) -> std::ops::Range<usize> {
+        0..usize::MAX
+    }
+    fn ports(&self, node: &mut ViewerNode) -> Vec<Port> {
+        vec![]
+    }
+    fn ui_title(&self, node: &mut ViewerNode) -> String {
+        self.name()
+    }
+    fn has_config(&self, node: &mut ViewerNode) -> bool {
+        false
+    }
+    fn ui_config(&self, node: &mut ViewerNode, ui: &mut Ui, scale: f32) {}
+}
+
+use std::collections::HashMap;
+struct UiSupport {
+    node_support: HashMap<NodeType, Box<dyn NodeUi>>,
+}
+impl UiSupport {
+    pub fn new() -> Self {
+        Self {
+            node_support: Default::default(),
+        }
+    }
+    pub fn add_node_default<T: Node + NodeUi + Default + 'static>(&mut self) {
+        self.node_support
+            .insert(T::static_type(), Box::new(T::default()));
+    }
+    pub fn node_types(&self) -> Vec<NodeType> {
+        self.node_support.keys().cloned().collect()
+    }
+    pub fn get_node_support(&self, node_type: &NodeType) -> Option<&dyn NodeUi> {
+        self.node_support.get(node_type).map(|v| &**v)
+    }
 }
 
 impl BetulaViewer {
     pub fn new(client: Box<dyn TreeClient>) -> Self {
-        BetulaViewer { client }
+        let mut ui_support = UiSupport::new();
+        ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
+        ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
+        ui_support.add_node_default::<betula_core::nodes::FailureNode>();
+        ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        BetulaViewer { client, ui_support }
     }
 }
 
@@ -121,5 +171,24 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         _: &mut Snarl<BetulaViewerNode>,
     ) -> Color32 {
         todo!()
+    }
+
+    fn graph_menu(
+        &mut self,
+        pos: egui::Pos2,
+        ui: &mut Ui,
+        _scale: f32,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        ui.label("Add node:");
+        for node_type in self.ui_support.node_types() {
+            let support = self.ui_support.get_node_support(&node_type);
+            if let Some(support) = support {
+                if ui.button(support.name()).clicked() {
+                    // snarl.insert_node(pos, DemoNode::String("".to_owned()));
+                    ui.close_menu();
+                }
+            }
+        }
     }
 }

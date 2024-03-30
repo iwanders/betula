@@ -111,7 +111,11 @@ impl TreeSupport {
         self.blackboard_factory.as_ref().map(|v| v())
     }
 
-    fn get_node_support(&self, node_type: &NodeType) -> Result<&NodeTypeSupport, BetulaError> {
+    pub fn get_node_types(&self) -> Vec<NodeType> {
+        self.node_support.keys().cloned().collect()
+    }
+
+    pub fn get_node_support(&self, node_type: &NodeType) -> Result<&NodeTypeSupport, BetulaError> {
         self.node_support
             .get(node_type)
             .ok_or(format!("could not get support for {node_type:?}").into())
