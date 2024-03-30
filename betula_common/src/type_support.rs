@@ -47,11 +47,11 @@ pub trait ConfigConverter: std::fmt::Debug {
 }
 
 pub trait DefaultConfigRequirements:
-    Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone
+    Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone + Send
 {
 }
 impl<T> DefaultConfigRequirements for T where
-    T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone
+    T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone + Send
 {
 }
 

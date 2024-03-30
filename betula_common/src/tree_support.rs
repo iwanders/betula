@@ -72,7 +72,7 @@ struct ValueTypeSupport {
 }
 
 #[derive(Default)]
-pub struct TreeConfig {
+pub struct TreeSupport {
     node_support: HashMap<NodeType, NodeTypeSupport>,
     // technically, value_support should index based on the name.
     // but we more often serialize than deserialize, so lets keep this
@@ -81,10 +81,10 @@ pub struct TreeConfig {
     blackboard_factory: Option<BlackboardFactory>,
 }
 
-impl std::fmt::Debug for TreeConfig {
+impl std::fmt::Debug for TreeSupport {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let factory_string = self.blackboard_factory.as_ref().map(|_| "Factory");
-        fmt.debug_struct("TreeConfig")
+        fmt.debug_struct("TreeSupport")
             .field("node_support", &self.node_support)
             .field("value_support", &self.value_support)
             .field("blackboard_factory", &factory_string)
@@ -92,14 +92,14 @@ impl std::fmt::Debug for TreeConfig {
     }
 }
 
-impl TreeConfig {
+impl TreeSupport {
     pub fn new() -> Self {
-        TreeConfig::default()
+        TreeSupport::default()
     }
     pub fn with_blackboard_factory(blackboard_factory: BlackboardFactory) -> Self {
-        TreeConfig {
+        TreeSupport {
             blackboard_factory: Some(blackboard_factory),
-            ..TreeConfig::default()
+            ..TreeSupport::default()
         }
     }
 
@@ -409,12 +409,12 @@ impl TreeConfig {
 }
 
 pub struct TreeSerializer<'a, 'b> {
-    config_support: &'b TreeConfig,
+    config_support: &'b TreeSupport,
     tree: &'a dyn Tree,
 }
 
 impl<'a, 'b> TreeSerializer<'a, 'b> {
-    pub fn new(config_support: &'b TreeConfig, tree: &'a dyn Tree) -> Self {
+    pub fn new(config_support: &'b TreeSupport, tree: &'a dyn Tree) -> Self {
         Self {
             tree,
             config_support,
@@ -440,15 +440,15 @@ mod test {
     use uuid::Uuid;
     #[test]
     fn test_config() -> Result<(), BetulaError> {
-        let mut tree_config = TreeConfig::new();
-        tree_config.add_node_default::<betula_core::nodes::SequenceNode>();
-        tree_config.add_node_default::<betula_core::nodes::SelectorNode>();
-        tree_config.add_node_default::<betula_core::nodes::FailureNode>();
-        tree_config.add_node_default::<betula_core::nodes::SuccessNode>();
-        tree_config
+        let mut tree_support = TreeSupport::new();
+        tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
+        tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
+        tree_support.add_node_default::<betula_core::nodes::FailureNode>();
+        tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        tree_support
             .add_node_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
             );
-        println!("loader: {tree_config:#?}");
+        println!("loader: {tree_support:#?}");
 
         // Lets make a new tree.
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
@@ -458,22 +458,22 @@ mod test {
         tree.add_relation(root, 0, f1)?;
         tree.add_relation(root, 1, s1)?;
 
-        let obj = TreeSerializer::new(&tree_config, &*tree);
+        let obj = TreeSerializer::new(&tree_support, &*tree);
         let config_json = serde_json::to_string(&obj)?;
         println!("config json: {config_json:?}");
 
-        let json_value = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
+        let json_value = tree_support.serialize(&*tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value}");
 
         // lets try to rebuild the tree from that json value.
         let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
-        tree_config.deserialize(&mut *new_tree, json_value.clone())?;
+        tree_support.deserialize(&mut *new_tree, json_value.clone())?;
         println!("new_tree: {new_tree:#?}");
-        let and_back = tree_config.serialize(&*new_tree, serde_json::value::Serializer)?;
+        let and_back = tree_support.serialize(&*new_tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
 
-        // let mut another_tree = tree_config.deserialize_default::<BasicTree,_>(json_value.clone())?;
-        // let and_another_back = tree_config.serialize(&tree, serde_json::value::Serializer)?;
+        // let mut another_tree = tree_support.deserialize_default::<BasicTree,_>(json_value.clone())?;
+        // let and_another_back = tree_support.serialize(&tree, serde_json::value::Serializer)?;
         // assert_eq!(and_another_back, json_value);
 
         Ok(())
@@ -481,16 +481,16 @@ mod test {
 
     #[test]
     fn test_with_blackboard() -> Result<(), BetulaError> {
-        let mut tree_config = TreeConfig::new();
-        tree_config.add_node_default::<betula_core::nodes::SequenceNode>();
-        tree_config.add_node_default::<betula_core::nodes::SelectorNode>();
-        tree_config.add_node_default::<betula_core::nodes::FailureNode>();
-        tree_config.add_node_default::<betula_core::nodes::SuccessNode>();
-        tree_config
+        let mut tree_support = TreeSupport::new();
+        tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
+        tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
+        tree_support.add_node_default::<betula_core::nodes::FailureNode>();
+        tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        tree_support
             .add_node_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
             );
-        tree_config.add_node_default::<crate::nodes::TimeNode>();
-        tree_config.add_value_default::<f64>();
+        tree_support.add_node_default::<crate::nodes::TimeNode>();
+        tree_support.add_value_default::<f64>();
 
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(
@@ -519,20 +519,20 @@ mod test {
         let input_ports = tree.node_ports(delay_node)?;
         tree.connect_port_to_blackboard(&input_ports[0], bb)?;
 
-        let obj = TreeSerializer::new(&tree_config, &*tree);
+        let obj = TreeSerializer::new(&tree_support, &*tree);
         let config_json = serde_json::to_string(&obj)?;
         println!("config_json: {config_json:?}");
 
-        let json_value = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
+        let json_value = tree_support.serialize(&*tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value:#?}");
 
-        tree_config.set_blackboard_factory(Box::new(|| Box::new(BasicBlackboard::default())));
+        tree_support.set_blackboard_factory(Box::new(|| Box::new(BasicBlackboard::default())));
 
         // lets try to rebuild the tree from that json value.
         let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
-        tree_config.deserialize(&mut *new_tree, json_value.clone())?;
+        tree_support.deserialize(&mut *new_tree, json_value.clone())?;
         println!("new_tree: {new_tree:#?}");
-        let and_back = tree_config.serialize(&*new_tree, serde_json::value::Serializer)?;
+        let and_back = tree_support.serialize(&*new_tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
 
         Ok(())
