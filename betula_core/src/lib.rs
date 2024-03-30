@@ -68,6 +68,7 @@ pub mod prelude {
         Tree,
     };
 }
+pub use blackboard::Blackboard;
 pub use blackboard::BlackboardInterface;
 
 mod as_any;
@@ -252,7 +253,6 @@ impl Port {
         self.name.clone()
     }
 }
-use crate::blackboard::Blackboard;
 
 /// An untyped identifier for a node's port.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]

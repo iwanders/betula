@@ -1,15 +1,26 @@
 use betula_core::prelude::*;
-use betula_core::{BetulaError, NodeType};
+use betula_core::{BetulaError, Blackboard, NodeType};
 use serde::{Deserialize, Serialize};
 
 use crate::support::{
-    ConfigConverter, DefaultConfigConverter, DefaultConfigRequirements, DefaultFactory,
-    DefaultFactoryRequirements, DefaultValueConverter, DefaultValueRequirements, NodeFactory,
+    // Config support.
+    ConfigConverter,
+    DefaultConfigConverter,
+    DefaultConfigRequirements,
+    // Node factories
+    DefaultNodeFactory,
+    DefaultNodeFactoryRequirements,
+    // Blackboard value.
+    DefaultValueConverter,
+    DefaultValueRequirements,
+    NodeFactory,
     ValueConverter,
 };
 
+pub type BlackboardFactory = Box<dyn Fn() -> Box<dyn Blackboard>>;
+
 mod v1 {
-    use betula_core::{BlackboardId, NodeId, PortConnection};
+    use betula_core::{BlackboardId, NodeId, PortConnection, PortName};
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
     pub type SerializableValue = serde_json::Value;
@@ -31,18 +42,13 @@ mod v1 {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Blackboard {
         pub id: BlackboardId,
-        pub values: BTreeMap<String, TypedValue>,
+        pub values: BTreeMap<PortName, TypedValue>,
         pub connections: Vec<PortConnection>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct TreeNodes {
-        pub nodes: Vec<TreeNode>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
     pub struct Root {
-        pub tree: TreeNodes,
+        pub nodes: Vec<TreeNode>,
         pub blackboards: Vec<Blackboard>,
     }
 }
@@ -65,17 +71,56 @@ struct ValueTypeSupport {
     value_converter: Box<dyn ValueConverter>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct TreeConfig {
     node_support: HashMap<NodeType, NodeTypeSupport>,
+    // technically, value_support should index based on the name.
+    // but we more often serialize than deserialize, so lets keep this
+    // as is for now.
     value_support: HashMap<std::any::TypeId, ValueTypeSupport>,
+    blackboard_factory: Option<BlackboardFactory>,
 }
+
+impl std::fmt::Debug for TreeConfig {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let factory_string = self.blackboard_factory.as_ref().map(|_| "Factory");
+        fmt.debug_struct("TreeConfig")
+            .field("node_support", &self.node_support)
+            .field("value_support", &self.value_support)
+            .field("blackboard_factory", &factory_string)
+            .finish()
+    }
+}
+
 impl TreeConfig {
     pub fn new() -> Self {
         TreeConfig::default()
     }
+    pub fn with_blackboard_factory(blackboard_factory: BlackboardFactory) -> Self {
+        TreeConfig {
+            blackboard_factory: Some(blackboard_factory),
+            ..TreeConfig::default()
+        }
+    }
 
-    pub fn add_factory(&mut self, node_type: NodeType, factory: Box<dyn NodeFactory>) {
+    pub fn set_blackboard_factory(&mut self, blackboard_factory: BlackboardFactory) {
+        self.blackboard_factory = Some(blackboard_factory);
+    }
+
+    fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
+        self.blackboard_factory.as_ref().map(|v| v())
+    }
+
+    fn get_value_type_support(&self, name: &str) -> Option<&ValueTypeSupport> {
+        for (_, v) in self.value_support.iter() {
+            if v.name == name {
+                return Some(v);
+            }
+        }
+        None
+    }
+
+    fn add_node_factory(&mut self, node_type: NodeType, factory: Box<dyn NodeFactory>) {
         let entry = self.node_support.insert(
             node_type.clone(),
             NodeTypeSupport {
@@ -104,17 +149,17 @@ impl TreeConfig {
         Ok(())
     }
 
-    pub fn add_default_node<N: DefaultFactoryRequirements>(&mut self) {
-        self.add_factory(N::static_type(), Box::new(DefaultFactory::<N>::new()))
+    pub fn add_node_default<N: DefaultNodeFactoryRequirements>(&mut self) {
+        self.add_node_factory(N::static_type(), Box::new(DefaultNodeFactory::<N>::new()))
     }
 
-    pub fn add_default_node_with_config<
-        N: DefaultFactoryRequirements,
+    pub fn add_node_default_with_config<
+        N: DefaultNodeFactoryRequirements,
         C: DefaultConfigRequirements,
     >(
         &mut self,
     ) {
-        self.add_factory(N::static_type(), Box::new(DefaultFactory::<N>::new()));
+        self.add_node_factory(N::static_type(), Box::new(DefaultNodeFactory::<N>::new()));
         self.add_config_converter(
             &N::static_type(),
             Box::new(DefaultConfigConverter::<C>::new()),
@@ -122,7 +167,7 @@ impl TreeConfig {
         .expect("cannot fail, key was added line above");
     }
 
-    pub fn add_default_value<V: DefaultValueRequirements>(&mut self) {
+    pub fn add_value_default<V: DefaultValueRequirements>(&mut self) {
         let support = ValueTypeSupport {
             name: std::any::type_name::<V>().to_owned(),
             value_converter: Box::new(DefaultValueConverter::<V>::new()),
@@ -137,6 +182,7 @@ impl TreeConfig {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         let mut nodes = vec![];
+        use betula_core::PortName;
         use serde::ser::Error;
         use v1::*;
 
@@ -189,7 +235,7 @@ impl TreeConfig {
             let blackboard = blackboard.borrow();
 
             // Collect the values.
-            let mut values: std::collections::BTreeMap<String, TypedValue> = Default::default();
+            let mut values: std::collections::BTreeMap<PortName, TypedValue> = Default::default();
             for port in blackboard.ports() {
                 use std::any::Any;
                 let value = blackboard.get(&port).ok_or(S::Error::custom(format!(
@@ -215,7 +261,7 @@ impl TreeConfig {
                     data: serde_json::to_value(serialize_erased)
                         .map_err(|e| S::Error::custom(format!("json serialize error {e:?}")))?,
                 };
-                values.insert(port.into(), t);
+                values.insert(port, t);
             }
 
             let b = Blackboard {
@@ -228,11 +274,11 @@ impl TreeConfig {
 
         // Make the results stable.
         blackboards.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
+        for bb in blackboards.iter_mut() {
+            bb.connections.sort();
+        }
         nodes.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
-        let root = Root {
-            tree: TreeNodes { nodes },
-            blackboards,
-        };
+        let root = Root { nodes, blackboards };
         let config = Config::V1(root);
         Ok(config
             .serialize(serializer)
@@ -243,6 +289,7 @@ impl TreeConfig {
         tree: &mut dyn Tree,
         deserializer: D,
     ) -> Result<(), D::Error> {
+        use betula_core::{blackboard::Chalkable, BlackboardId, PortConnection, PortName};
         use serde::de::Error;
         let config: Config = Config::deserialize(deserializer)?;
 
@@ -252,7 +299,7 @@ impl TreeConfig {
                 let mut new_nodes = vec![];
 
                 // First, deserialize everything.
-                for node in root.tree.nodes {
+                for node in root.nodes {
                     let node_type = node.node_type.into();
                     let node_support =
                         self.node_support
@@ -282,15 +329,71 @@ impl TreeConfig {
                     new_nodes.push((node.id, new_node));
                     relations.push((node.id, node.children));
                 }
-                // Serialization is all done, now add them to the tree.
+                // deserialize the blackboards.
+                struct BlackboardDeserialized {
+                    pub id: BlackboardId,
+                    pub values: HashMap<PortName, Box<dyn Chalkable>>,
+                    pub connections: Vec<PortConnection>,
+                }
+                let mut blackboards: Vec<BlackboardDeserialized> = vec![];
+                for blackboard in root.blackboards {
+                    let mut deserialized_bb = BlackboardDeserialized {
+                        id: blackboard.id,
+                        connections: blackboard.connections.clone(),
+                        values: Default::default(),
+                    };
+                    for (k, v) in blackboard.values {
+                        let v1::TypedValue { type_id, data } = v;
+                        let support =
+                            self.get_value_type_support(&type_id)
+                                .ok_or(D::Error::custom(format!(
+                                    "could not get value support for {type_id:?}"
+                                )))?;
+                        // Now, convert it to the boxed value.
+                        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(data));
+                        let boxed_value = support
+                            .value_converter
+                            .value_deserialize(&mut erased)
+                            .map_err(|e| {
+                                D::Error::custom(format!("failed deserialize value {e:?}"))
+                            })?;
+                        deserialized_bb.values.insert(k.clone(), boxed_value);
+                    }
+                    blackboards.push(deserialized_bb);
+                }
+
+                // Serialization is all done, now add the nodes to the tree.
                 for (node_id, node) in new_nodes {
                     tree.add_node_boxed(node_id, node)
                         .map_err(|e| D::Error::custom(format!("failed to add new node {e:?}")))?;
                 }
+
+                // Create the connections.
                 for (parent, children) in relations {
                     for (i, child) in children.iter().enumerate() {
                         tree.add_relation(parent, i, *child)
                             .map_err(|e| D::Error::custom(format!("failed to relation {e:?}")))?;
+                    }
+                }
+
+                // Add the blackboards
+                for blackboard in blackboards {
+                    let id = blackboard.id;
+                    let mut bb = self
+                        .create_blackboard()
+                        .ok_or(D::Error::custom(format!("no blackboard factory function")))?;
+                    for (k, v) in blackboard.values {
+                        bb.set(&k, v.clone()).map_err(|e| {
+                            D::Error::custom(format!(
+                                "failed to set {k:?} to {v:?} on {id:?}: {e:?}"
+                            ))
+                        })?;
+                    }
+                    tree.add_blackboard_boxed(id, bb).map_err(|e| {
+                        D::Error::custom(format!("failed to add blackboard with {id:?}: {e:?}"))
+                    })?;
+                    for connection in blackboard.connections {
+                        tree.connect_port(&connection).map_err(|e| D::Error::custom(format!("failed to make connection {connection:?} for blackboard {id:?}: {e:?}")))?;
                     }
                 }
             }
@@ -339,12 +442,12 @@ mod test {
     #[test]
     fn test_config() -> Result<(), BetulaError> {
         let mut tree_config = TreeConfig::new();
-        tree_config.add_default_node::<betula_core::nodes::SequenceNode>();
-        tree_config.add_default_node::<betula_core::nodes::SelectorNode>();
-        tree_config.add_default_node::<betula_core::nodes::FailureNode>();
-        tree_config.add_default_node::<betula_core::nodes::SuccessNode>();
+        tree_config.add_node_default::<betula_core::nodes::SequenceNode>();
+        tree_config.add_node_default::<betula_core::nodes::SelectorNode>();
+        tree_config.add_node_default::<betula_core::nodes::FailureNode>();
+        tree_config.add_node_default::<betula_core::nodes::SuccessNode>();
         tree_config
-            .add_default_node_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
+            .add_node_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
             );
         println!("loader: {tree_config:#?}");
 
@@ -380,15 +483,15 @@ mod test {
     #[test]
     fn test_with_blackboard() -> Result<(), BetulaError> {
         let mut tree_config = TreeConfig::new();
-        tree_config.add_default_node::<betula_core::nodes::SequenceNode>();
-        tree_config.add_default_node::<betula_core::nodes::SelectorNode>();
-        tree_config.add_default_node::<betula_core::nodes::FailureNode>();
-        tree_config.add_default_node::<betula_core::nodes::SuccessNode>();
+        tree_config.add_node_default::<betula_core::nodes::SequenceNode>();
+        tree_config.add_node_default::<betula_core::nodes::SelectorNode>();
+        tree_config.add_node_default::<betula_core::nodes::FailureNode>();
+        tree_config.add_node_default::<betula_core::nodes::SuccessNode>();
         tree_config
-            .add_default_node_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
+            .add_node_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
             );
-        tree_config.add_default_node::<crate::nodes::TimeNode>();
-        tree_config.add_default_value::<f64>();
+        tree_config.add_node_default::<crate::nodes::TimeNode>();
+        tree_config.add_value_default::<f64>();
 
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(
@@ -423,6 +526,8 @@ mod test {
 
         let json_value = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value:#?}");
+
+        tree_config.set_blackboard_factory(Box::new(|| Box::new(BasicBlackboard::default())));
 
         // lets try to rebuild the tree from that json value.
         let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());

@@ -8,27 +8,27 @@ pub trait NodeFactory: std::fmt::Debug {
     fn create(&self) -> Result<Box<dyn Node>, BetulaError>;
 }
 
-pub trait DefaultFactoryRequirements: betula_core::Node + 'static + Default {}
-impl<T> DefaultFactoryRequirements for T where T: betula_core::Node + 'static + Default {}
+pub trait DefaultNodeFactoryRequirements: betula_core::Node + 'static + Default {}
+impl<T> DefaultNodeFactoryRequirements for T where T: betula_core::Node + 'static + Default {}
 
 /// Default factory for nodes.
-pub struct DefaultFactory<T: DefaultFactoryRequirements> {
+pub struct DefaultNodeFactory<T: DefaultNodeFactoryRequirements> {
     _z: std::marker::PhantomData<T>,
 }
-impl<T: DefaultFactoryRequirements> std::fmt::Debug for DefaultFactory<T> {
+impl<T: DefaultNodeFactoryRequirements> std::fmt::Debug for DefaultNodeFactory<T> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(fmt, "DefaultFactory<{}>", std::any::type_name::<T>())
+        write!(fmt, "DefaultNodeFactory<{}>", std::any::type_name::<T>())
     }
 }
 
-impl<T: DefaultFactoryRequirements> DefaultFactory<T> {
+impl<T: DefaultNodeFactoryRequirements> DefaultNodeFactory<T> {
     pub fn new() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
     }
 }
-impl<T: DefaultFactoryRequirements> NodeFactory for DefaultFactory<T> {
+impl<T: DefaultNodeFactoryRequirements> NodeFactory for DefaultNodeFactory<T> {
     fn create(&self) -> Result<Box<dyn Node>, BetulaError> {
         Ok(Box::new(T::default()))
     }
@@ -209,7 +209,7 @@ mod test {
 
     #[test]
     fn test_things() -> Result<(), BetulaError> {
-        let factory: Box<dyn NodeFactory> = Box::new(DefaultFactory::<DummyNode>::new());
+        let factory: Box<dyn NodeFactory> = Box::new(DefaultNodeFactory::<DummyNode>::new());
         let mut boxed_node = factory.create()?;
         {
             let loaded_dummy: &DummyNode = (*boxed_node)

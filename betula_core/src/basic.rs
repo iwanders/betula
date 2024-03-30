@@ -372,7 +372,7 @@ impl Blackboard for BasicBlackboard {
     }
 
     fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError> {
-        let new_value_type = (*value).type_id();
+        let new_value_type = (*value).as_any_type_id();
         let old_value_type = self.values.get(&port).map(|x| (*x).type_id());
         if let Some(old_value_type) = old_value_type {
             if new_value_type != old_value_type {
