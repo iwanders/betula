@@ -1,4 +1,4 @@
-pub mod config;
 pub mod control;
 pub mod nodes;
-pub mod support;
+pub mod tree_support;
+pub mod type_support;

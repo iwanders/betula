@@ -2,7 +2,7 @@ use betula_core::prelude::*;
 use betula_core::{BetulaError, Blackboard, NodeType};
 use serde::{Deserialize, Serialize};
 
-use crate::support::{
+use crate::type_support::{
     // Config support.
     ConfigConverter,
     DefaultConfigConverter,

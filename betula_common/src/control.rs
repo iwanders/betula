@@ -79,7 +79,12 @@ pub enum InteractionEvent {
     NodeInformation(NodeInformationEvent),
 }
 
-pub trait TreeControl {
-    fn command(&self, command: InteractionCommand) -> Result<(), BetulaError>;
-    fn event(&self) -> Result<Option<InteractionEvent>, BetulaError>;
+pub trait TreeClient {
+    fn send_command(&self, command: InteractionCommand) -> Result<(), BetulaError>;
+    fn get_event(&self) -> Result<Option<InteractionEvent>, BetulaError>;
+}
+
+pub trait TreeServer {
+    fn get_command(&self) -> Result<Option<InteractionCommand>, BetulaError>;
+    fn send_event(&self, event: InteractionEvent) -> Result<(), BetulaError>;
 }
