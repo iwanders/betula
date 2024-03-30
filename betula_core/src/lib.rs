@@ -302,8 +302,8 @@ impl BlackboardPort {
 }
 
 /// Trait the configuration types must implement.
-pub trait NodeConfig: std::fmt::Debug + AsAny {}
-impl<T: std::fmt::Debug + 'static> NodeConfig for T {}
+pub trait NodeConfig: std::fmt::Debug + AsAny + Send {}
+impl<T: std::fmt::Debug + 'static + Send> NodeConfig for T {}
 
 /// Helper trait to easily load types implementing clone, used in [`Node::set_config`]:
 /// ```ignore

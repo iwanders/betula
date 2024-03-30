@@ -4,14 +4,14 @@ use std::any::{Any, TypeId};
 
 /// Requirements for any value that is written to the blackboard.
 /// Clone, std::any::Any, std::fmt::Debug, std::cmp::PartialEq
-pub trait Chalkable: std::fmt::Debug + crate::AsAny {
+pub trait Chalkable: std::fmt::Debug + crate::AsAny + Send {
     fn clone_boxed(&self) -> Box<dyn Chalkable>;
     fn is_equal(&self, other: &dyn Chalkable) -> bool;
 }
 
 impl<T> Chalkable for T
 where
-    T: Clone + 'static + std::fmt::Debug + Any + std::cmp::PartialEq,
+    T: Clone + 'static + std::fmt::Debug + Any + std::cmp::PartialEq + Send,
 {
     fn clone_boxed(&self) -> Box<dyn Chalkable> {
         Box::new(self.clone())
