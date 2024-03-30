@@ -365,6 +365,8 @@ pub trait Node: std::fmt::Debug + AsAny {
     /// Setup method for the node to obtain outputs and inputs from the
     /// blackboard. Setup should happen mostly through the [`blackboard::Setup`] trait.
     /// The node should ONLY use the interface to register the specified port.
+    /// This needs to be for a specific port such that we can setup outputs
+    /// first, and then when the inputs are setup there's strict typechecking.
     fn port_setup(
         &mut self,
         port: &PortName,

@@ -173,6 +173,7 @@ impl Tree for BasicTree {
             .remove(&id)
             .map(|v| v.blackboard.into_inner())
     }
+
     fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
         // node_port: &NodePort,
         // blackboard_port: &BlackboardPort,
