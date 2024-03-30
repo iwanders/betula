@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::support::{
     ConfigConverter, DefaultConfigConverter, DefaultConfigRequirements, DefaultFactory,
-    DefaultFactoryRequirements, NodeFactory,
+    DefaultFactoryRequirements, DefaultValueConverter, DefaultValueRequirements, NodeFactory,
+    ValueConverter,
 };
 
 mod v1 {
@@ -53,13 +54,21 @@ enum Config {
 
 use std::collections::HashMap;
 #[derive(Debug)]
-struct TypeSupport {
+struct NodeTypeSupport {
     factory: Box<dyn NodeFactory>,
     config_converter: Option<Box<dyn ConfigConverter>>,
 }
+
+#[derive(Debug)]
+struct ValueTypeSupport {
+    name: String,
+    value_converter: Box<dyn ValueConverter>,
+}
+
 #[derive(Debug, Default)]
 pub struct TreeConfig {
-    support: HashMap<NodeType, TypeSupport>,
+    node_support: HashMap<NodeType, NodeTypeSupport>,
+    value_support: HashMap<std::any::TypeId, ValueTypeSupport>,
 }
 impl TreeConfig {
     pub fn new() -> Self {
@@ -67,9 +76,9 @@ impl TreeConfig {
     }
 
     pub fn add_factory(&mut self, node_type: NodeType, factory: Box<dyn NodeFactory>) {
-        let entry = self.support.insert(
+        let entry = self.node_support.insert(
             node_type.clone(),
-            TypeSupport {
+            NodeTypeSupport {
                 factory,
                 config_converter: None,
             },
@@ -88,18 +97,21 @@ impl TreeConfig {
         config_converter: Box<dyn ConfigConverter>,
     ) -> Result<(), BetulaError> {
         let support = self
-            .support
+            .node_support
             .get_mut(node_type)
             .ok_or(format!("node {node_type:?} was missing"))?;
         support.config_converter = Some(config_converter);
         Ok(())
     }
 
-    pub fn add_default<N: DefaultFactoryRequirements>(&mut self) {
+    pub fn add_default_node<N: DefaultFactoryRequirements>(&mut self) {
         self.add_factory(N::static_type(), Box::new(DefaultFactory::<N>::new()))
     }
 
-    pub fn add_default_with_config<N: DefaultFactoryRequirements, C: DefaultConfigRequirements>(
+    pub fn add_default_node_with_config<
+        N: DefaultFactoryRequirements,
+        C: DefaultConfigRequirements,
+    >(
         &mut self,
     ) {
         self.add_factory(N::static_type(), Box::new(DefaultFactory::<N>::new()));
@@ -108,6 +120,15 @@ impl TreeConfig {
             Box::new(DefaultConfigConverter::<C>::new()),
         )
         .expect("cannot fail, key was added line above");
+    }
+
+    pub fn add_default_value<V: DefaultValueRequirements>(&mut self) {
+        let support = ValueTypeSupport {
+            name: std::any::type_name::<V>().to_owned(),
+            value_converter: Box::new(DefaultValueConverter::<V>::new()),
+        };
+        self.value_support
+            .insert(std::any::TypeId::of::<V>(), support);
     }
 
     pub fn serialize<S: serde::Serializer>(
@@ -129,7 +150,7 @@ impl TreeConfig {
                 .map_err(|e| S::Error::custom(format!("could not get config {e:?}")))?;
             let node_type = tree_node.node_type();
             let config: Option<SerializableValue> = if let Some(config) = config {
-                let converter = self.support.get(&node_type);
+                let converter = self.node_support.get(&node_type);
                 let converter = converter
                     .map(|v| v.config_converter.as_ref())
                     .flatten()
@@ -161,7 +182,48 @@ impl TreeConfig {
 
         let mut blackboards = vec![];
         for id in tree.blackboards() {
-            todo!();
+            let connections = tree.blackboard_connections(id);
+            let blackboard = tree
+                .blackboard_ref(id)
+                .ok_or(Error::custom(format!("could not get {id:?}")))?;
+            let blackboard = blackboard.borrow();
+
+            // Collect the values.
+            let mut values: HashMap<String, TypedValue> = Default::default();
+            for port in blackboard.ports() {
+                use std::any::Any;
+                let value = blackboard.get(&port).ok_or(S::Error::custom(format!(
+                    "could not get value for {port:?}"
+                )))?;
+
+                let value_type = (*value).as_any_type_id();
+
+                let converter =
+                    self.value_support
+                        .get(&value_type)
+                        .ok_or(S::Error::custom(format!(
+                            "could not get converter for {:?}",
+                            (*value).type_name()
+                        )))?;
+
+                let serialize_erased = converter
+                    .value_converter
+                    .value_serialize(&*value)
+                    .map_err(|e| S::Error::custom(format!("failed with {e}")))?;
+                let t = TypedValue {
+                    type_id: converter.name.clone(),
+                    data: serde_json::to_value(serialize_erased)
+                        .map_err(|e| S::Error::custom(format!("json serialize error {e:?}")))?,
+                };
+                values.insert(port.into(), t);
+            }
+
+            let b = Blackboard {
+                id,
+                values,
+                connections,
+            };
+            blackboards.push(b);
         }
 
         let root = Root {
@@ -189,18 +251,18 @@ impl TreeConfig {
                 // First, deserialize everything.
                 for node in root.tree.nodes {
                     let node_type = node.node_type.into();
-                    let support = self
-                        .support
-                        .get(&node_type)
-                        .ok_or(D::Error::custom(format!(
-                            "could not get support for {node_type:?}"
-                        )))?;
-                    let mut new_node = support
+                    let node_support =
+                        self.node_support
+                            .get(&node_type)
+                            .ok_or(D::Error::custom(format!(
+                                "could not get support for {node_type:?}"
+                            )))?;
+                    let mut new_node = node_support
                         .factory
                         .create()
                         .map_err(|e| D::Error::custom(format!("failed to construct node {e:?}")))?;
                     if let Some(config) = node.config {
-                        if let Some(config_support) = support.config_converter.as_ref() {
+                        if let Some(config_support) = node_support.config_converter.as_ref() {
                             let mut erased =
                                 Box::new(<dyn erased_serde::Deserializer>::erase(config));
                             let new_config = config_support
@@ -273,12 +335,13 @@ mod test {
     #[test]
     fn test_config() -> Result<(), BetulaError> {
         let mut tree_config = TreeConfig::new();
-        tree_config.add_default::<betula_core::nodes::SequenceNode>();
-        tree_config.add_default::<betula_core::nodes::SelectorNode>();
-        tree_config.add_default::<betula_core::nodes::FailureNode>();
-        tree_config.add_default::<betula_core::nodes::SuccessNode>();
+        tree_config.add_default_node::<betula_core::nodes::SequenceNode>();
+        tree_config.add_default_node::<betula_core::nodes::SelectorNode>();
+        tree_config.add_default_node::<betula_core::nodes::FailureNode>();
+        tree_config.add_default_node::<betula_core::nodes::SuccessNode>();
         tree_config
-            .add_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>();
+            .add_default_node_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
+            );
         println!("loader: {tree_config:#?}");
 
         // Lets make a new tree.
@@ -313,13 +376,15 @@ mod test {
     #[test]
     fn test_with_blackboard() -> Result<(), BetulaError> {
         let mut tree_config = TreeConfig::new();
-        tree_config.add_default::<betula_core::nodes::SequenceNode>();
-        tree_config.add_default::<betula_core::nodes::SelectorNode>();
-        tree_config.add_default::<betula_core::nodes::FailureNode>();
-        tree_config.add_default::<betula_core::nodes::SuccessNode>();
+        tree_config.add_default_node::<betula_core::nodes::SequenceNode>();
+        tree_config.add_default_node::<betula_core::nodes::SelectorNode>();
+        tree_config.add_default_node::<betula_core::nodes::FailureNode>();
+        tree_config.add_default_node::<betula_core::nodes::SuccessNode>();
         tree_config
-            .add_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>();
-        tree_config.add_default::<crate::nodes::TimeNode>();
+            .add_default_node_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
+            );
+        tree_config.add_default_node::<crate::nodes::TimeNode>();
+        tree_config.add_default_value::<f64>();
 
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(

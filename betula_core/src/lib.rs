@@ -474,6 +474,9 @@ pub trait Tree: std::fmt::Debug + AsAny {
     /// Return a mutable reference to a blackboard.
     fn blackboard_mut(&mut self, id: BlackboardId) -> Option<&mut dyn Blackboard>;
 
+    /// List blackboard connections for a particular blackboard.
+    fn blackboard_connections(&self, id: BlackboardId) -> Vec<PortConnection>;
+
     /// Add a new blackboard to the tree.
     fn add_blackboard_boxed(
         &mut self,
@@ -503,7 +506,13 @@ pub trait Tree: std::fmt::Debug + AsAny {
     fn disconnect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError>;
 
     /// List all port connections.
-    fn port_connections(&self) -> Vec<PortConnection>;
+    fn port_connections(&self) -> Vec<PortConnection> {
+        let mut v = vec![];
+        for id in self.blackboards() {
+            v.extend(self.blackboard_connections(id));
+        }
+        v
+    }
 
     /// List all ports of a node
     fn node_ports(&self, node: NodeId) -> Result<Vec<NodePort>, NodeError> {

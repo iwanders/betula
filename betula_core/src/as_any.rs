@@ -10,6 +10,8 @@ pub trait AsAny {
     fn as_any_box(self: Box<Self>) -> Box<dyn Any>;
 
     fn type_name(&self) -> &'static str;
+
+    fn as_any_type_id(&self) -> std::any::TypeId;
 }
 
 impl<T> AsAny for T
@@ -32,6 +34,9 @@ where
 
     fn type_name(&self) -> &'static str {
         std::any::type_name::<T>()
+    }
+    fn as_any_type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<T>()
     }
 }
 // helper here to avoid .as_any_ref() everywhere, with blanket implementation.
