@@ -4,12 +4,15 @@ version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"
 
-# Use egui from source as the PanZoom example is really new.
 [dependencies]
-egui = { git = "https://github.com/emilk/egui.git", rev = "bf7ffb982a6e8c0a40d0871c38bccacef9ee8efb"}
-
+egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "082e7d0063f3cf83cc10b0a4e023d03488eacbcb"}
+betula_common = { workspace = true, default-features = false }
 betula_core = { workspace = true, default-features = false }
+egui = { version = "0.26" }
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-eframe = { git = "https://github.com/emilk/egui.git", rev = "bf7ffb982a6e8c0a40d0871c38bccacef9ee8efb"}
 uuid = {version = "1.8.0", features=["v4"]}
+eframe = { version = "0.26", features = ["serde", "persistence"] }
+serde_json = { version = "1.0" }
+serde = { version = "1.0", features = ["derive"] }
