@@ -9,7 +9,7 @@ pub trait AsAny {
 
     fn as_any_box(self: Box<Self>) -> Box<dyn Any>;
 
-    fn type_name(&self) -> &'static str;
+    fn as_any_type_name(&self) -> &'static str;
 
     fn as_any_type_id(&self) -> std::any::TypeId;
 }
@@ -32,7 +32,7 @@ where
         self
     }
 
-    fn type_name(&self) -> &'static str {
+    fn as_any_type_name(&self) -> &'static str {
         std::any::type_name::<T>()
     }
     fn as_any_type_id(&self) -> std::any::TypeId {

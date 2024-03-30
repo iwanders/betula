@@ -310,7 +310,7 @@ impl BlackboardInterface for BasicBlackboard {
             let z = temp_rc
                 .try_borrow_mut()
                 .or_else(|_| Err(format!("{key:?} was already borrowed")))?;
-            (**z).type_name().to_string()
+            (**z).as_any_type_name().to_string()
         };
         let owned_key = key.to_string();
         if typeid != id {
@@ -322,11 +322,11 @@ impl BlackboardInterface for BasicBlackboard {
         } else {
             Ok(Box::new(move |v: Value| {
                 let mut locked = rc.try_borrow_mut()?;
-                if (**locked).type_id() != (*v).type_id() {
+                if (**locked).as_any_type_id() != (*v).as_any_type_id() {
                     Err(format!(
                         "assignment for '{owned_key:?}' is incorrect type {} expected {}",
-                        (**locked).type_name(),
-                        (*v).type_name()
+                        (**locked).as_any_type_name(),
+                        (*v).as_any_type_name()
                     )
                     .into())
                 } else {
@@ -346,7 +346,7 @@ impl BlackboardInterface for BasicBlackboard {
         if typeid != id {
             Err(format!(
                 "new reader for '{key:?}' mismatches type: already got {}",
-                rc.type_name()
+                rc.as_any_type_name()
             )
             .into())
         } else {
@@ -565,9 +565,9 @@ mod tests {
         let entries = bbref.borrow().ports();
         assert_eq!(entries.len(), 1);
         let value = bbref.borrow().get(&entries[0]);
-        println!("Value: {value:?}, {}", value.type_name());
+        println!("Value: {value:?}, {}", value.as_any_type_name());
         let expected: Option<Box<dyn crate::blackboard::Chalkable>> = Some(Box::new(3.3f64));
-        println!("expected: {expected:?}, {}", expected.type_name());
+        println!("expected: {expected:?}, {}", expected.as_any_type_name());
         assert!(value.unwrap().is_equal(&*expected.unwrap()));
         Ok(())
     }

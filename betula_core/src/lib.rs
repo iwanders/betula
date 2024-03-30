@@ -320,7 +320,7 @@ pub trait NodeConfigLoad: NodeConfig {
         let v = (*v).downcast_ref::<Self>().ok_or_else(|| {
             format!(
                 "could not downcast {:?} to {:?}",
-                (*v).type_name(),
+                (*v).as_any_type_name(),
                 std::any::type_name::<Self>()
             )
         })?;

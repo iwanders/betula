@@ -11,7 +11,7 @@ use crate::support::{
 mod v1 {
     use betula_core::{BlackboardId, NodeId, PortConnection};
     use serde::{Deserialize, Serialize};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     pub type SerializableValue = serde_json::Value;
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -31,7 +31,7 @@ mod v1 {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Blackboard {
         pub id: BlackboardId,
-        pub values: HashMap<String, TypedValue>,
+        pub values: BTreeMap<String, TypedValue>,
         pub connections: Vec<PortConnection>,
     }
 
@@ -189,7 +189,7 @@ impl TreeConfig {
             let blackboard = blackboard.borrow();
 
             // Collect the values.
-            let mut values: HashMap<String, TypedValue> = Default::default();
+            let mut values: std::collections::BTreeMap<String, TypedValue> = Default::default();
             for port in blackboard.ports() {
                 use std::any::Any;
                 let value = blackboard.get(&port).ok_or(S::Error::custom(format!(
@@ -203,7 +203,7 @@ impl TreeConfig {
                         .get(&value_type)
                         .ok_or(S::Error::custom(format!(
                             "could not get converter for {:?}",
-                            (*value).type_name()
+                            (*value).as_any_type_name()
                         )))?;
 
                 let serialize_erased = converter
@@ -226,6 +226,9 @@ impl TreeConfig {
             blackboards.push(b);
         }
 
+        // Make the results stable.
+        blackboards.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
+        nodes.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
         let root = Root {
             tree: TreeNodes { nodes },
             blackboards,
@@ -270,7 +273,8 @@ impl TreeConfig {
                                 .map_err(|e| {
                                     D::Error::custom(format!("failed deserialize config {e:?}"))
                                 })?;
-                            new_node.set_config(&new_config).map_err(|e| {
+                            println!("new_config: {new_config:?}");
+                            new_node.set_config(&*new_config).map_err(|e| {
                                 D::Error::custom(format!("failed set config {e:?}"))
                             })?;
                         }
@@ -363,7 +367,7 @@ mod test {
         let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
         tree_config.deserialize(&mut *new_tree, json_value.clone())?;
         println!("new_tree: {new_tree:#?}");
-        let and_back = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
+        let and_back = tree_config.serialize(&*new_tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
 
         // let mut another_tree = tree_config.deserialize_default::<BasicTree,_>(json_value.clone())?;
@@ -415,10 +419,17 @@ mod test {
 
         let obj = TreeSerializer::new(&tree_config, &*tree);
         let config_json = serde_json::to_string(&obj)?;
-        println!("config json: {config_json:?}");
+        println!("config_json: {config_json:?}");
 
         let json_value = tree_config.serialize(&*tree, serde_json::value::Serializer)?;
-        println!("json_value: {json_value}");
+        println!("json_value: {json_value:#?}");
+
+        // lets try to rebuild the tree from that json value.
+        let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
+        tree_config.deserialize(&mut *new_tree, json_value.clone())?;
+        println!("new_tree: {new_tree:#?}");
+        let and_back = tree_config.serialize(&*new_tree, serde_json::value::Serializer)?;
+        assert_eq!(and_back, json_value);
 
         Ok(())
     }

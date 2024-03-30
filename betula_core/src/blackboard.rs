@@ -146,7 +146,7 @@ pub trait Setup: BlackboardInterface {
                 let v = (*boxed_value).downcast_ref::<TT>().ok_or_else(|| {
                     format!(
                         "could not downcast {:?} to {:?}",
-                        boxed_value.type_name(),
+                        (*boxed_value).as_any_type_name(),
                         std::any::type_name::<TT>()
                     )
                 })?;
