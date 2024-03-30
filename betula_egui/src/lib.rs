@@ -41,6 +41,13 @@ To tree:
 use betula_core::{BlackboardId, NodeId};
 use serde::{Deserialize, Serialize};
 
+use egui_snarl::{
+    ui::{PinInfo, SnarlStyle, SnarlViewer},
+    InPin, NodeId as SnarlNodeId, OutPin, Snarl,
+};
+
+use betula_common::control::TreeClient;
+
 #[derive(Clone, Serialize, Deserialize)]
 struct ViewerNode {
     id: NodeId,
@@ -53,13 +60,66 @@ struct ViewerBlackboard {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-enum BetulaViewerNode {
+pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
 }
 
-pub struct GuiSupport {}
-
 pub struct BetulaViewer {
     // Some ui support... for stuff like configs.
+    client: Box<dyn TreeClient>,
+}
+
+impl BetulaViewer {
+    pub fn new(client: Box<dyn TreeClient>) -> Self {
+        BetulaViewer { client }
+    }
+}
+
+use egui::{Color32, Ui};
+
+impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
+    fn title(&mut self, _: &BetulaViewerNode) -> std::string::String {
+        todo!()
+    }
+    fn outputs(&mut self, _: &BetulaViewerNode) -> usize {
+        todo!()
+    }
+    fn inputs(&mut self, _: &BetulaViewerNode) -> usize {
+        todo!()
+    }
+    fn show_input(
+        &mut self,
+        _: &InPin,
+        _: &mut Ui,
+        _: f32,
+        _: &mut Snarl<BetulaViewerNode>,
+    ) -> PinInfo {
+        todo!()
+    }
+    fn show_output(
+        &mut self,
+        _: &OutPin,
+        _: &mut Ui,
+        _: f32,
+        _: &mut Snarl<BetulaViewerNode>,
+    ) -> PinInfo {
+        todo!()
+    }
+    fn input_color(
+        &mut self,
+        _: &InPin,
+        _: &egui::style::Style,
+        _: &mut Snarl<BetulaViewerNode>,
+    ) -> Color32 {
+        todo!()
+    }
+    fn output_color(
+        &mut self,
+        _: &OutPin,
+        _: &egui::style::Style,
+        _: &mut Snarl<BetulaViewerNode>,
+    ) -> Color32 {
+        todo!()
+    }
 }
