@@ -302,8 +302,19 @@ impl BlackboardPort {
 }
 
 /// Trait the configuration types must implement.
-pub trait NodeConfig: std::fmt::Debug + AsAny + Send {}
-impl<T: std::fmt::Debug + 'static + Send> NodeConfig for T {}
+pub trait NodeConfig: std::fmt::Debug + AsAny + Send {
+    fn clone_boxed(&self) -> Box<dyn NodeConfig>;
+}
+impl<T: std::fmt::Debug + 'static + Send + Clone> NodeConfig for T {
+    fn clone_boxed(&self) -> Box<dyn NodeConfig> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn NodeConfig> {
+    fn clone(&self) -> Self {
+        (**self).clone_boxed()
+    }
+}
 
 /// Helper trait to easily load types implementing clone, used in [`Node::set_config`]:
 /// ```ignore

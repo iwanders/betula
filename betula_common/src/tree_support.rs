@@ -1,5 +1,5 @@
 use betula_core::prelude::*;
-use betula_core::{BetulaError, Blackboard, NodeType};
+use betula_core::{BetulaError, Blackboard, Node, NodeType};
 use serde::{Deserialize, Serialize};
 
 use crate::type_support::{
@@ -109,6 +109,18 @@ impl TreeSupport {
 
     fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
         self.blackboard_factory.as_ref().map(|v| v())
+    }
+
+    fn get_node_support(&self, node_type: &NodeType) -> Result<&NodeTypeSupport, BetulaError> {
+        self.node_support
+            .get(node_type)
+            .ok_or(format!("could not get support for {node_type:?}").into())
+    }
+
+    pub fn create_node(&self, node_type: &NodeType) -> Result<Box<dyn Node>, BetulaError> {
+        let node_support = self.get_node_support(node_type)?;
+
+        node_support.factory.create()
     }
 
     fn get_value_type_support(&self, name: &str) -> Option<&ValueTypeSupport> {
@@ -283,6 +295,7 @@ impl TreeSupport {
             .serialize(serializer)
             .map_err(|e| S::Error::custom(format!("serialize failed with {e:?}")))?)
     }
+
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(
         &self,
         tree: &mut dyn Tree,
@@ -300,17 +313,17 @@ impl TreeSupport {
                 // First, deserialize everything.
                 for node in root.nodes {
                     let node_type = node.node_type.into();
-                    let node_support =
-                        self.node_support
-                            .get(&node_type)
-                            .ok_or(D::Error::custom(format!(
-                                "could not get support for {node_type:?}"
-                            )))?;
-                    let mut new_node = node_support
-                        .factory
-                        .create()
+
+                    let mut new_node = self
+                        .create_node(&node_type)
                         .map_err(|e| D::Error::custom(format!("failed to construct node {e:?}")))?;
+
                     if let Some(config) = node.config {
+                        let node_support = self.get_node_support(&node_type).map_err(|e| {
+                            D::Error::custom(format!(
+                                "failed to get node support for {node_type:?}"
+                            ))
+                        })?;
                         if let Some(config_support) = node_support.config_converter.as_ref() {
                             let mut erased =
                                 Box::new(<dyn erased_serde::Deserializer>::erase(config));
@@ -400,12 +413,6 @@ impl TreeSupport {
 
         Ok(())
     }
-
-    // pub fn deserialize_default<'de, T: Tree + Default, D: serde::Deserializer<'de>, >(&self, deserializer: D) -> Result<T, D::Error> {
-    // let mut tree = T::default();
-    // self.deserialize(&mut tree, deserializer)?;
-    // Ok(tree)
-    // }
 }
 
 pub struct TreeSerializer<'a, 'b> {
