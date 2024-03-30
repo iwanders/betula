@@ -237,7 +237,6 @@ impl TreeConfig {
             // Collect the values.
             let mut values: std::collections::BTreeMap<PortName, TypedValue> = Default::default();
             for port in blackboard.ports() {
-                use std::any::Any;
                 let value = blackboard.get(&port).ok_or(S::Error::custom(format!(
                     "could not get value for {port:?}"
                 )))?;
