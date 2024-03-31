@@ -44,6 +44,7 @@ use betula_core::{
 use serde::{Deserialize, Serialize};
 
 const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
+const UNKNOWN_COLOR: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
 
 use uuid::Uuid;
 
@@ -319,8 +320,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
         match snarl[pin.id.node] {
-            BetulaViewerNode::Node(ref mut node) => {
-                let child_ports = node.vertical_outputs();
+            BetulaViewerNode::Node(ref _node) => {
+                // let child_ports = node.vertical_outputs();
                 if pin.remotes.is_empty() {
                     PinInfo::triangle()
                         .with_fill(RELATION_COLOR)
@@ -335,25 +336,60 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
-    fn inputs(&mut self, _: &BetulaViewerNode) -> usize {
-        0
+    fn inputs(&mut self, node: &BetulaViewerNode) -> usize {
+        match &node {
+            BetulaViewerNode::Node(ref _node) => 1,
+            _ => todo!(),
+        }
     }
+
+    fn vertical_input(
+        &mut self,
+        pin: &InPin,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Option<PinInfo> {
+        match snarl[pin.id.node] {
+            BetulaViewerNode::Node(ref _node) => {
+                if pin.id.input == 0 {
+                    Some(PinInfo::triangle().with_fill(RELATION_COLOR).vertical())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn show_input(
         &mut self,
-        _: &InPin,
+        pin: &InPin,
         _: &mut Ui,
         _: f32,
-        _: &mut Snarl<BetulaViewerNode>,
+        snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
-        todo!()
+        match snarl[pin.id.node] {
+            BetulaViewerNode::Node(ref _node) => {
+                if pin.id.input == 1 {
+                    PinInfo::triangle()
+                        .with_fill(RELATION_COLOR)
+                        .vertical()
+                        .wiring()
+                        .with_gamma(0.5)
+                } else {
+                    PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                }
+            }
+            _ => todo!(),
+        }
     }
+
     fn input_color(
         &mut self,
         _: &InPin,
         _: &egui::style::Style,
         _: &mut Snarl<BetulaViewerNode>,
     ) -> Color32 {
-        todo!()
+        UNKNOWN_COLOR
     }
     fn output_color(
         &mut self,
@@ -361,7 +397,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         _: &egui::style::Style,
         _: &mut Snarl<BetulaViewerNode>,
     ) -> Color32 {
-        todo!()
+        UNKNOWN_COLOR
     }
 
     fn graph_menu(
