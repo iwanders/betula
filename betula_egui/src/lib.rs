@@ -63,6 +63,9 @@ pub struct ViewerNode {
 
     #[serde(skip)]
     node_config: Option<Box<dyn NodeConfig>>,
+
+    #[serde(skip)]
+    my_f32: f32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -263,6 +266,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                                 id,
                                 node_type: None,
                                 node_config: None,
+                                my_f32: 0.0,
                             }),
                         );
                         self.node_map.insert(id, snarl_id);
@@ -290,6 +294,27 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     }
 
     fn has_footer(&mut self, node: &BetulaViewerNode) -> bool {
-        false
+        true
+    }
+    fn show_footer(
+        &mut self,
+        node: SnarlNodeId,
+        inputs: &[InPin],
+        outputs: &[OutPin],
+        ui: &mut Ui,
+        scale: f32,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        let r = match &mut snarl[node] {
+            BetulaViewerNode::Node(ref mut node) => {
+                // Grab the type support for this node.
+                if let Some(node_type) = &node.node_type {
+                    if let Some(support) = self.ui_support.node_support.get(node_type) {
+                        support.ui_config(node, ui, scale)
+                    }
+                }
+            }
+            _ => todo!(),
+        };
     }
 }
