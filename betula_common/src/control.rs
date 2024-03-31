@@ -56,6 +56,10 @@ use crate::tree_support::TreeSupport;
 use betula_core::Tree;
 
 impl InteractionCommand {
+    pub fn add_node(id: NodeId, node_type: NodeType) -> Self {
+        InteractionCommand::AddNode(AddNodeCommand { id, node_type })
+    }
+
     pub fn execute(
         &self,
         tree_support: &TreeSupport,

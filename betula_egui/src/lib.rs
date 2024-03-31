@@ -38,7 +38,9 @@ To tree:
 
 // use betula_core::prelude::*;
 // , NodeType
-use betula_core::{BetulaError, BlackboardId, Node, NodeId, NodeType, Port};
+use betula_core::{
+    BetulaError, BlackboardId, Node, NodeConfig, NodeId as BetulaNodeId, NodeType, Port,
+};
 use serde::{Deserialize, Serialize};
 
 use uuid::Uuid;
@@ -54,10 +56,13 @@ use betula_common::control::TreeClient;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ViewerNode {
-    id: NodeId,
+    id: BetulaNodeId,
 
     #[serde(skip)]
     node_type: Option<NodeType>,
+
+    #[serde(skip)]
+    node_config: Option<Box<dyn NodeConfig>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -70,14 +75,6 @@ pub struct ViewerBlackboard {
 pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
-}
-
-pub struct BetulaViewer {
-    // Some ui support... for stuff like configs.
-    client: Box<dyn TreeClient>,
-    ui_support: UiSupport,
-
-    node_map: HashMap<NodeId, SnarlNodeId>,
 }
 
 pub trait NodeUi {
@@ -94,7 +91,7 @@ pub trait NodeUi {
     fn has_config(&self, _node: &ViewerNode) -> bool {
         false
     }
-    fn ui_config(&self, _node: &ViewerNode, _ui: &mut Ui, _scale: f32) {}
+    fn ui_config(&self, _node: &mut ViewerNode, _ui: &mut Ui, _scale: f32) {}
 }
 
 use std::collections::HashMap;
@@ -119,6 +116,13 @@ impl UiSupport {
     }
 }
 
+pub struct BetulaViewer {
+    // Some ui support... for stuff like configs.
+    client: Box<dyn TreeClient>,
+    ui_support: UiSupport,
+
+    node_map: HashMap<BetulaNodeId, SnarlNodeId>,
+}
 impl BetulaViewer {
     pub fn new(client: Box<dyn TreeClient>) -> Self {
         let mut ui_support = UiSupport::new();
@@ -126,6 +130,8 @@ impl BetulaViewer {
         ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
         ui_support.add_node_default::<betula_core::nodes::FailureNode>();
         ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        ui_support.add_node_default::<betula_common::nodes::DelayNode>();
+        ui_support.add_node_default::<betula_common::nodes::TimeNode>();
         BetulaViewer {
             client,
             ui_support,
@@ -135,7 +141,7 @@ impl BetulaViewer {
 
     fn get_node_mut<'a>(
         &self,
-        node_id: NodeId,
+        node_id: BetulaNodeId,
         snarl: &'a mut Snarl<BetulaViewerNode>,
     ) -> Result<&'a mut ViewerNode, BetulaError> {
         if let Some(snarl_id) = self.node_map.get(&node_id) {
@@ -247,18 +253,16 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             let support = self.ui_support.get_node_support(&node_type);
             if let Some(support) = support {
                 if ui.button(support.name()).clicked() {
-                    use betula_common::control::AddNodeCommand;
-                    let id = NodeId(Uuid::new_v4());
-                    let add_cmd = AddNodeCommand { id, node_type };
-                    if let Ok(_) = self
-                        .client
-                        .send_command(betula_common::control::InteractionCommand::AddNode(add_cmd))
-                    {
+                    use betula_common::control::InteractionCommand;
+                    let id = BetulaNodeId(Uuid::new_v4());
+                    let cmd = InteractionCommand::add_node(id, node_type);
+                    if let Ok(_) = self.client.send_command(cmd) {
                         let snarl_id = snarl.insert_node(
                             pos,
                             BetulaViewerNode::Node(ViewerNode {
                                 id,
                                 node_type: None,
+                                node_config: None,
                             }),
                         );
                         self.node_map.insert(id, snarl_id);
@@ -267,5 +271,25 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 }
             }
         }
+    }
+
+    fn node_menu(
+        &mut self,
+        node: SnarlNodeId,
+        _inputs: &[InPin],
+        _outputs: &[OutPin],
+        ui: &mut Ui,
+        _scale: f32,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        ui.label("Node menu");
+        if ui.button("Remove").clicked() {
+            snarl.remove_node(node);
+            ui.close_menu();
+        }
+    }
+
+    fn has_footer(&mut self, node: &BetulaViewerNode) -> bool {
+        false
     }
 }

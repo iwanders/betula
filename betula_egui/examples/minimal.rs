@@ -74,6 +74,7 @@ fn main() -> eframe::Result<()> {
         tree_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>(
             );
         tree_support.add_node_default::<betula_common::nodes::TimeNode>();
+        tree_support.add_node_default::<betula_common::nodes::DelayNode>();
         tree_support.add_value_default::<f64>();
 
         loop {
@@ -81,7 +82,7 @@ fn main() -> eframe::Result<()> {
             let received = server.get_command()?;
 
             if let Some(command) = received {
-                println!("Executing {command:?}");
+                println!("    Executing {command:?}");
                 let r = command.execute(&tree_support, &mut tree);
                 match r {
                     Ok(v) => {
