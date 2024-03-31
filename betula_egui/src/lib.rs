@@ -195,6 +195,10 @@ pub struct BetulaViewer {
 }
 
 impl BetulaViewer {
+    pub fn client(&self) -> &dyn TreeClient {
+        &*self.client
+    }
+
     pub fn new(client: Box<dyn TreeClient>) -> Self {
         let mut ui_support = UiSupport::new();
         // ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
@@ -416,32 +420,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     .map(|n| n.ui_output_port_count())
                     .unwrap_or(0);
 
-                /*
-                // Sort by output pin.
-                connected_pins.sort_by(|a, b| a.output.partial_cmp(&b.output).unwrap());
-                let mut current: Vec<BetulaNodeId> = vec![];
-                let mut current_new: Vec<BetulaNodeId> = vec![];
-                for i in connected_pins.iter().skip(output_count) {
-                    let pin_with_remotes = snarl.out_pin(*pin);
-                    if pin_with_remotes.remotes.is_empty() {
-                        continue;
-                    }
-                    if pin_with_remotes.remotes.len() > 1 {
-                        // this should never happen and is a logic error.
-                        unreachable!("no output pin should be connected to two remotes");
-                    }
-
-                    // guaranteed to have a single remote now.
-                    let remote_snarl_id = pin_with_remotes.remotes.first().unwrap();
-                    current.push(self.get_betula_id(remote_snarl_id.node).expect("mapping should exist"));
-                }
-                */
                 // Make two vectors of all ports, one with current, one with updated.
                 let mut current: Vec<Option<SnarlNodeId>> = vec![];
                 let mut proposed: Vec<Option<SnarlNodeId>> = vec![];
                 current.resize(highest_connected + 1, None);
                 proposed.resize(highest_connected + 1, None);
-                for output in output_count..highest_connected + 1 {
+                for output in output_count..(highest_connected + 1) {
                     let p = egui_snarl::OutPinId {
                         node: from.id.node,
                         output: output,
@@ -458,10 +442,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 }
 
                 println!("current: {current:?}");
-                // let mut connected_pins : Vec<_> = snarl.out_pins_connected(from.id.node).collect();
-                // add the newly proposed entry;
-                // connected_pins.push(from.id);
-                // let new_pins = create_connections(connected_pins, Some(from.id));
                 println!("proposed: {proposed:?}");
 
                 if current != proposed {
@@ -764,14 +744,19 @@ mod test {
     fn test_connection() -> Result<(), BetulaError> {
         use betula_common::control::InProcessControl;
         let (server, client) = InProcessControl::new();
+        use crate::InteractionCommand::TreeCall;
+        use betula_common::control::TreeCallWrapper;
+
+        // client.
 
         let delay1 = BetulaNodeId(Uuid::new_v4());
         let delay2 = BetulaNodeId(Uuid::new_v4());
+        let delay3 = BetulaNodeId(Uuid::new_v4());
 
         let server_thing = make_server_check(server, move |tree| -> Result<(), BetulaError> {
             println!("testing");
-            assert!(tree.nodes().len() == 2);
-            assert!(tree.children(delay1)? == vec![delay2]);
+            assert!(tree.nodes().len() == 3);
+            assert!(tree.children(delay1)? == vec![delay2, delay3]);
             Ok(())
         });
 
@@ -779,7 +764,12 @@ mod test {
 
         {
             let mut viewer = BetulaViewer::new(Box::new(client));
-
+            viewer
+                .client()
+                .send_command(InteractionCommand::tree_call(|tree| {
+                    assert!(tree.nodes().len() == 5);
+                    Ok(())
+                }))?;
             viewer.ui_create_node(
                 delay1,
                 egui::pos2(0.0, 0.0),
@@ -792,9 +782,18 @@ mod test {
                 betula_common::nodes::DelayNode::static_type(),
                 &mut snarl,
             );
+            viewer.ui_create_node(
+                delay3,
+                egui::pos2(0.0, 0.0),
+                betula_common::nodes::DelayNode::static_type(),
+                &mut snarl,
+            );
             std::thread::sleep(std::time::Duration::from_millis(50));
             viewer.service(&mut snarl)?;
             viewer.connect_relation(delay1, delay2, 0, &mut snarl)?;
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            viewer.service(&mut snarl)?;
+            viewer.connect_relation(delay1, delay3, 1, &mut snarl)?;
             std::thread::sleep(std::time::Duration::from_millis(50));
             viewer.service(&mut snarl)?;
             std::thread::sleep(std::time::Duration::from_millis(50));

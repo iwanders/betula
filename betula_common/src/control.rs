@@ -25,6 +25,48 @@ pub struct SetConfigCommand {
     pub config: SerializedConfig,
 }
 
+pub trait TreeCall: std::fmt::Debug + Send {
+    fn clone_boxed(&self) -> Box<dyn TreeCall>;
+    fn call(&self, tree: &mut dyn Tree) -> Result<(), BetulaError>;
+}
+
+#[derive(Clone)]
+pub struct TreeCallWrapper<
+    TT: Fn(&mut dyn Tree) -> Result<(), BetulaError> + std::marker::Send + Clone + 'static,
+> {
+    f: TT,
+}
+impl<TT: Fn(&mut dyn Tree) -> Result<(), BetulaError> + std::marker::Send + Clone + 'static>
+    TreeCallWrapper<TT>
+{
+    pub fn new(f: TT) -> Box<dyn TreeCall> {
+        Box::new(Self { f })
+    }
+}
+impl<TT: Fn(&mut dyn Tree) -> Result<(), BetulaError> + std::marker::Send + Clone + 'static>
+    TreeCall for TreeCallWrapper<TT>
+{
+    fn clone_boxed(&self) -> Box<dyn TreeCall> {
+        Box::new(self.clone())
+    }
+    fn call(&self, tree: &mut dyn Tree) -> Result<(), BetulaError> {
+        (self.f)(tree)
+    }
+}
+impl<TT: Fn(&mut dyn Tree) -> Result<(), BetulaError> + std::marker::Send + Clone> std::fmt::Debug
+    for TreeCallWrapper<TT>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "TreeCall")
+    }
+}
+
+impl Clone for Box<dyn TreeCall> {
+    fn clone(&self) -> Self {
+        (**self).clone_boxed()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
     AddNode(AddNodeCommand),
@@ -36,6 +78,11 @@ pub enum InteractionCommand {
     SetConfig(SetConfigCommand),
 
     RequestNodes,
+
+    /// Call the function on the tree, this _obviously_ only works for the
+    /// inter process situation, but it is helpful for unit tests.
+    #[serde(skip)]
+    TreeCall(Box<dyn TreeCall>),
 }
 
 use crate::tree_support::TreeSupport;
@@ -51,6 +98,13 @@ impl InteractionCommand {
 
     pub fn set_children(parent: NodeId, children: Vec<NodeId>) -> Self {
         InteractionCommand::SetChildren(SetChildren { parent, children })
+    }
+    pub fn tree_call<
+        F: Fn(&mut dyn Tree) -> Result<(), BetulaError> + std::marker::Send + Clone + 'static,
+    >(
+        f: F,
+    ) -> Self {
+        InteractionCommand::TreeCall(TreeCallWrapper::new(f))
     }
 
     fn node_information(
@@ -113,6 +167,10 @@ impl InteractionCommand {
                     command: self.clone(),
                     error: None,
                 })])
+            }
+            InteractionCommand::TreeCall(f) => {
+                (*f).call(tree)?;
+                Ok(vec![])
             }
             e => Err(format!("unhandled command {e:?}").into()),
         }
