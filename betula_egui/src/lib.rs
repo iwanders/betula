@@ -135,33 +135,44 @@ impl BetulaViewer {
         }
     }
 
-    pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) {
-        let received = self.client.get_event();
-        if received.is_err() {
-            println!("Receive error!!: {received:?}");
-            return;
+    fn get_node_mut<'a>(
+        &self,
+        node_id: NodeId,
+        snarl: &'a mut Snarl<BetulaViewerNode>,
+    ) -> Result<&'a mut ViewerNode, BetulaError> {
+        if let Some(snarl_id) = self.node_map.get(&node_id) {
+            let node = snarl.get_node_mut(*snarl_id);
+            if let Some(viewer_node) = node {
+                if let BetulaViewerNode::Node(viewer_node) = viewer_node {
+                    return Ok(viewer_node);
+                } else {
+                    Err(format!("snarl node {node_id:?} is no node").into())
+                }
+            } else {
+                Err(format!("snarl node {node_id:?} cannot be found").into())
+            }
+        } else {
+            Err(format!("node {node_id:?} cannot be found").into())
         }
-        let received = received.unwrap();
+    }
+
+    pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
+        let event = self.client.get_event()?;
         use betula_common::control::InteractionEvent::NodeInformation;
         use betula_common::control::NodeInformationEvent;
 
-        if let Some(event) = received {
+        if let Some(event) = event {
             println!("event {event:?}");
             match event {
                 NodeInformation(v) => {
-                    if let Some(snarl_id) = self.node_map.get(&v.id) {
-                        let node = snarl.get_node_mut(*snarl_id);
-                        if let Some(viewer_node) = node {
-                            if let BetulaViewerNode::Node(viewer_node) = viewer_node {
-                                viewer_node.node_type = Some(v.node_type);
-                            }
-                        }
-                    }
+                    let viewer_node = self.get_node_mut(v.id, snarl)?;
+                    viewer_node.node_type = Some(v.node_type);
+                    Ok(())
                 }
-                unknown => {
-                    println!("Unhandled event {unknown:?}")
-                }
+                unknown => Err(format!("Unhandled event {unknown:?}").into()),
             }
+        } else {
+            Ok(())
         }
     }
 }
