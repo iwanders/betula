@@ -21,13 +21,13 @@ pub type BlackboardFactory = Box<dyn Fn() -> Box<dyn Blackboard>>;
 
 type SerializableHolder = serde_json::Value;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SerializedConfig {
     node_type: NodeType,
     data: SerializableHolder,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SerializedValue {
     type_id: String,
     data: SerializableHolder,
@@ -501,7 +501,7 @@ mod test {
         use crate::nodes::{DelayNode, DelayNodeConfig};
         tree_support.add_node_default_with_config::<DelayNode, DelayNodeConfig>();
         let interval = 3.3;
-        let mut config: Box<dyn NodeConfig> = Box::new(DelayNodeConfig { interval });
+        let config: Box<dyn NodeConfig> = Box::new(DelayNodeConfig { interval });
         let serialized = tree_support.config_serialize(DelayNode::static_type(), &*config)?;
         let deserialized_box = tree_support.config_deserialize(serialized)?;
         let deserialized = (*deserialized_box)

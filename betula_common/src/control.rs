@@ -1,7 +1,8 @@
 use betula_core::{
-    blackboard::Chalkable, BetulaError, BlackboardId, NodeConfig, NodeId, NodeStatus, NodeType,
-    PortConnection, PortName,
+    BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortConnection, PortName,
 };
+
+use crate::{tree_support::SerializedConfig, tree_support::SerializedValue};
 
 use serde::{Deserialize, Serialize};
 // we want asynchronous control & interaction with the tree.
@@ -21,19 +22,19 @@ pub struct Relation {
     pub child: NodeId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SetConfigCommand {
     pub id: NodeId,
-    pub config: Box<dyn NodeConfig>,
+    pub config: SerializedConfig,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecutionCommand {
     pub running: bool,
     pub one_shot: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
     AddNode(AddNodeCommand),
     AddBlackboard(BlackboardId),
@@ -82,39 +83,39 @@ impl InteractionCommand {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlackboardValueEvent {
     pub id: BlackboardId,
     pub name: PortName,
-    pub value: Box<dyn Chalkable>,
+    pub value: SerializedValue,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum NodeExecutionResult {
     Success(NodeStatus),
     Error(String),
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecutionResult {
     pub nodes: Vec<(NodeId, NodeExecutionResult)>,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInformationEvent {
     pub id: NodeId,
     pub node_type: NodeType,
-    pub config: Option<Box<dyn NodeConfig>>,
+    pub config: Option<SerializedConfig>,
     pub children: Vec<NodeId>,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CommandResult {
     pub command: InteractionCommand,
     pub error: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionEvent {
     CommandResult(CommandResult),
     BlackboardChange(BlackboardValueEvent),
