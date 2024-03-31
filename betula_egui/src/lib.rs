@@ -52,89 +52,109 @@ use egui_snarl::{
     InPin, NodeId as SnarlNodeId, OutPin, Snarl,
 };
 
-use betula_common::control::TreeClient;
+use betula_common::{control::TreeClient, TreeSupport};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ViewerNode {
     id: BetulaNodeId,
 
     #[serde(skip)]
-    node_type: Option<NodeType>,
-
-    #[serde(skip)]
-    node_config: Option<Box<dyn NodeConfig>>,
-
-    #[serde(skip)]
-    my_f32: f32,
+    ui_node: Option<Box<dyn UiNode>>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ViewerBlackboard {
     id: BlackboardId,
     // Full, or just a single?
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
 }
 
-pub trait NodeUi {
-    fn name(&self) -> String;
-    fn child_constraints(&self, _node: &mut ViewerNode) -> std::ops::Range<usize> {
+/// Trait for nodes in the ui.
+///
+/// It will never be executed, but sharing functionality from Node is
+/// useful as it allows reusing the get_config and set_config methods as
+/// well as the ports function.
+pub trait UiNode: Node {
+    fn ui_title(&self) -> String {
+        self.node_type().0.clone()
+    }
+
+    fn ui_child_range(&self) -> std::ops::Range<usize> {
         0..usize::MAX
     }
-    fn ports(&self, _node: &ViewerNode) -> Vec<Port> {
-        vec![]
-    }
-    fn ui_title(&self, _node: &ViewerNode) -> String {
-        self.name()
-    }
-    fn has_config(&self, _node: &ViewerNode) -> bool {
-        false
-    }
-    fn ui_config(&self, _node: &mut ViewerNode, _ui: &mut Ui, _scale: f32) {}
+
+    fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) {}
 }
 
 use std::collections::HashMap;
+
+type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;
+struct UiNodeSupport {
+    node_type: NodeType,
+    display_name: String,
+    node_factory: UiNodeFactory,
+}
+
 struct UiSupport {
-    node_support: HashMap<NodeType, Box<dyn NodeUi>>,
+    ui: HashMap<NodeType, UiNodeSupport>,
+    tree: TreeSupport,
 }
 impl UiSupport {
     pub fn new() -> Self {
         Self {
-            node_support: Default::default(),
+            ui: Default::default(),
+            tree: Default::default(),
         }
     }
-    pub fn add_node_default<T: Node + NodeUi + Default + 'static>(&mut self) {
-        self.node_support
-            .insert(T::static_type(), Box::new(T::default()));
+    pub fn add_node_default<T: Node + UiNode + Default + 'static>(&mut self) {
+        self.tree.add_node_default::<T>();
+        let ui_support = UiNodeSupport {
+            node_type: T::static_type(),
+            display_name: T::static_type().0.clone(),
+            node_factory: Box::new(|| Box::new(T::default())),
+        };
+        self.ui.insert(T::static_type(), ui_support);
     }
     pub fn node_types(&self) -> Vec<NodeType> {
-        self.node_support.keys().cloned().collect()
+        self.ui.keys().cloned().collect()
     }
-    pub fn get_node_support(&self, node_type: &NodeType) -> Option<&dyn NodeUi> {
-        self.node_support.get(node_type).map(|v| &**v)
+    pub fn display_name(&self, node_type: &NodeType) -> String {
+        if let Some(node_support) = self.ui.get(node_type) {
+            node_support.display_name.clone()
+        } else {
+            "Unknown Node".into()
+        }
+    }
+    pub fn create_ui_node(&self, node_type: &NodeType) -> Result<Box<dyn UiNode>, BetulaError> {
+        if let Some(node_support) = self.ui.get(node_type) {
+            Ok((node_support.node_factory)())
+        } else {
+            Err("no ui node support for {node_type:?}".into())
+        }
     }
 }
 
 pub struct BetulaViewer {
     // Some ui support... for stuff like configs.
     client: Box<dyn TreeClient>,
-    ui_support: UiSupport,
 
     node_map: HashMap<BetulaNodeId, SnarlNodeId>,
+    ui_support: UiSupport,
 }
 impl BetulaViewer {
     pub fn new(client: Box<dyn TreeClient>) -> Self {
         let mut ui_support = UiSupport::new();
-        ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
-        ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
-        ui_support.add_node_default::<betula_core::nodes::FailureNode>();
-        ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        // ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
+        // ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
+        // ui_support.add_node_default::<betula_core::nodes::FailureNode>();
+        // ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
         ui_support.add_node_default::<betula_common::nodes::DelayNode>();
-        ui_support.add_node_default::<betula_common::nodes::TimeNode>();
+        // ui_support.add_node_default::<betula_common::nodes::TimeNode>();
         BetulaViewer {
             client,
             ui_support,
@@ -172,7 +192,7 @@ impl BetulaViewer {
             match event {
                 NodeInformation(v) => {
                     let viewer_node = self.get_node_mut(v.id, snarl)?;
-                    viewer_node.node_type = Some(v.node_type);
+                    viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
                     Ok(())
                 }
                 unknown => Err(format!("Unhandled event {unknown:?}").into()),
@@ -190,12 +210,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match node {
             BetulaViewerNode::Node(node) => {
                 // Grab the type support for this node.
-                if let Some(node_type) = &node.node_type {
-                    if let Some(support) = self.ui_support.node_support.get(node_type) {
-                        support.ui_title(node)
-                    } else {
-                        format!("{node_type:?}")
-                    }
+                if let Some(ui_node) = &node.ui_node {
+                    ui_node.ui_title()
                 } else {
                     "Pending...".to_owned()
                 }
@@ -253,26 +269,19 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         ui.label("Add node:");
         for node_type in self.ui_support.node_types() {
-            let support = self.ui_support.get_node_support(&node_type);
-            if let Some(support) = support {
-                if ui.button(support.name()).clicked() {
-                    use betula_common::control::InteractionCommand;
-                    let id = BetulaNodeId(Uuid::new_v4());
-                    let cmd = InteractionCommand::add_node(id, node_type);
-                    if let Ok(_) = self.client.send_command(cmd) {
-                        let snarl_id = snarl.insert_node(
-                            pos,
-                            BetulaViewerNode::Node(ViewerNode {
-                                id,
-                                node_type: None,
-                                node_config: None,
-                                my_f32: 0.0,
-                            }),
-                        );
-                        self.node_map.insert(id, snarl_id);
-                    }
-                    ui.close_menu();
+            let name = self.ui_support.display_name(&node_type);
+            if ui.button(name).clicked() {
+                use betula_common::control::InteractionCommand;
+                let id = BetulaNodeId(Uuid::new_v4());
+                let cmd = InteractionCommand::add_node(id, node_type);
+                if let Ok(_) = self.client.send_command(cmd) {
+                    let snarl_id = snarl.insert_node(
+                        pos,
+                        BetulaViewerNode::Node(ViewerNode { id, ui_node: None }),
+                    );
+                    self.node_map.insert(id, snarl_id);
                 }
+                ui.close_menu();
             }
         }
     }
@@ -307,12 +316,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         let r = match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
-                // Grab the type support for this node.
-                if let Some(node_type) = &node.node_type {
-                    if let Some(support) = self.ui_support.node_support.get(node_type) {
-                        support.ui_config(node, ui, scale)
-                    }
-                }
+                node.ui_node.as_mut().map(|e| e.ui_config(ui, scale));
             }
             _ => todo!(),
         };

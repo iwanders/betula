@@ -14,7 +14,7 @@ pub struct DelayNodeConfig {
 pub struct DelayNode {
     time: Input<f64>,
     last_time: f64,
-    config: DelayNodeConfig,
+    pub config: DelayNodeConfig,
 }
 
 impl DelayNode {
