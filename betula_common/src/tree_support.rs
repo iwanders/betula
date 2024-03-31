@@ -1,5 +1,5 @@
 use betula_core::prelude::*;
-use betula_core::{BetulaError, Blackboard, Node, NodeType};
+use betula_core::{BetulaError, Blackboard, Node, NodeConfig, NodeType};
 use serde::{Deserialize, Serialize};
 
 use crate::type_support::{
@@ -19,24 +19,38 @@ use crate::type_support::{
 
 pub type BlackboardFactory = Box<dyn Fn() -> Box<dyn Blackboard>>;
 
+type SerializableHolder = serde_json::Value;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SerializedConfig {
+    node_type: NodeType,
+    data: SerializableHolder,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SerializedValue {
+    type_id: String,
+    data: SerializableHolder,
+}
+
 mod v1 {
+    use super::SerializableHolder;
     use betula_core::{BlackboardId, NodeId, PortConnection, PortName};
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
-    pub type SerializableValue = serde_json::Value;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct TreeNode {
         pub id: NodeId,
         pub node_type: String,
-        pub config: Option<SerializableValue>,
+        pub config: Option<SerializableHolder>,
         pub children: Vec<NodeId>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct TypedValue {
         pub type_id: String,
-        pub data: SerializableValue,
+        pub data: SerializableHolder,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -111,11 +125,11 @@ impl TreeSupport {
         self.blackboard_factory.as_ref().map(|v| v())
     }
 
-    pub fn get_node_types(&self) -> Vec<NodeType> {
-        self.node_support.keys().cloned().collect()
-    }
+    //fn get_node_types(&self) -> Vec<NodeType> {
+    //    self.node_support.keys().cloned().collect()
+    //}
 
-    pub fn get_node_support(&self, node_type: &NodeType) -> Result<&NodeTypeSupport, BetulaError> {
+    fn get_node_support(&self, node_type: &NodeType) -> Result<&NodeTypeSupport, BetulaError> {
         self.node_support
             .get(node_type)
             .ok_or(format!("could not get support for {node_type:?}").into())
@@ -192,7 +206,7 @@ impl TreeSupport {
             .insert(std::any::TypeId::of::<V>(), support);
     }
 
-    pub fn serialize<S: serde::Serializer>(
+    pub fn tree_serialize<S: serde::Serializer>(
         &self,
         tree: &dyn Tree,
         serializer: S,
@@ -211,7 +225,7 @@ impl TreeSupport {
                 .get_config()
                 .map_err(|e| S::Error::custom(format!("could not get config {e:?}")))?;
             let node_type = tree_node.node_type();
-            let config: Option<SerializableValue> = if let Some(config) = config {
+            let config: Option<SerializableHolder> = if let Some(config) = config {
                 let converter = self.node_support.get(&node_type);
                 let converter = converter
                     .map(|v| v.config_converter.as_ref())
@@ -300,7 +314,7 @@ impl TreeSupport {
             .map_err(|e| S::Error::custom(format!("serialize failed with {e:?}")))?)
     }
 
-    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+    pub fn tree_deserialize<'de, D: serde::Deserializer<'de>>(
         &self,
         tree: &mut dyn Tree,
         deserializer: D,
@@ -325,7 +339,7 @@ impl TreeSupport {
                     if let Some(config) = node.config {
                         let node_support = self.get_node_support(&node_type).map_err(|e| {
                             D::Error::custom(format!(
-                                "failed to get node support for {node_type:?}"
+                                "failed to get node support for {node_type:?}: {e:?}"
                             ))
                         })?;
                         if let Some(config_support) = node_support.config_converter.as_ref() {
@@ -417,6 +431,38 @@ impl TreeSupport {
 
         Ok(())
     }
+
+    pub fn config_serialize(
+        &self,
+        node_type: NodeType,
+        config: &dyn NodeConfig,
+    ) -> Result<SerializedConfig, BetulaError> {
+        let converter = self.node_support.get(&node_type);
+        let converter = converter
+            .map(|v| v.config_converter.as_ref())
+            .flatten()
+            .ok_or(format!("could not get support for {node_type:?}"))?;
+        let serialize_erased = converter.config_serialize(&*config)?;
+        Ok(SerializedConfig {
+            node_type: node_type,
+            data: serde_json::to_value(serialize_erased)
+                .map_err(|e| format!("json serialize error {e:?}"))?,
+        })
+    }
+
+    pub fn config_deserialize(
+        &self,
+        config: SerializedConfig,
+    ) -> Result<Box<dyn NodeConfig>, BetulaError> {
+        let node_type = &config.node_type;
+        let converter = self.node_support.get(&node_type);
+        let converter = converter
+            .map(|v| v.config_converter.as_ref())
+            .flatten()
+            .ok_or(format!("could not get support for {node_type:?}"))?;
+        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(config.data));
+        Ok(converter.config_deserialize(&mut erased)?)
+    }
 }
 
 pub struct TreeSerializer<'a, 'b> {
@@ -438,7 +484,7 @@ impl<'a, 'b> serde::Serialize for TreeSerializer<'a, 'b> {
     where
         S: serde::Serializer,
     {
-        self.config_support.serialize(self.tree, serializer)
+        self.config_support.tree_serialize(self.tree, serializer)
     }
 }
 
@@ -451,6 +497,21 @@ mod test {
     use uuid::Uuid;
     #[test]
     fn test_config() -> Result<(), BetulaError> {
+        let mut tree_support = TreeSupport::new();
+        use crate::nodes::{DelayNode, DelayNodeConfig};
+        tree_support.add_node_default_with_config::<DelayNode, DelayNodeConfig>();
+        let interval = 3.3;
+        let mut config: Box<dyn NodeConfig> = Box::new(DelayNodeConfig { interval });
+        let serialized = tree_support.config_serialize(DelayNode::static_type(), &*config)?;
+        let deserialized_box = tree_support.config_deserialize(serialized)?;
+        let deserialized = (*deserialized_box)
+            .downcast_ref::<DelayNodeConfig>()
+            .ok_or(format!("could not downcast"))?;
+        assert_eq!(interval, deserialized.interval);
+        Ok(())
+    }
+    #[test]
+    fn test_tree() -> Result<(), BetulaError> {
         let mut tree_support = TreeSupport::new();
         tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
         tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
@@ -473,14 +534,14 @@ mod test {
         let config_json = serde_json::to_string(&obj)?;
         println!("config json: {config_json:?}");
 
-        let json_value = tree_support.serialize(&*tree, serde_json::value::Serializer)?;
+        let json_value = tree_support.tree_serialize(&*tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value}");
 
         // lets try to rebuild the tree from that json value.
         let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
-        tree_support.deserialize(&mut *new_tree, json_value.clone())?;
+        tree_support.tree_deserialize(&mut *new_tree, json_value.clone())?;
         println!("new_tree: {new_tree:#?}");
-        let and_back = tree_support.serialize(&*new_tree, serde_json::value::Serializer)?;
+        let and_back = tree_support.tree_serialize(&*new_tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
 
         // let mut another_tree = tree_support.deserialize_default::<BasicTree,_>(json_value.clone())?;
@@ -534,16 +595,16 @@ mod test {
         let config_json = serde_json::to_string(&obj)?;
         println!("config_json: {config_json:?}");
 
-        let json_value = tree_support.serialize(&*tree, serde_json::value::Serializer)?;
+        let json_value = tree_support.tree_serialize(&*tree, serde_json::value::Serializer)?;
         println!("json_value: {json_value:#?}");
 
         tree_support.set_blackboard_factory(Box::new(|| Box::new(BasicBlackboard::default())));
 
         // lets try to rebuild the tree from that json value.
         let mut new_tree: Box<dyn Tree> = Box::new(BasicTree::new());
-        tree_support.deserialize(&mut *new_tree, json_value.clone())?;
+        tree_support.tree_deserialize(&mut *new_tree, json_value.clone())?;
         println!("new_tree: {new_tree:#?}");
-        let and_back = tree_support.serialize(&*new_tree, serde_json::value::Serializer)?;
+        let and_back = tree_support.tree_serialize(&*new_tree, serde_json::value::Serializer)?;
         assert_eq!(and_back, json_value);
 
         Ok(())

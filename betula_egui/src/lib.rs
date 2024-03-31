@@ -38,9 +38,7 @@ To tree:
 
 // use betula_core::prelude::*;
 // , NodeType
-use betula_core::{
-    BetulaError, BlackboardId, Node, NodeId, NodeStatus, NodeType, Port, RunContext,
-};
+use betula_core::{BetulaError, BlackboardId, Node, NodeId, NodeType, Port};
 use serde::{Deserialize, Serialize};
 
 use uuid::Uuid;
@@ -48,11 +46,11 @@ use uuid::Uuid;
 pub mod nodes;
 
 use egui_snarl::{
-    ui::{PinInfo, SnarlStyle, SnarlViewer},
+    ui::{PinInfo, SnarlViewer},
     InPin, NodeId as SnarlNodeId, OutPin, Snarl,
 };
 
-use betula_common::{control::TreeClient, TreeSupport};
+use betula_common::control::TreeClient;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ViewerNode {
@@ -84,19 +82,19 @@ pub struct BetulaViewer {
 
 pub trait NodeUi {
     fn name(&self) -> String;
-    fn child_constraints(&self, node: &mut ViewerNode) -> std::ops::Range<usize> {
+    fn child_constraints(&self, _node: &mut ViewerNode) -> std::ops::Range<usize> {
         0..usize::MAX
     }
-    fn ports(&self, node: &ViewerNode) -> Vec<Port> {
+    fn ports(&self, _node: &ViewerNode) -> Vec<Port> {
         vec![]
     }
-    fn ui_title(&self, node: &ViewerNode) -> String {
+    fn ui_title(&self, _node: &ViewerNode) -> String {
         self.name()
     }
-    fn has_config(&self, node: &ViewerNode) -> bool {
+    fn has_config(&self, _node: &ViewerNode) -> bool {
         false
     }
-    fn ui_config(&self, node: &ViewerNode, ui: &mut Ui, scale: f32) {}
+    fn ui_config(&self, _node: &ViewerNode, _ui: &mut Ui, _scale: f32) {}
 }
 
 use std::collections::HashMap;
@@ -159,7 +157,6 @@ impl BetulaViewer {
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         let event = self.client.get_event()?;
         use betula_common::control::InteractionEvent::NodeInformation;
-        use betula_common::control::NodeInformationEvent;
 
         if let Some(event) = event {
             println!("event {event:?}");

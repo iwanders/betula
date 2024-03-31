@@ -1,5 +1,5 @@
-use crate::{NodeUi, ViewerNode};
-use betula_core::{nodes, Node, NodeType};
+use crate::NodeUi;
+use betula_core::{nodes, Node};
 
 impl NodeUi for nodes::SequenceNode {
     fn name(&self) -> String {

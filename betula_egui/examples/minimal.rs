@@ -11,7 +11,7 @@ pub struct DemoApp {
 }
 
 impl DemoApp {
-    pub fn new(viewer: BetulaViewer, cx: &CreationContext) -> Self {
+    pub fn new(viewer: BetulaViewer, _cx: &CreationContext) -> Self {
         let snarl = Snarl::<BetulaViewerNode>::new();
 
         let style = SnarlStyle::new();
@@ -27,7 +27,7 @@ impl DemoApp {
 impl App for DemoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let r = self.viewer.service(&mut self.snarl);
-        if (r.is_err()) {
+        if r.is_err() {
             println!("Error servicing: {:?}", r.err());
         }
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -51,13 +51,13 @@ impl App for DemoApp {
         });
     }
 
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {}
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 }
 
 fn main() -> eframe::Result<()> {
     let (server, client) = InProcessControl::new();
 
-    let server_thing = std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
+    let _server_thing = std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
         use betula_common::control::TreeServer;
         use betula_common::TreeSupport;
         use betula_core::basic::BasicTree;
