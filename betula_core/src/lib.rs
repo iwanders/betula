@@ -469,7 +469,7 @@ pub trait Tree: std::fmt::Debug + AsAny {
     fn children(&self, id: NodeId) -> Result<Vec<NodeId>, BetulaError>;
 
     /// Set the children of a particular parent node.
-    fn set_children(&mut self, parent: NodeId, children: Vec<NodeId>) -> Result<(), BetulaError>;
+    fn set_children(&mut self, parent: NodeId, children: &[NodeId]) -> Result<(), BetulaError>;
 
     /// Execute the tick, starting at the provided node.
     fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError>;

@@ -265,6 +265,37 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
+    fn connect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
+        // Validate connection
+        match (&snarl[from.id.node], &snarl[to.id.node]) {
+            (BetulaViewerNode::Node(_), BetulaViewerNode::Blackboard(_)) => {
+                // Setup an output port.
+                todo!("Setup an output port.")
+            }
+            (BetulaViewerNode::Node(_), BetulaViewerNode::Node(_)) => {
+                // Setup a relation.
+                todo!("Setup a relation.")
+            }
+            (BetulaViewerNode::Blackboard(_), BetulaViewerNode::Node(_)) => {
+                // Setup an input port.
+                todo!("Setup an input port.")
+            }
+            (_, _) => {
+                // this connection is disallowed.
+                return;
+            }
+        }
+
+        // for &remote in &to.remotes {
+        // snarl.disconnect(remote, to.id);
+        // }
+
+        // snarl.connect(from.id, to.id);
+
+        // handle_tree_outputs(from.id.node, snarl);
+        // handle_tree_outputs(to.id.node, snarl);
+    }
+
     fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
             BetulaViewerNode::Node(ref node) => {

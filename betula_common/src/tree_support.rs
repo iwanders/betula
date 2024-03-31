@@ -400,7 +400,7 @@ impl TreeSupport {
 
                 // Create the connections.
                 for (parent, children) in relations {
-                    tree.set_children(parent, children)
+                    tree.set_children(parent, &children)
                         .map_err(|e| D::Error::custom(format!("failed to relation {e:?}")))?;
                 }
 
@@ -525,7 +525,7 @@ mod test {
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode {}))?;
         let s1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SuccessNode {}))?;
-        tree.set_children(root, vec![f1, s1])?;
+        tree.set_children(root, &vec![f1, s1])?;
 
         let obj = TreeSerializer::new(&tree_support, &*tree);
         let config_json = serde_json::to_string(&obj)?;
@@ -574,7 +574,7 @@ mod test {
             NodeId(Uuid::new_v4()),
             Box::new(crate::nodes::DelayNode::default()),
         )?;
-        tree.set_children(root, vec![time_node, delay_node])?;
+        tree.set_children(root, &vec![time_node, delay_node])?;
 
         // Add the blackboard.
         let bb = tree.add_blackboard_boxed(

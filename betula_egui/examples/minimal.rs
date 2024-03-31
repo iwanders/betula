@@ -14,7 +14,8 @@ impl DemoApp {
     pub fn new(viewer: BetulaViewer, _cx: &CreationContext) -> Self {
         let snarl = Snarl::<BetulaViewerNode>::new();
 
-        let style = SnarlStyle::new();
+        let mut style = SnarlStyle::new();
+        style.simple_wire = true;
 
         DemoApp {
             viewer,

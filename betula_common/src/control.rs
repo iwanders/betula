@@ -1,6 +1,4 @@
-use betula_core::{
-    BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortConnection, PortName,
-};
+use betula_core::{BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortName};
 
 use crate::{tree_support::SerializedConfig, tree_support::SerializedValue};
 
@@ -51,6 +49,29 @@ impl InteractionCommand {
         InteractionCommand::RemoveNode(id)
     }
 
+    pub fn set_children(parent: NodeId, children: Vec<NodeId>) -> Self {
+        InteractionCommand::SetChildren(SetChildren { parent, children })
+    }
+
+    fn node_information(
+        tree_support: &TreeSupport,
+        node_id: NodeId,
+        tree: &mut dyn Tree,
+    ) -> Result<NodeInformationEvent, BetulaError> {
+        let node = tree
+            .node_mut(node_id)
+            .ok_or(format!("cannot find {node_id:?}"))?;
+        let node_type = node.node_type().clone();
+        let children = tree.children(node_id)?;
+        let _ = tree_support; // do something with the config.
+        Ok(NodeInformationEvent {
+            id: node_id,
+            node_type,
+            config: None,
+            children,
+        })
+    }
+
     pub fn execute(
         &self,
         tree_support: &TreeSupport,
@@ -65,12 +86,25 @@ impl InteractionCommand {
                         command: self.clone(),
                         error: None,
                     }),
-                    InteractionEvent::NodeInformation(NodeInformationEvent {
-                        id: v.id,
-                        node_type: v.node_type.clone(),
-                        config: None,
-                        children: vec![],
+                    InteractionEvent::NodeInformation(Self::node_information(
+                        tree_support,
+                        v.id,
+                        tree,
+                    )?),
+                ])
+            }
+            InteractionCommand::SetChildren(ref v) => {
+                let _modified = tree.set_children(v.parent, &v.children)?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
                     }),
+                    InteractionEvent::NodeInformation(Self::node_information(
+                        tree_support,
+                        v.parent,
+                        tree,
+                    )?),
                 ])
             }
             InteractionCommand::RemoveNode(v) => {
