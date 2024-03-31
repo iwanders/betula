@@ -679,17 +679,14 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 mod test {
     use super::*;
     use betula_common::control::InProcessControlServer;
-    use betula_core::Tree;
 
-    fn make_server_check<F: FnOnce(&dyn Tree) -> Result<(), BetulaError> + Send + 'static>(
+    fn make_server_check(
         server: InProcessControlServer,
-        fun: F,
     ) -> std::thread::JoinHandle<Result<(), betula_core::BetulaError>> {
         use betula_core::basic::BasicTree;
         std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
             use betula_common::control::TreeServer;
-            use betula_common::TreeSupport;
-            use betula_core::Tree;
+            // use betula_core::Tree;
 
             use betula_common::control::CommandResult;
             use betula_common::control::InteractionEvent;
@@ -733,9 +730,6 @@ mod test {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
             }
-
-            fun(&tree)?;
-            // assert!(tree.nodes().len() == 2);
             Ok(())
         })
     }
@@ -744,8 +738,6 @@ mod test {
     fn test_connection() -> Result<(), BetulaError> {
         use betula_common::control::InProcessControl;
         let (server, client) = InProcessControl::new();
-        use crate::InteractionCommand::TreeCall;
-        use betula_common::control::TreeCallWrapper;
 
         // client.
 
@@ -753,21 +745,15 @@ mod test {
         let delay2 = BetulaNodeId(Uuid::new_v4());
         let delay3 = BetulaNodeId(Uuid::new_v4());
 
-        let server_thing = make_server_check(server, move |tree| -> Result<(), BetulaError> {
-            println!("testing");
-            assert!(tree.nodes().len() == 3);
-            assert!(tree.children(delay1)? == vec![delay2, delay3]);
-            Ok(())
-        });
+        let server_thing = make_server_check(server);
 
         let mut snarl = Snarl::<BetulaViewerNode>::new();
-
         {
             let mut viewer = BetulaViewer::new(Box::new(client));
             viewer
                 .client()
-                .send_command(InteractionCommand::tree_call(|tree| {
-                    assert!(tree.nodes().len() == 5);
+                .send_command(InteractionCommand::tree_call(move |tree| {
+                    assert!(tree.nodes().len() == 0);
                     Ok(())
                 }))?;
             viewer.ui_create_node(
@@ -797,6 +783,14 @@ mod test {
             std::thread::sleep(std::time::Duration::from_millis(50));
             viewer.service(&mut snarl)?;
             std::thread::sleep(std::time::Duration::from_millis(50));
+            viewer
+                .client()
+                .send_command(InteractionCommand::tree_call(move |tree| {
+                    println!("testing");
+                    assert!(tree.nodes().len() == 3);
+                    assert!(tree.children(delay1)? == vec![delay2, delay3]);
+                    Ok(())
+                }))?;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert!(server_thing.join().is_ok());
