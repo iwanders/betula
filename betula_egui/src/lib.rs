@@ -39,9 +39,11 @@ To tree:
 // use betula_core::prelude::*;
 // , NodeType
 use betula_core::{
-    BetulaError, BlackboardId, Node, NodeConfig, NodeId as BetulaNodeId, NodeType, Port,
+    BetulaError, BlackboardId, Node, NodeId as BetulaNodeId, NodeType, PortDirection,
 };
 use serde::{Deserialize, Serialize};
+
+const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
 
 use uuid::Uuid;
 
@@ -61,6 +63,25 @@ pub struct ViewerNode {
 
     #[serde(skip)]
     ui_node: Option<Box<dyn UiNode>>,
+
+    #[serde(skip)]
+    children: Vec<Option<BetulaNodeId>>,
+}
+
+impl ViewerNode {
+    pub fn vertical_outputs(&self) -> usize {
+        let current = self.children.len();
+        let allowed = self
+            .ui_node
+            .as_ref()
+            .map(|n| n.ui_child_range())
+            .unwrap_or(0..0);
+        if current <= allowed.end {
+            current + 1
+        } else {
+            current
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -90,13 +111,21 @@ pub trait UiNode: Node {
     }
 
     fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) {}
+
+    fn ui_output_port_count(&self) -> usize {
+        self.ports()
+            .unwrap_or(vec![])
+            .iter()
+            .filter(|p| p.direction() == PortDirection::Output)
+            .count()
+    }
 }
 
 use std::collections::HashMap;
 
 type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;
 struct UiNodeSupport {
-    node_type: NodeType,
+    // node_type: NodeType,
     display_name: String,
     node_factory: UiNodeFactory,
 }
@@ -115,7 +144,7 @@ impl UiSupport {
     pub fn add_node_default<T: Node + UiNode + Default + 'static>(&mut self) {
         self.tree.add_node_default::<T>();
         let ui_support = UiNodeSupport {
-            node_type: T::static_type(),
+            // node_type: T::static_type(),
             display_name: T::static_type().0.clone(),
             node_factory: Box::new(|| Box::new(T::default())),
         };
@@ -234,24 +263,84 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             _ => todo!(),
         }
     }
-    fn outputs(&mut self, _: &BetulaViewerNode) -> usize {
-        0
+
+    fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
+        match &node {
+            BetulaViewerNode::Node(ref node) => {
+                // First collect the child ports:
+                let child_ports = node.vertical_outputs();
+                // Then collect the actual output ports.
+                let output_count = node
+                    .ui_node
+                    .as_ref()
+                    .map(|n| n.ui_output_port_count())
+                    .unwrap_or(0);
+                child_ports + output_count
+            }
+            _ => 0,
+        }
     }
+
+    fn vertical_output(
+        &mut self,
+        pin: &OutPin,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Option<PinInfo> {
+        match snarl[pin.id.node] {
+            BetulaViewerNode::Node(ref mut node) => {
+                //node.ui_node.as_mut().map(|e|e.ui_config(ui, scale));
+                // So we have outputs for the entire length of children.
+                let child_ports = node.vertical_outputs();
+                if pin.id.output < child_ports {
+                    if pin.remotes.is_empty() {
+                        Some(
+                            PinInfo::triangle()
+                                .with_fill(RELATION_COLOR)
+                                .vertical()
+                                .wiring()
+                                .with_gamma(0.5),
+                        )
+                    } else {
+                        Some(PinInfo::triangle().with_fill(RELATION_COLOR).vertical())
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => todo!(),
+        }
+    }
+
+    fn show_output(
+        &mut self,
+        pin: &OutPin,
+        _: &mut Ui,
+        _: f32,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> PinInfo {
+        match snarl[pin.id.node] {
+            BetulaViewerNode::Node(ref mut node) => {
+                let child_ports = node.vertical_outputs();
+                if pin.remotes.is_empty() {
+                    PinInfo::triangle()
+                        .with_fill(RELATION_COLOR)
+                        .vertical()
+                        .wiring()
+                        .with_gamma(0.5)
+                } else {
+                    PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                }
+            }
+            _ => todo!(),
+        }
+    }
+
     fn inputs(&mut self, _: &BetulaViewerNode) -> usize {
         0
     }
     fn show_input(
         &mut self,
         _: &InPin,
-        _: &mut Ui,
-        _: f32,
-        _: &mut Snarl<BetulaViewerNode>,
-    ) -> PinInfo {
-        todo!()
-    }
-    fn show_output(
-        &mut self,
-        _: &OutPin,
         _: &mut Ui,
         _: f32,
         _: &mut Snarl<BetulaViewerNode>,
@@ -291,7 +380,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 if let Ok(_) = self.client.send_command(cmd) {
                     let snarl_id = snarl.insert_node(
                         pos,
-                        BetulaViewerNode::Node(ViewerNode { id, ui_node: None }),
+                        BetulaViewerNode::Node(ViewerNode {
+                            id,
+                            ui_node: None,
+                            children: vec![],
+                        }),
                     );
                     self.node_map.insert(id, snarl_id);
                 }
@@ -311,7 +404,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         ui.label("Node menu");
         if ui.button("Remove").clicked() {
-            let r = match &mut snarl[node] {
+            match &mut snarl[node] {
                 BetulaViewerNode::Node(ref mut node) => {
                     let node_id = node.id;
                     let cmd = InteractionCommand::remove_node(node_id);
@@ -323,19 +416,19 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
-    fn has_footer(&mut self, node: &BetulaViewerNode) -> bool {
+    fn has_footer(&mut self, _node: &BetulaViewerNode) -> bool {
         true
     }
     fn show_footer(
         &mut self,
         node: SnarlNodeId,
-        inputs: &[InPin],
-        outputs: &[OutPin],
+        _inputs: &[InPin],
+        _outputs: &[OutPin],
         ui: &mut Ui,
         scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
-        let r = match &mut snarl[node] {
+        match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 node.ui_node.as_mut().map(|e| e.ui_config(ui, scale));
             }

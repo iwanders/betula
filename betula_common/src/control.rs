@@ -29,12 +29,6 @@ pub struct SetConfigCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ExecutionCommand {
-    pub running: bool,
-    pub one_shot: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
     AddNode(AddNodeCommand),
     RemoveNode(NodeId),
@@ -48,8 +42,6 @@ pub enum InteractionCommand {
 
     AddRelation(Relation),
     RemoveRelation(Relation),
-
-    ExecutionCommand(ExecutionCommand),
 
     RequestNodes,
 }

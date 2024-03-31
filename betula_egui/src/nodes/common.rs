@@ -1,6 +1,5 @@
-use crate::{UiNode, ViewerNode};
-use betula_core::{Node, NodeConfig};
-use egui::{widgets, Ui};
+use crate::UiNode;
+use egui::Ui;
 
 use betula_common::nodes;
 
