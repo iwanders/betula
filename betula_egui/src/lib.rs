@@ -738,10 +738,10 @@ mod test {
     fn test_connection() -> Result<(), BetulaError> {
         use betula_common::control::InProcessControl;
         let (server, client) = InProcessControl::new();
-
-        let delay1 = BetulaNodeId(Uuid::new_v4());
-        let delay2 = BetulaNodeId(Uuid::new_v4());
-        let delay3 = BetulaNodeId(Uuid::new_v4());
+        use uuid::uuid;
+        let delay1 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000001"));
+        let delay2 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000002"));
+        let delay3 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000003"));
 
         let server_thing = make_server_check(server);
 
