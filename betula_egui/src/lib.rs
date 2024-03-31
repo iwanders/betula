@@ -34,6 +34,14 @@ To tree:
     - Port / Relation changes.
     - Node configuration set.
 
+
+For nodes:
+    Outputs:
+        Ports are first.
+        Children are second.
+    Inputs:
+        Parent is 0.
+        Ports are second.
 */
 
 // use betula_core::prelude::*;
@@ -118,6 +126,13 @@ pub trait UiNode: Node {
             .unwrap_or(vec![])
             .iter()
             .filter(|p| p.direction() == PortDirection::Output)
+            .count()
+    }
+    fn ui_input_port_count(&self) -> usize {
+        self.ports()
+            .unwrap_or(vec![])
+            .iter()
+            .filter(|p| p.direction() == PortDirection::Input)
             .count()
     }
 }
@@ -214,6 +229,13 @@ impl BetulaViewer {
         }
     }
 
+    fn get_snarl_id(&self, node_id: BetulaNodeId) -> Result<SnarlNodeId, BetulaError> {
+        self.node_map
+            .get(&node_id)
+            .ok_or(format!("could not find {node_id:?}").into())
+            .copied()
+    }
+
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         let event = self.client.get_event()?;
         use betula_common::control::InteractionCommand::RemoveNode;
@@ -225,7 +247,47 @@ impl BetulaViewer {
             match event {
                 NodeInformation(v) => {
                     let viewer_node = self.get_node_mut(v.id, snarl)?;
-                    viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
+                    if viewer_node.ui_node.is_none() {
+                        viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
+                    }
+
+                    let ui_node = viewer_node.ui_node.as_mut().unwrap();
+                    let port_output_count = ui_node.ui_output_port_count();
+                    let previous_children = viewer_node.children.clone();
+                    viewer_node.children = v.children.iter().map(|i| Some(*i)).collect();
+
+                    // Disconnect the previous children.
+                    for (i, child) in previous_children.iter().flatten().enumerate() {
+                        let output_port = port_output_count + i;
+                        let from_snarl_id = self.get_snarl_id(v.id)?;
+                        let to_snarl_id = self.get_snarl_id(*child)?;
+                        let from = snarl.out_pin(egui_snarl::OutPinId {
+                            node: from_snarl_id,
+                            output: output_port,
+                        });
+                        let to = snarl.in_pin(egui_snarl::InPinId {
+                            node: to_snarl_id,
+                            input: 0,
+                        });
+                        snarl.disconnect(from.id, to.id);
+                    }
+
+                    // Update the snarl things.
+                    for (i, child) in v.children.iter().enumerate() {
+                        let output_port = port_output_count + i;
+                        let from_snarl_id = self.get_snarl_id(v.id)?;
+                        let to_snarl_id = self.get_snarl_id(*child)?;
+                        let from = snarl.out_pin(egui_snarl::OutPinId {
+                            node: from_snarl_id,
+                            output: output_port,
+                        });
+                        let to = snarl.in_pin(egui_snarl::InPinId {
+                            node: to_snarl_id,
+                            input: 0,
+                        });
+                        snarl.connect(from.id, to.id);
+                    }
+                    // Update the children of this node.
                     Ok(())
                 }
                 CommandResult(c) => {
@@ -272,9 +334,31 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 // Setup an output port.
                 todo!("Setup an output port.")
             }
-            (BetulaViewerNode::Node(_), BetulaViewerNode::Node(_)) => {
+            (BetulaViewerNode::Node(parent), BetulaViewerNode::Node(child_node)) => {
+                if parent.id == child_node.id {
+                    println!("Not allow connections to self.");
+                    return;
+                }
                 // Setup a relation.
-                todo!("Setup a relation.")
+                // todo!("Setup a relation.")
+                let parent_id = parent.id;
+                // Collect the children... okay so this is a bit tricky, we need the parents' children
+                // and then insert this pin where we need it.
+                // let outputs = parent.ui_output_port_count();
+                let output_count = parent
+                    .ui_node
+                    .as_ref()
+                    .map(|n| n.ui_output_port_count())
+                    .unwrap_or(0);
+                let new_output_index = from.id.output - output_count;
+                let mut children = parent.children.clone();
+                // TODO need to disconnect old links?
+                children.insert(new_output_index, Some(child_node.id));
+                let cmd = InteractionCommand::set_children(
+                    parent_id,
+                    children.iter().cloned().flatten().collect(),
+                );
+                if let Ok(_) = self.client.send_command(cmd) {}
             }
             (BetulaViewerNode::Blackboard(_), BetulaViewerNode::Node(_)) => {
                 // Setup an input port.
@@ -294,6 +378,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
         // handle_tree_outputs(from.id.node, snarl);
         // handle_tree_outputs(to.id.node, snarl);
+    }
+
+    fn disconnect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
+        snarl.disconnect(from.id, to.id);
     }
 
     fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
