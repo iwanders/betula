@@ -52,6 +52,7 @@ use egui_snarl::{
     InPin, NodeId as SnarlNodeId, OutPin, Snarl,
 };
 
+use betula_common::control::InteractionCommand;
 use betula_common::{control::TreeClient, TreeSupport};
 
 #[derive(Serialize, Deserialize)]
@@ -185,6 +186,8 @@ impl BetulaViewer {
 
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         let event = self.client.get_event()?;
+        use betula_common::control::InteractionCommand::RemoveNode;
+        use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
 
         if let Some(event) = event {
@@ -195,6 +198,18 @@ impl BetulaViewer {
                     viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
                     Ok(())
                 }
+                CommandResult(c) => {
+                    match c.command {
+                        RemoveNode(node_id) => {
+                            if let Some(snarl_id) = self.node_map.remove(&node_id) {
+                                snarl.remove_node(snarl_id);
+                            }
+                        }
+                        _ => {}
+                    }
+                    Ok(())
+                }
+
                 unknown => Err(format!("Unhandled event {unknown:?}").into()),
             }
         } else {
@@ -271,7 +286,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         for node_type in self.ui_support.node_types() {
             let name = self.ui_support.display_name(&node_type);
             if ui.button(name).clicked() {
-                use betula_common::control::InteractionCommand;
                 let id = BetulaNodeId(Uuid::new_v4());
                 let cmd = InteractionCommand::add_node(id, node_type);
                 if let Ok(_) = self.client.send_command(cmd) {
@@ -297,7 +311,14 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         ui.label("Node menu");
         if ui.button("Remove").clicked() {
-            snarl.remove_node(node);
+            let r = match &mut snarl[node] {
+                BetulaViewerNode::Node(ref mut node) => {
+                    let node_id = node.id;
+                    let cmd = InteractionCommand::remove_node(node_id);
+                    if let Ok(_) = self.client.send_command(cmd) {}
+                }
+                _ => todo!(),
+            };
             ui.close_menu();
         }
     }

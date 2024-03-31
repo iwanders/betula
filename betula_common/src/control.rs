@@ -37,6 +37,8 @@ pub struct ExecutionCommand {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
     AddNode(AddNodeCommand),
+    RemoveNode(NodeId),
+
     AddBlackboard(BlackboardId),
 
     SetConfig(SetConfigCommand),
@@ -58,6 +60,9 @@ use betula_core::Tree;
 impl InteractionCommand {
     pub fn add_node(id: NodeId, node_type: NodeType) -> Self {
         InteractionCommand::AddNode(AddNodeCommand { id, node_type })
+    }
+    pub fn remove_node(id: NodeId) -> Self {
+        InteractionCommand::RemoveNode(id)
     }
 
     pub fn execute(
@@ -81,6 +86,13 @@ impl InteractionCommand {
                         children: vec![],
                     }),
                 ])
+            }
+            InteractionCommand::RemoveNode(v) => {
+                tree.remove_node(*v)?;
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
             }
             e => Err(format!("unhandled command {e:?}").into()),
         }
@@ -127,6 +139,7 @@ pub enum InteractionEvent {
     NodeInformation(NodeInformationEvent),
 }
 
+//------------------------------------------------------------------------
 pub trait TreeClient {
     fn send_command(&self, command: InteractionCommand) -> Result<(), BetulaError>;
     fn get_event(&self) -> Result<Option<InteractionEvent>, BetulaError>;
