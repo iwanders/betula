@@ -78,6 +78,8 @@ pub struct BetulaViewer {
     // Some ui support... for stuff like configs.
     client: Box<dyn TreeClient>,
     ui_support: UiSupport,
+
+    node_map: HashMap<NodeId, SnarlNodeId>,
 }
 
 pub trait NodeUi {
@@ -126,7 +128,41 @@ impl BetulaViewer {
         ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
         ui_support.add_node_default::<betula_core::nodes::FailureNode>();
         ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-        BetulaViewer { client, ui_support }
+        BetulaViewer {
+            client,
+            ui_support,
+            node_map: Default::default(),
+        }
+    }
+
+    pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) {
+        let received = self.client.get_event();
+        if received.is_err() {
+            println!("Receive error!!: {received:?}");
+            return;
+        }
+        let received = received.unwrap();
+        use betula_common::control::InteractionEvent::NodeInformation;
+        use betula_common::control::NodeInformationEvent;
+
+        if let Some(event) = received {
+            println!("event {event:?}");
+            match event {
+                NodeInformation(v) => {
+                    if let Some(snarl_id) = self.node_map.get(&v.id) {
+                        let node = snarl.get_node_mut(*snarl_id);
+                        if let Some(viewer_node) = node {
+                            if let BetulaViewerNode::Node(viewer_node) = viewer_node {
+                                viewer_node.node_type = Some(v.node_type);
+                            }
+                        }
+                    }
+                }
+                unknown => {
+                    println!("Unhandled event {unknown:?}")
+                }
+            }
+        }
     }
 }
 
@@ -210,13 +246,14 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                         .client
                         .send_command(betula_common::control::InteractionCommand::AddNode(add_cmd))
                     {
-                        snarl.insert_node(
+                        let snarl_id = snarl.insert_node(
                             pos,
                             BetulaViewerNode::Node(ViewerNode {
                                 id,
                                 node_type: None,
                             }),
                         );
+                        self.node_map.insert(id, snarl_id);
                     }
                     ui.close_menu();
                 }

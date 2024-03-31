@@ -64,10 +64,18 @@ impl InteractionCommand {
             InteractionCommand::AddNode(ref v) => {
                 let new_node = tree_support.create_node(&v.node_type)?;
                 tree.add_node_boxed(v.id, new_node)?;
-                Ok(vec![InteractionEvent::CommandResult(CommandResult {
-                    command: self.clone(),
-                    error: None,
-                })])
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::NodeInformation(NodeInformationEvent {
+                        id: v.id,
+                        node_type: v.node_type.clone(),
+                        config: None,
+                        children: vec![],
+                    }),
+                ])
             }
             e => Err(format!("unhandled command {e:?}").into()),
         }
@@ -95,7 +103,7 @@ pub struct ExecutionResult {
 #[derive(Debug)]
 pub struct NodeInformationEvent {
     pub id: NodeId,
-    pub node_type: String,
+    pub node_type: NodeType,
     pub config: Option<Box<dyn NodeConfig>>,
     pub children: Vec<NodeId>,
 }
