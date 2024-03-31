@@ -66,7 +66,7 @@ use egui_snarl::{
 use betula_common::control::InteractionCommand;
 use betula_common::{control::TreeClient, TreeSupport};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerNode {
     id: BetulaNodeId,
 
@@ -93,13 +93,13 @@ impl ViewerNode {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerBlackboard {
     id: BlackboardId,
     // Full, or just a single?
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
@@ -263,6 +263,72 @@ impl BetulaViewer {
         }
     }
 
+    fn disconnect_children(
+        &mut self,
+        node_id: BetulaNodeId,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        let viewer_node = self.get_node_mut(node_id, snarl)?;
+        let ui_node = viewer_node
+            .ui_node
+            .as_mut()
+            .ok_or(format!("node is only placeholder"))?;
+        let port_output_count = ui_node.ui_output_port_count();
+        let snarl_parent = self.get_snarl_id(node_id).unwrap();
+        let connected = snarl.out_pins_connected(snarl_parent);
+        let mut disconnectables = vec![];
+        for p in connected {
+            if p.output < port_output_count {
+                continue; // blackboard output, skip those.
+            }
+            let from = snarl.out_pin(p);
+            for r in from.remotes {
+                disconnectables.push((p, r));
+            }
+        }
+        for (from, to) in disconnectables {
+            snarl.disconnect(from, to);
+        }
+        Ok(())
+    }
+
+    fn connect_children(
+        &mut self,
+        node_id: BetulaNodeId,
+        children: &[BetulaNodeId],
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        use egui_snarl::{InPinId, OutPinId};
+        let viewer_node = self.get_node_mut(node_id, snarl)?;
+        let ui_node = viewer_node
+            .ui_node
+            .as_mut()
+            .ok_or(format!("node is only placeholder"))?;
+        let snarl_parent = self.get_snarl_id(node_id).unwrap();
+        let port_output_count = ui_node.ui_output_port_count();
+        let mut connections = vec![];
+        for (i, c) in children.iter().enumerate() {
+            let snarl_id = self.get_snarl_id(*c)?;
+            let output = OutPinId {
+                node: snarl_parent,
+                output: port_output_count + i,
+            };
+            connections.push((
+                output,
+                InPinId {
+                    node: snarl_id,
+                    input: 0,
+                },
+            ));
+        }
+        for (from, to) in connections {
+            snarl.connect(from, to);
+        }
+        let viewer_node = self.get_node_mut(node_id, snarl)?;
+        viewer_node.children = children.iter().map(|n| Some(*n)).collect();
+        Ok(())
+    }
+
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionEvent::CommandResult;
@@ -277,44 +343,10 @@ impl BetulaViewer {
                             viewer_node.ui_node =
                                 Some(self.ui_support.create_ui_node(&v.node_type)?);
                         }
+                        // let ui_node = viewer_node.ui_node.as_mut().unwrap();
 
-                        let ui_node = viewer_node.ui_node.as_mut().unwrap();
-                        let port_output_count = ui_node.ui_output_port_count();
-                        let previous_children = viewer_node.children.clone();
-                        viewer_node.children = v.children.iter().map(|i| Some(*i)).collect();
-
-                        // Disconnect the previous children.
-                        for (i, child) in previous_children.iter().flatten().enumerate() {
-                            let output_port = port_output_count + i;
-                            let from_snarl_id = self.get_snarl_id(v.id)?;
-                            let to_snarl_id = self.get_snarl_id(*child)?;
-                            let from = snarl.out_pin(egui_snarl::OutPinId {
-                                node: from_snarl_id,
-                                output: output_port,
-                            });
-                            let to = snarl.in_pin(egui_snarl::InPinId {
-                                node: to_snarl_id,
-                                input: 0,
-                            });
-                            snarl.disconnect(from.id, to.id);
-                        }
-
-                        // Connect the new children.
-                        for (i, child) in v.children.iter().enumerate() {
-                            let output_port = port_output_count + i;
-                            let from_snarl_id = self.get_snarl_id(v.id)?;
-                            let to_snarl_id = self.get_snarl_id(*child)?;
-                            let from = snarl.out_pin(egui_snarl::OutPinId {
-                                node: from_snarl_id,
-                                output: output_port,
-                            });
-                            let to = snarl.in_pin(egui_snarl::InPinId {
-                                node: to_snarl_id,
-                                input: 0,
-                            });
-                            snarl.connect(from.id, to.id);
-                        }
-                        // Update the children of this node.
+                        self.disconnect_children(v.id, snarl)?;
+                        self.connect_children(v.id, &v.children, snarl)?;
                     }
                     CommandResult(c) => match c.command {
                         RemoveNode(node_id) => {
@@ -411,7 +443,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     println!("Not allow connections to self.");
                     return;
                 }
-
+                println!("Trying {:?} to {:?}", parent.id, child_node.id);
                 let connected = snarl.out_pins_connected(from.id.node);
                 let highest_connected = connected.map(|v| v.output).max().unwrap_or(0);
                 let output_count = parent
@@ -419,13 +451,20 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     .as_ref()
                     .map(|n| n.ui_output_port_count())
                     .unwrap_or(0);
+                println!("highest_connected: {highest_connected:?}");
+                println!("output_count: {output_count:?}");
+                println!(
+                    "connected: {:?}",
+                    snarl.out_pins_connected(from.id.node).collect::<Vec<_>>()
+                );
 
                 // Make two vectors of all ports, one with current, one with updated.
                 let mut current: Vec<Option<SnarlNodeId>> = vec![];
                 let mut proposed: Vec<Option<SnarlNodeId>> = vec![];
-                current.resize(highest_connected + 1, None);
-                proposed.resize(highest_connected + 1, None);
-                for output in output_count..(highest_connected + 1) {
+                current.resize(highest_connected + 2, None);
+                proposed.resize(highest_connected + 2, None);
+                for output in output_count..=(highest_connected + 1) {
+                    println!("at output {output}");
                     let p = egui_snarl::OutPinId {
                         node: from.id.node,
                         output: output,
@@ -445,7 +484,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 println!("proposed: {proposed:?}");
 
                 if current != proposed {
-                    // drop all the none's we don't care about those.
+                    // drop all the None's we don't care about those.
                     let proposed = proposed
                         .iter()
                         .flatten()
