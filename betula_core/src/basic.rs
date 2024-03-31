@@ -91,33 +91,12 @@ impl Tree for BasicTree {
             .map(|x| x.children.clone())
     }
 
-    fn add_relation(
-        &mut self,
-        parent: NodeId,
-        position: usize,
-        child: NodeId,
-    ) -> Result<(), BetulaError> {
+    fn set_children(&mut self, parent: NodeId, children: Vec<NodeId>) -> Result<(), BetulaError> {
         let n = self
             .nodes
             .get_mut(&parent)
             .ok_or_else(|| format!("node {parent:?} is not present").to_string())?;
-        if position > n.children.len() {
-            // insert would panic, lets raise an error
-            return Err(format!("position {position} is too large").into());
-        }
-        n.children.insert(position, child);
-        Ok(())
-    }
-    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), BetulaError> {
-        let n = self
-            .nodes
-            .get_mut(&parent)
-            .ok_or_else(|| format!("node {parent:?} is not present").to_string())?;
-        if position >= n.children.len() {
-            // insert would panic, lets raise an error
-            return Err(format!("position {position} is too large").into());
-        }
-        n.children.remove(position);
+        n.children = children;
         Ok(())
     }
 
@@ -403,7 +382,7 @@ mod tests {
         let mut tree = BasicTree::new();
         let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
-        tree.add_relation(root, 0, f1)?;
+        tree.set_children(root, vec![f1])?;
         let res = tree.execute(root)?;
         assert_eq!(res, NodeStatus::Failure);
         Ok(())
@@ -415,8 +394,7 @@ mod tests {
         let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SelectorNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
         let s1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SuccessNode {}))?;
-        tree.add_relation(root, 0, f1)?;
-        tree.add_relation(root, 1, s1)?;
+        tree.set_children(root, vec![f1, s1])?;
         let res = tree.execute(root)?;
         assert_eq!(res, NodeStatus::Success);
         Ok(())
@@ -544,8 +522,7 @@ mod tests {
             NodeId(crate::Uuid::new_v4()),
             Box::new(InputNode::default()),
         )?;
-        tree.add_relation(root, 0, o1)?;
-        tree.add_relation(root, 1, i1)?;
+        tree.set_children(root, vec![o1, i1])?;
 
         // Add the blackboard.
         let bb = tree.add_blackboard_boxed(

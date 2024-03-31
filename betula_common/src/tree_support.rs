@@ -400,10 +400,8 @@ impl TreeSupport {
 
                 // Create the connections.
                 for (parent, children) in relations {
-                    for (i, child) in children.iter().enumerate() {
-                        tree.add_relation(parent, i, *child)
-                            .map_err(|e| D::Error::custom(format!("failed to relation {e:?}")))?;
-                    }
+                    tree.set_children(parent, children)
+                        .map_err(|e| D::Error::custom(format!("failed to relation {e:?}")))?;
                 }
 
                 // Add the blackboards
@@ -527,8 +525,7 @@ mod test {
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode {}))?;
         let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode {}))?;
         let s1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SuccessNode {}))?;
-        tree.add_relation(root, 0, f1)?;
-        tree.add_relation(root, 1, s1)?;
+        tree.set_children(root, vec![f1, s1])?;
 
         let obj = TreeSerializer::new(&tree_support, &*tree);
         let config_json = serde_json::to_string(&obj)?;
@@ -577,8 +574,7 @@ mod test {
             NodeId(Uuid::new_v4()),
             Box::new(crate::nodes::DelayNode::default()),
         )?;
-        tree.add_relation(root, 0, time_node)?;
-        tree.add_relation(root, 1, delay_node)?;
+        tree.set_children(root, vec![time_node, delay_node])?;
 
         // Add the blackboard.
         let bb = tree.add_blackboard_boxed(

@@ -86,8 +86,12 @@ pub enum NodeStatus {
     Success,
 }
 
-/// The purest interface of a tree, used by the nodes to run their
-/// children. The nodes don't have access to children directly.
+/// The context through which nodes call children.
+///
+/// Nodes don't have access to the children directly, this allows for
+/// reusing the exact same node in multiple places in the tree. It also
+/// allows the tree itself to decide whether or not to re-evaluate a node
+/// or return the previous result in case it cannot have changed.
 pub trait RunContext {
     /// Get the number of immediate children.
     fn children(&self) -> usize;
@@ -464,16 +468,8 @@ pub trait Tree: std::fmt::Debug + AsAny {
     /// Obtain a list of the children of a particular node.
     fn children(&self, id: NodeId) -> Result<Vec<NodeId>, BetulaError>;
 
-    /// Add a relation between two nodes, specifying the insert position into the children
-    /// vector.
-    fn add_relation(
-        &mut self,
-        parent: NodeId,
-        position: usize,
-        child: NodeId,
-    ) -> Result<(), BetulaError>;
-    /// Remove a relation between two nodes, specifying the parent and the child position to remove.
-    fn remove_relation(&mut self, parent: NodeId, position: usize) -> Result<(), BetulaError>;
+    /// Set the children of a particular parent node.
+    fn set_children(&mut self, parent: NodeId, children: Vec<NodeId>) -> Result<(), BetulaError>;
 
     /// Execute the tick, starting at the provided node.
     fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError>;

@@ -16,10 +16,9 @@ pub struct AddNodeCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Relation {
+pub struct SetChildren {
     pub parent: NodeId,
-    pub position: usize,
-    pub child: NodeId,
+    pub children: Vec<NodeId>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -33,15 +32,10 @@ pub enum InteractionCommand {
     AddNode(AddNodeCommand),
     RemoveNode(NodeId),
 
-    AddBlackboard(BlackboardId),
+    SetChildren(SetChildren),
 
+    // AddBlackboard(BlackboardId),
     SetConfig(SetConfigCommand),
-
-    AddConnection(PortConnection),
-    RemoveConnection(PortConnection),
-
-    AddRelation(Relation),
-    RemoveRelation(Relation),
 
     RequestNodes,
 }
