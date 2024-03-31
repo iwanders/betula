@@ -739,8 +739,6 @@ mod test {
         use betula_common::control::InProcessControl;
         let (server, client) = InProcessControl::new();
 
-        // client.
-
         let delay1 = BetulaNodeId(Uuid::new_v4());
         let delay2 = BetulaNodeId(Uuid::new_v4());
         let delay3 = BetulaNodeId(Uuid::new_v4());
@@ -775,6 +773,14 @@ mod test {
                 &mut snarl,
             );
             std::thread::sleep(std::time::Duration::from_millis(50));
+            // Verify that the tree now has 3 nodes.
+            viewer
+                .client()
+                .send_command(InteractionCommand::tree_call(move |tree| {
+                    assert!(tree.nodes().len() == 3);
+                    Ok(())
+                }))?;
+            // Next, setup relations.
             viewer.service(&mut snarl)?;
             viewer.connect_relation(delay1, delay2, 0, &mut snarl)?;
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -783,6 +789,7 @@ mod test {
             std::thread::sleep(std::time::Duration::from_millis(50));
             viewer.service(&mut snarl)?;
             std::thread::sleep(std::time::Duration::from_millis(50));
+            // Verify the children of delay 1.
             viewer
                 .client()
                 .send_command(InteractionCommand::tree_call(move |tree| {
