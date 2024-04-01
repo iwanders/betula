@@ -187,6 +187,7 @@ impl ViewerNode {
     }
 
     /// Update the local children list with the bounds and possible new pins.
+    #[track_caller]
     fn update_children(&mut self) {
         let allowed = self
             .ui_node
@@ -237,6 +238,7 @@ impl ViewerNode {
     }
 
     /// Disconnect a particular child.
+    #[track_caller]
     pub fn child_disconnect(&mut self, outpin: &OutPinId) {
         if let Some(child_index) = self.pin_to_child(outpin) {
             self.children.get_mut(child_index).map(|z| *z = None);
@@ -245,6 +247,7 @@ impl ViewerNode {
         }
     }
 
+    #[track_caller]
     pub fn child_connect(&mut self, our_pin: &OutPinId, node_id: BetulaNodeId) {
         if let Some(child_index) = self.pin_to_child(our_pin) {
             self.children
@@ -383,35 +386,6 @@ impl BetulaViewer {
         }
     }
 
-    fn disconnect_children(
-        &mut self,
-        node_id: BetulaNodeId,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) -> Result<(), BetulaError> {
-        let viewer_node = self.get_node_mut(node_id, snarl)?;
-        let ui_node = viewer_node
-            .ui_node
-            .as_mut()
-            .ok_or(format!("node is only placeholder"))?;
-        let port_output_count = ui_node.ui_output_port_count();
-        let snarl_parent = self.get_snarl_id(node_id).unwrap();
-        let connected = snarl.out_pins_connected(snarl_parent);
-        let mut disconnectables = vec![];
-        for p in connected {
-            if p.output < port_output_count {
-                continue; // blackboard output, skip those.
-            }
-            let from = snarl.out_pin(p);
-            for r in from.remotes {
-                disconnectables.push((p, r));
-            }
-        }
-        for (from, to) in disconnectables {
-            snarl.disconnect(from, to);
-        }
-        Ok(())
-    }
-
     fn child_connections(
         &self,
         node_id: BetulaNodeId,
@@ -472,35 +446,14 @@ impl BetulaViewer {
         Ok(v)
     }
 
-    /*
-    fn connect_children(&mut self, node_id: BetulaNodeId, children: &[BetulaNodeId], snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
-        use egui_snarl::{InPinId, OutPinId};
-        let viewer_node = self.get_node_mut(node_id, snarl)?;
-        let ui_node = viewer_node.ui_node.as_mut().ok_or(format!("node is only placeholder"))?;
-        let snarl_parent = self.get_snarl_id(node_id).unwrap();
-        let port_output_count = ui_node.ui_output_port_count();
-        let mut connections = vec![];
-        for (i, c) in children.iter().enumerate() {
-            let snarl_id = self.get_snarl_id(*c)?;
-            let output = OutPinId{node: snarl_parent, output: port_output_count+i};
-            connections.push((output, InPinId{node: snarl_id, input: 0}));
-        }
-        for (from, to) in connections {
-            snarl.connect(from, to);
-        }
-        let viewer_node = self.get_node_mut(node_id, snarl)?;
-        viewer_node.children_remote = children.iter().cloned().collect();
-        Ok(())
-    }
-    */
-
+    #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
 
         // Check for dirty nodes, and update the snarl state.
-        let node_ids = snarl.node_ids().map(|(a, b)| a).collect::<Vec<_>>();
+        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
         for node in node_ids {
             let mut disconnections = vec![];
             let mut connections = vec![];
@@ -620,8 +573,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
     fn connect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
         // Validate connection
-        let mut to_disconnect = None;
-        let mut to_connect = None;
+        let to_disconnect;
+        let to_connect;
         match (&snarl[from.id.node], &snarl[to.id.node]) {
             (BetulaViewerNode::Node(_), BetulaViewerNode::Blackboard(_)) => {
                 // Setup an output port.
@@ -634,46 +587,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 }
                 to_disconnect = Some(to.id);
                 to_connect = Some((from.id, to.id));
-                /*
-                println!("Trying {:?} to {:?}", parent.id, child_node.id);
-                let connected = snarl.out_pins_connected(from.id.node);
-                let highest_connected = connected.map(|v| v.output).max().unwrap_or(0);
-                let output_count = parent.ui_node.as_ref().map(|n|n.ui_output_port_count()).unwrap_or(0);
-                println!("highest_connected: {highest_connected:?}");
-                println!("output_count: {output_count:?}");
-                println!("connected: {:?}", snarl.out_pins_connected(from.id.node).collect::<Vec<_>>());
-
-
-                // Make two vectors of all ports, one with current, one with updated.
-                let mut current: Vec<Option<SnarlNodeId>> = vec![];
-                let mut proposed: Vec<Option<SnarlNodeId>> = vec![];
-                current.resize(highest_connected + 2, None);
-                proposed.resize(highest_connected + 2, None);
-                for output in output_count..=(highest_connected + 1) {
-                    println!("at output {output}");
-                    let p = egui_snarl::OutPinId{node: from.id.node, output: output};
-                    let pin_with_remotes = snarl.out_pin(p);
-                    if !pin_with_remotes.remotes.is_empty() {
-                        let remote = pin_with_remotes.remotes.first().unwrap();
-                        current[p.output] = Some(remote.node);
-                        proposed[p.output] = Some(remote.node);
-                    }
-                    if p.output == from.id.output {
-                        proposed[p.output] = Some(to.id.node);
-                    }
-                }
-
-                println!("current: {current:?}");
-                println!("proposed: {proposed:?}");
-
-                if current != proposed {
-                    // drop all the None's we don't care about those.
-                    let proposed = proposed.iter().flatten().map(|n| self.get_betula_id(n).unwrap()).collect::<Vec<_>>();
-                    let cmd = InteractionCommand::set_children(parent.id, proposed);
-                    if let Ok(_) = self.client.send_command(cmd) {
-                    }
-                }
-                */
             }
             (BetulaViewerNode::Blackboard(_), BetulaViewerNode::Node(_)) => {
                 // Setup an input port.
@@ -711,9 +624,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     }
 
     fn disconnect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
-        let mut to_disconnect = None;
+        let to_disconnect;
         match (&snarl[from.id.node], &snarl[to.id.node]) {
-            (BetulaViewerNode::Node(parent), BetulaViewerNode::Node(child_node)) => {
+            (BetulaViewerNode::Node(_), BetulaViewerNode::Node(_)) => {
                 to_disconnect = Some(from.id);
             }
 
