@@ -10,6 +10,9 @@ impl UiNode for nodes::DelayNode {
             println!("Changed! now: {}", self.config.interval);
         }
     }
+    fn ui_child_range(&self) -> std::ops::Range<usize> {
+        0..usize::MAX
+    }
 }
 /*
 impl NodeUi for nodes::TimeNode {
