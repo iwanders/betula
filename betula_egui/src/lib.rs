@@ -194,7 +194,6 @@ impl ViewerNode {
             .as_ref()
             .map(|n| n.ui_child_range())
             .unwrap_or(0..0);
-        println!("Allowed: {allowed:?}");
         if self.children.len() < allowed.start {
             // ensure lower bound.
             self.children
@@ -202,12 +201,22 @@ impl ViewerNode {
         } else {
             // ensure upper bound.
             if self.children.len() < allowed.end {
-                if !self.children.last().copied().flatten().is_none() || self.children.is_empty() {
+                if self.children.is_empty() {
                     self.children.push(None);
+                }
+                if !self.children.last().copied().flatten().is_none() {
+                    self.children.push(None);
+                }
+                // need to drop entries from the rear if there's two none's
+                if self.children.len() > allowed.start && self.children.len() > 2 {
+                    let last = self.children[self.children.len() - 1];
+                    let second_last = self.children[self.children.len() - 2];
+                    if last.is_none() && second_last.is_none() {
+                        self.children.pop();
+                    }
                 }
             }
         }
-        println!("Updated children to: {:?}", self.children);
     }
 
     /// Map a pin to a child index.
@@ -242,7 +251,7 @@ impl ViewerNode {
     pub fn child_disconnect(&mut self, outpin: &OutPinId) {
         if let Some(child_index) = self.pin_to_child(outpin) {
             self.children.get_mut(child_index).map(|z| *z = None);
-            self.update_children();
+            // self.update_children();
             self.children_dirty = true;
         }
     }
@@ -253,7 +262,7 @@ impl ViewerNode {
             self.children
                 .get_mut(child_index)
                 .map(|z| *z = Some(node_id));
-            self.update_children();
+            // self.update_children();
             self.children_dirty = true;
         }
     }
@@ -269,7 +278,7 @@ impl ViewerNode {
         // This function doesn't preserve gaps atm.
         self.children = children.iter().map(|z| Some(*z)).collect();
         self.children_remote = children.to_vec();
-        self.update_children();
+        // self.update_children();
         self.children_dirty = true;
     }
 }
@@ -480,6 +489,7 @@ impl BetulaViewer {
             }
             if let BetulaViewerNode::Node(node) = &mut snarl[node] {
                 node.set_clean();
+                node.update_children();
             }
         }
 
