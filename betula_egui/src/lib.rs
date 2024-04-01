@@ -259,6 +259,10 @@ impl ViewerNode {
     #[track_caller]
     pub fn child_connect(&mut self, our_pin: &OutPinId, node_id: BetulaNodeId) {
         if let Some(child_index) = self.pin_to_child(our_pin) {
+            // snarl crashes if there's wires to pins that don't exist, so we have a bandaid here.
+            if child_index >= self.children.len() {
+                self.children.resize(child_index + 1, None);
+            }
             self.children
                 .get_mut(child_index)
                 .map(|z| *z = Some(node_id));
@@ -276,7 +280,14 @@ impl ViewerNode {
 
     pub fn update_children_remote(&mut self, children: &[BetulaNodeId]) {
         // This function doesn't preserve gaps atm.
+        let current_length = self.children.len();
         self.children = children.iter().map(|z| Some(*z)).collect();
+
+        // snarl crashes if there's wires to pins that don't exist, so we have a bandaid here.
+        if self.children.len() < current_length {
+            self.children
+                .append(&mut vec![None; current_length - self.children.len()]);
+        }
         self.children_remote = children.to_vec();
         // self.update_children();
         self.children_dirty = true;
