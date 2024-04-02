@@ -706,6 +706,28 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
+    fn drop_outputs(&mut self, pin: &OutPin, snarl: &mut Snarl<BetulaViewerNode>) {
+        let to_disconnect;
+        match &snarl[pin.id.node] {
+            BetulaViewerNode::Node(_) => {
+                // One outpin can only point at a single thing, so we only have to disconnect one child.
+                to_disconnect = Some(pin.id);
+            }
+            _ => {
+                todo!();
+            }
+        }
+        if let Some(to_disconnect) = to_disconnect {
+            if let BetulaViewerNode::Node(ref mut node) = &mut snarl[to_disconnect.node] {
+                node.child_disconnect(&to_disconnect);
+            }
+        }
+    }
+
+    fn drop_inputs(&mut self, pin: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
+        todo!();
+    }
+
     fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
             BetulaViewerNode::Node(ref node) => node.total_outputs(),
