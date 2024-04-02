@@ -77,8 +77,7 @@ pub enum InteractionCommand {
     // AddBlackboard(BlackboardId),
     SetConfig(SetConfigCommand),
 
-    RequestNodes,
-
+    // RequestNodes,
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
     #[serde(skip)]
@@ -116,12 +115,17 @@ impl InteractionCommand {
             .node_mut(node_id)
             .ok_or(format!("cannot find {node_id:?}"))?;
         let node_type = node.node_type().clone();
+        let node_config = node.get_config()?;
+        let config = if let Some(node_config) = node_config {
+            Some(tree_support.config_serialize(node_type.clone(), &*node_config)?)
+        } else {
+            None
+        };
         let children = tree.children(node_id)?;
-        let _ = tree_support; // do something with the config.
         Ok(NodeInformationEvent {
             id: node_id,
             node_type,
-            config: None,
+            config,
             children,
         })
     }
@@ -168,11 +172,25 @@ impl InteractionCommand {
                     error: None,
                 })])
             }
+            InteractionCommand::SetConfig(config_cmd) => {
+                // get the node
+                let node_id = config_cmd.id;
+                let node_mut = tree
+                    .node_mut(node_id)
+                    .ok_or(format!("cannot find {node_id:?}"))?;
+                // deserialize this config.
+                let real_config = tree_support.config_deserialize(config_cmd.config.clone())?;
+                // And set the config.
+                node_mut.set_config(&*real_config)?;
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
+            }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;
                 Ok(vec![])
-            }
-            e => Err(format!("unhandled command {e:?}").into()),
+            } // e => Err(format!("unhandled command {e:?}").into()),
         }
     }
 }
@@ -212,8 +230,8 @@ pub struct CommandResult {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionEvent {
     CommandResult(CommandResult),
-    BlackboardChange(BlackboardValueEvent),
-    ExecutionResult(ExecutionResult),
+    // BlackboardChange(BlackboardValueEvent),
+    // ExecutionResult(ExecutionResult),
     NodeInformation(NodeInformationEvent),
 }
 
