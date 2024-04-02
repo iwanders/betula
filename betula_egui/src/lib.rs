@@ -263,7 +263,7 @@ impl ViewerNode {
         ours.eq(theirs)
     }
 
-    /// Disconnect a particular child.
+    /// Disconnect a particular child based on the provided output pin.
     #[track_caller]
     pub fn child_disconnect(&mut self, outpin: &OutPinId) {
         if let Some(child_index) = self.pin_to_child(outpin) {
@@ -725,7 +725,23 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     }
 
     fn drop_inputs(&mut self, pin: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
-        todo!();
+        let to_disconnect;
+        match &snarl[pin.id.node] {
+            BetulaViewerNode::Node(_) => {
+                // need to disconnect multiple, namely all remotes.
+                to_disconnect = pin
+                    .remotes
+                    .iter()
+                    .map(|v| snarl.out_pin(*v))
+                    .collect::<Vec<_>>();
+            }
+            _ => {
+                todo!();
+            }
+        }
+        for outpin in to_disconnect {
+            self.disconnect(&outpin, pin, snarl);
+        }
     }
 
     fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
