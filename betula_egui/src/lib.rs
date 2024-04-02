@@ -189,6 +189,7 @@ impl ViewerNode {
     /// Update the local children list with the bounds and possible new pins.
     #[track_caller]
     fn update_children(&mut self) {
+        // This function could do with a test...
         let allowed = self
             .ui_node
             .as_ref()
@@ -259,14 +260,14 @@ impl ViewerNode {
     #[track_caller]
     pub fn child_connect(&mut self, our_pin: &OutPinId, node_id: BetulaNodeId) {
         if let Some(child_index) = self.pin_to_child(our_pin) {
-            // snarl crashes if there's wires to pins that don't exist, so we have a bandaid here.
+            // Enforce that the children vector is long enough to have this pin.
+            // Otherwise we can't make the connection.
             if child_index >= self.children.len() {
                 self.children.resize(child_index + 1, None);
             }
             self.children
                 .get_mut(child_index)
                 .map(|z| *z = Some(node_id));
-            // self.update_children();
             self.children_dirty = true;
         }
     }
@@ -282,14 +283,8 @@ impl ViewerNode {
         // This function doesn't preserve gaps atm.
         let current_length = self.children.len();
         self.children = children.iter().map(|z| Some(*z)).collect();
-
-        // snarl crashes if there's wires to pins that don't exist, so we have a bandaid here.
-        if self.children.len() < current_length {
-            self.children
-                .append(&mut vec![None; current_length - self.children.len()]);
-        }
         self.children_remote = children.to_vec();
-        // self.update_children();
+
         self.children_dirty = true;
     }
 }
@@ -466,12 +461,10 @@ impl BetulaViewer {
         Ok(v)
     }
 
-    #[track_caller]
-    pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
-        use betula_common::control::InteractionCommand::RemoveNode;
-        use betula_common::control::InteractionEvent::CommandResult;
-        use betula_common::control::InteractionEvent::NodeInformation;
-
+    fn update_snarl_dirty_nodes(
+        &mut self,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
         // Check for dirty nodes, and update the snarl state.
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
         for node in node_ids {
@@ -503,6 +496,16 @@ impl BetulaViewer {
                 node.update_children();
             }
         }
+        Ok(())
+    }
+
+    #[track_caller]
+    pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
+        use betula_common::control::InteractionCommand::RemoveNode;
+        use betula_common::control::InteractionEvent::CommandResult;
+        use betula_common::control::InteractionEvent::NodeInformation;
+
+        self.update_snarl_dirty_nodes(snarl)?;
 
         loop {
             if let Some(event) = self.client.get_event()? {
@@ -516,6 +519,8 @@ impl BetulaViewer {
                             viewer_node.update_children();
                         }
                         viewer_node.update_children_remote(&v.children);
+                        // Pins may have changed, so we must update the snarl state.
+                        self.update_snarl_dirty_nodes(snarl)?;
                     }
                     CommandResult(c) => match c.command {
                         RemoveNode(node_id) => {
