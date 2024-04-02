@@ -146,17 +146,34 @@ impl UiSupport {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerNode {
+    /// The node id for this element.
     id: BetulaNodeId,
 
+    /// The actual ui node handling.
     #[serde(skip)]
     ui_node: Option<Box<dyn UiNode>>,
 
+    /// Local version of the children.
+    ///
+    /// Basically the vector of children, empty optionals are empty pins.
     #[serde(skip)]
     children: Vec<Option<BetulaNodeId>>,
 
+    /// Remove version of children.
+    ///
+    /// If this differs from the flattened version of children, the node is
+    /// considered not up to date and the server is sent an setChildren
+    /// instruction.
     #[serde(skip)]
     children_remote: Vec<BetulaNodeId>,
 
+    /// Denotes whether the node child connections are currently dirty.
+    ///
+    /// A node is marked dirty if a connect or disconnect has occured that
+    /// is not yet represented in the actual snarl state. This is necessary
+    /// because the viewer may make many connects / disconnects in a single
+    /// cycle, this makes it easier to track the changes happening to the
+    /// snarl state.
     #[serde(skip)]
     children_dirty: bool,
 }
@@ -178,7 +195,6 @@ impl ViewerNode {
             .as_ref()
             .map(|n| n.ui_output_port_count())
             .unwrap_or(0);
-        // println!("Total outputs: {}", output_count + self.children.len());
         output_count + self.children.len()
     }
 
@@ -252,7 +268,6 @@ impl ViewerNode {
     pub fn child_disconnect(&mut self, outpin: &OutPinId) {
         if let Some(child_index) = self.pin_to_child(outpin) {
             self.children.get_mut(child_index).map(|z| *z = None);
-            // self.update_children();
             self.children_dirty = true;
         }
     }
@@ -260,8 +275,10 @@ impl ViewerNode {
     #[track_caller]
     pub fn child_connect(&mut self, our_pin: &OutPinId, node_id: BetulaNodeId) {
         if let Some(child_index) = self.pin_to_child(our_pin) {
-            // Enforce that the children vector is long enough to have this pin.
-            // Otherwise we can't make the connection.
+            // Enforce that the children vector is long enough to have this pin,
+            // otherwise we can't make the connection, this can happen if
+            // we move a block of inputs in snarl and have to make connections
+            // to pins that are not really in existance yet.
             if child_index >= self.children.len() {
                 self.children.resize(child_index + 1, None);
             }
@@ -281,10 +298,8 @@ impl ViewerNode {
 
     pub fn update_children_remote(&mut self, children: &[BetulaNodeId]) {
         // This function doesn't preserve gaps atm.
-        let current_length = self.children.len();
         self.children = children.iter().map(|z| Some(*z)).collect();
         self.children_remote = children.to_vec();
-
         self.children_dirty = true;
     }
 }
@@ -401,6 +416,7 @@ impl BetulaViewer {
         }
     }
 
+    /// Obtain the current snarl connections this node has.
     fn child_connections(
         &self,
         node_id: BetulaNodeId,
@@ -427,6 +443,7 @@ impl BetulaViewer {
         Ok(disconnectables)
     }
 
+    /// Create the desired snarl connections according to the children.
     fn child_connections_desired(
         &self,
         node_id: BetulaNodeId,
@@ -461,6 +478,24 @@ impl BetulaViewer {
         Ok(v)
     }
 
+    /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
+    fn send_changes_to_server(
+        &mut self,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
+        for node in node_ids {
+            if let BetulaViewerNode::Node(node) = &snarl[node] {
+                if !node.is_up_to_date() {
+                    let cmd = InteractionCommand::set_children(node.id, node.desired_children());
+                    self.client.send_command(cmd)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Update the snarl state based on the current connections and desired connections.
     fn update_snarl_dirty_nodes(
         &mut self,
         snarl: &mut Snarl<BetulaViewerNode>,
@@ -471,11 +506,6 @@ impl BetulaViewer {
             let mut disconnections = vec![];
             let mut connections = vec![];
             if let BetulaViewerNode::Node(node) = &snarl[node] {
-                if !node.is_up_to_date() {
-                    let cmd = InteractionCommand::set_children(node.id, node.desired_children());
-                    self.client.send_command(cmd)?;
-                }
-
                 // Now, we need to do snarly things.
                 // Lets just disconnect all connections, then reconnect the ones we care about.
                 if node.is_dirty() {
@@ -499,14 +529,20 @@ impl BetulaViewer {
         Ok(())
     }
 
+    /// Service routine to handle communication and update state.
     #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
 
+        // First, send changes to the server if necessary.
+        self.send_changes_to_server(snarl)?;
+
+        // Process any dirty nodes and update the snarl state.
         self.update_snarl_dirty_nodes(snarl)?;
 
+        // Handle any incoming events.
         loop {
             if let Some(event) = self.client.get_event()? {
                 println!("event {event:?}");
@@ -516,10 +552,10 @@ impl BetulaViewer {
                         if viewer_node.ui_node.is_none() {
                             viewer_node.ui_node =
                                 Some(self.ui_support.create_ui_node(&v.node_type)?);
-                            viewer_node.update_children();
                         }
                         viewer_node.update_children_remote(&v.children);
                         // Pins may have changed, so we must update the snarl state.
+                        // Todo: just this node instead of all of them.
                         self.update_snarl_dirty_nodes(snarl)?;
                     }
                     CommandResult(c) => match c.command {
@@ -539,6 +575,7 @@ impl BetulaViewer {
         Ok(())
     }
 
+    /// Spawn a new node and send that the the server.
     pub fn ui_create_node(
         &mut self,
         id: BetulaNodeId,
@@ -554,7 +591,8 @@ impl BetulaViewer {
         id
     }
 
-    pub fn connect_relation(
+    #[cfg(test)]
+    fn connect_relation(
         &mut self,
         parent: BetulaNodeId,
         child: BetulaNodeId,
