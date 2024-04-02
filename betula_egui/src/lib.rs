@@ -19,6 +19,11 @@ Future:
     - Tree needs to be able to run in a different process, where we hook
       up the viewer.
 
+
+Notes:
+    A node is up to date if the remote (server) data matches the client.
+    A node is dirty if the snarl state needs updating.
+
 */
 
 /*
@@ -66,6 +71,13 @@ use egui_snarl::{
 use betula_common::control::InteractionCommand;
 use betula_common::{control::TreeClient, TreeSupport};
 
+pub enum UiConfigResponse {
+    /// Config has changed, needs to be sent to the server.
+    UnChanged,
+    /// Config is unchanged, no action necessary.
+    Changed,
+}
+
 /// Trait for nodes in the ui.
 ///
 /// It will never be executed, but sharing functionality from Node is
@@ -80,7 +92,9 @@ pub trait UiNode: Node {
         0..usize::MAX
     }
 
-    fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) {}
+    fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+        UiConfigResponse::UnChanged
+    }
 
     fn ui_output_port_count(&self) -> usize {
         self.ports()
@@ -157,9 +171,9 @@ pub struct ViewerNode {
     ///
     /// Basically the vector of children, empty optionals are empty pins.
     #[serde(skip)]
-    children: Vec<Option<BetulaNodeId>>,
+    children_local: Vec<Option<BetulaNodeId>>,
 
-    /// Remove version of children.
+    /// Remote version of children.
     ///
     /// If this differs from the flattened version of children, the node is
     /// considered not up to date and the server is sent an setChildren
@@ -183,7 +197,7 @@ impl ViewerNode {
         Self {
             id,
             ui_node: None,
-            children: vec![],
+            children_local: vec![],
             children_remote: vec![],
             children_dirty: false,
         }
@@ -195,7 +209,7 @@ impl ViewerNode {
             .as_ref()
             .map(|n| n.ui_output_port_count())
             .unwrap_or(0);
-        output_count + self.children.len()
+        output_count + self.children_local.len()
     }
 
     pub fn is_child_output(&self, outpin: &OutPinId) -> bool {
@@ -204,32 +218,32 @@ impl ViewerNode {
 
     /// Update the local children list with the bounds and possible new pins.
     #[track_caller]
-    fn update_children(&mut self) {
+    fn update_children_local(&mut self) {
         // This function could do with a test...
         let allowed = self
             .ui_node
             .as_ref()
             .map(|n| n.ui_child_range())
             .unwrap_or(0..0);
-        if self.children.len() < allowed.start {
+        if self.children_local.len() < allowed.start {
             // ensure lower bound.
-            self.children
-                .append(&mut vec![None; allowed.start - self.children.len()]);
+            self.children_local
+                .append(&mut vec![None; allowed.start - self.children_local.len()]);
         } else {
             // ensure upper bound.
-            if self.children.len() < allowed.end {
-                if self.children.is_empty() {
-                    self.children.push(None);
+            if self.children_local.len() < allowed.end {
+                if self.children_local.is_empty() {
+                    self.children_local.push(None);
                 }
-                if !self.children.last().copied().flatten().is_none() {
-                    self.children.push(None);
+                if !self.children_local.last().copied().flatten().is_none() {
+                    self.children_local.push(None);
                 }
                 // need to drop entries from the rear if there's two none's
-                if self.children.len() > allowed.start && self.children.len() > 2 {
-                    let last = self.children[self.children.len() - 1];
-                    let second_last = self.children[self.children.len() - 2];
+                if self.children_local.len() > allowed.start && self.children_local.len() > 2 {
+                    let last = self.children_local[self.children_local.len() - 1];
+                    let second_last = self.children_local[self.children_local.len() - 2];
                     if last.is_none() && second_last.is_none() {
-                        self.children.pop();
+                        self.children_local.pop();
                     }
                 }
             }
@@ -258,7 +272,7 @@ impl ViewerNode {
     }
 
     pub fn is_up_to_date(&self) -> bool {
-        let ours = self.children.iter().flatten();
+        let ours = self.children_local.iter().flatten();
         let theirs = self.children_remote.iter();
         ours.eq(theirs)
     }
@@ -267,7 +281,7 @@ impl ViewerNode {
     #[track_caller]
     pub fn child_disconnect(&mut self, outpin: &OutPinId) {
         if let Some(child_index) = self.pin_to_child(outpin) {
-            self.children.get_mut(child_index).map(|z| *z = None);
+            self.children_local.get_mut(child_index).map(|z| *z = None);
             self.children_dirty = true;
         }
     }
@@ -279,10 +293,10 @@ impl ViewerNode {
             // otherwise we can't make the connection, this can happen if
             // we move a block of inputs in snarl and have to make connections
             // to pins that are not really in existance yet.
-            if child_index >= self.children.len() {
-                self.children.resize(child_index + 1, None);
+            if child_index >= self.children_local.len() {
+                self.children_local.resize(child_index + 1, None);
             }
-            self.children
+            self.children_local
                 .get_mut(child_index)
                 .map(|z| *z = Some(node_id));
             self.children_dirty = true;
@@ -290,15 +304,15 @@ impl ViewerNode {
     }
 
     pub fn desired_children(&self) -> Vec<BetulaNodeId> {
-        self.children.iter().cloned().flatten().collect()
+        self.children_local.iter().cloned().flatten().collect()
     }
-    pub fn children(&self) -> Vec<Option<BetulaNodeId>> {
-        self.children.clone()
+    pub fn children_local(&self) -> Vec<Option<BetulaNodeId>> {
+        self.children_local.clone()
     }
 
     pub fn update_children_remote(&mut self, children: &[BetulaNodeId]) {
         // This function doesn't preserve gaps atm.
-        self.children = children.iter().map(|z| Some(*z)).collect();
+        self.children_local = children.iter().map(|z| Some(*z)).collect();
         self.children_remote = children.to_vec();
         self.children_dirty = true;
     }
@@ -455,7 +469,7 @@ impl BetulaViewer {
             .as_ref()
             .ok_or(format!("node is only placeholder"))?;
         let port_output_count = ui_node.ui_output_port_count();
-        let children = viewer_node.children();
+        let children = viewer_node.children_local();
         let snarl_parent = self.get_snarl_id(node_id)?;
 
         let mut v = vec![];
@@ -523,7 +537,7 @@ impl BetulaViewer {
             }
             if let BetulaViewerNode::Node(node) = &mut snarl[node] {
                 node.set_clean();
-                node.update_children();
+                node.update_children_local();
             }
         }
         Ok(())
@@ -565,8 +579,6 @@ impl BetulaViewer {
                         }
                         _ => {}
                     },
-
-                    unknown => return Err(format!("Unhandled event {unknown:?}").into()),
                 }
             } else {
                 break;
