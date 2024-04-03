@@ -1005,7 +1005,7 @@ dependencies = [
 [[package]]
 name = "egui-snarl"
 version = "0.2.1"
-source = "git+https://github.com/iwanders/egui-snarl.git?rev=d9ee7fe56da3637f33a293e18105ad35c7890258#d9ee7fe56da3637f33a293e18105ad35c7890258"
+source = "git+https://github.com/iwanders/egui-snarl.git?rev=792eb233b082c6393c28f5414c7e1c1fbb28f787#792eb233b082c6393c28f5414c7e1c1fbb28f787"
 dependencies = [
  "egui",
  "slab",
