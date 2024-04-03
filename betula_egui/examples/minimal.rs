@@ -108,7 +108,7 @@ fn main() -> eframe::Result<()> {
     // ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
     ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
     // ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode>();
-    // ui_support.add_node_default::<betula_common::nodes::TimeNode>();
+    ui_support.add_node_default::<betula_common::nodes::TimeNode>();
     let viewer = BetulaViewer::new(Box::new(client), ui_support);
 
     let native_options = eframe::NativeOptions {

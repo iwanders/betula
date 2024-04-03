@@ -58,6 +58,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
+const BLACKBOARD_COLOR: Color32 = Color32::from_rgb(0xb0, 0x00, 0xb0);
 const UNKNOWN_COLOR: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
 
 use uuid::Uuid;
@@ -759,16 +760,20 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
         match snarl[pin.id.node] {
-            BetulaViewerNode::Node(ref _node) => {
+            BetulaViewerNode::Node(ref node) => {
                 // let child_ports = node.vertical_outputs();
-                if pin.remotes.is_empty() {
-                    PinInfo::triangle()
-                        .with_fill(RELATION_COLOR)
-                        .vertical()
-                        .wiring()
-                        .with_gamma(0.5)
+                if node.is_child_output(&pin.id) {
+                    if pin.remotes.is_empty() {
+                        PinInfo::triangle()
+                            .with_fill(RELATION_COLOR)
+                            .vertical()
+                            .wiring()
+                            .with_gamma(0.5)
+                    } else {
+                        PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                    }
                 } else {
-                    PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                    PinInfo::circle().with_fill(BLACKBOARD_COLOR)
                 }
             }
             _ => todo!(),

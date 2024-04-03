@@ -16,10 +16,9 @@ impl UiNode for nodes::DelayNode {
         0..usize::MAX
     }
 }
-/*
-impl NodeUi for nodes::TimeNode {
-    fn name(&self) -> String {
-        nodes::TimeNode::static_type().into()
+
+impl UiNode for nodes::TimeNode {
+    fn ui_child_range(&self) -> std::ops::Range<usize> {
+        0..0
     }
 }
-*/
