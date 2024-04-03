@@ -2,7 +2,7 @@ use betula_common::TreeSupport;
 use egui::Ui;
 use std::collections::HashMap;
 
-use betula_core::{BetulaError, Node, NodeType, PortDirection};
+use betula_core::{BetulaError, Node, NodeType, Port, PortDirection};
 
 #[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
 pub enum UiConfigResponse {
@@ -49,6 +49,16 @@ pub trait UiNode: Node {
             .iter()
             .filter(|p| p.direction() == PortDirection::Input)
             .count()
+    }
+
+    /// The port to show at this input number.
+    fn ui_input_port(&self, input: usize) -> Option<Port> {
+        self.ports()
+            .unwrap_or(vec![])
+            .iter()
+            .filter(|p| p.direction() == PortDirection::Input)
+            .nth(input)
+            .cloned()
     }
 }
 

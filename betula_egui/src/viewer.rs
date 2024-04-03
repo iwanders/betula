@@ -131,8 +131,21 @@ impl ViewerNode {
         output_count + self.children_local.len()
     }
 
+    pub fn total_inputs(&self) -> usize {
+        let input_count = self
+            .ui_node
+            .as_ref()
+            .map(|n| n.ui_input_port_count())
+            .unwrap_or(0);
+        input_count + 1 // +1 for parent.
+    }
+
     pub fn is_child_output(&self, outpin: &OutPinId) -> bool {
         self.pin_to_child(outpin).is_some()
+    }
+
+    pub fn is_child_input(&self, inpin: &InPinId) -> bool {
+        inpin.input == 0
     }
 
     /// Update the local children list with the bounds and possible new pins.
@@ -180,6 +193,13 @@ impl ViewerNode {
             None
         } else {
             Some(outpin.output - output_count)
+        }
+    }
+    fn pin_to_input(&self, input: &InPinId) -> Option<usize> {
+        if input.input >= 1 {
+            Some(input.input - 1)
+        } else {
+            None
         }
     }
 
@@ -782,7 +802,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
     fn inputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
-            BetulaViewerNode::Node(ref _node) => 1,
+            BetulaViewerNode::Node(ref node) => node.total_inputs(),
             _ => todo!(),
         }
     }
@@ -793,8 +813,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
-            BetulaViewerNode::Node(ref _node) => {
-                if pin.id.input == 0 {
+            BetulaViewerNode::Node(ref node) => {
+                if node.is_child_input(&pin.id) {
                     Some(PinInfo::triangle().with_fill(RELATION_COLOR).vertical())
                 } else {
                     None
@@ -807,20 +827,33 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     fn show_input(
         &mut self,
         pin: &InPin,
-        _: &mut Ui,
+        ui: &mut Ui,
         _: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
         match snarl[pin.id.node] {
-            BetulaViewerNode::Node(ref _node) => {
-                if pin.id.input == 1 {
-                    PinInfo::triangle()
-                        .with_fill(RELATION_COLOR)
-                        .vertical()
-                        .wiring()
-                        .with_gamma(0.5)
-                } else {
+            BetulaViewerNode::Node(ref node) => {
+                if node.is_child_input(&pin.id) {
                     PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                } else {
+                    if let Some(ui_node) = &node.ui_node {
+                        if let Some(input_port) = node.pin_to_input(&pin.id) {
+                            if let Some(port) = ui_node.ui_input_port(input_port) {
+                                ui.label(format!(
+                                    "{:} [{:?}]",
+                                    port.name().as_ref(),
+                                    port.port_type()
+                                ));
+                                PinInfo::triangle().with_fill(BLACKBOARD_COLOR)
+                            } else {
+                                unreachable!("tried to get pin for input beyond range");
+                            }
+                        } else {
+                            unreachable!("tried to get non input pin");
+                        }
+                    } else {
+                        unreachable!("cant show input for pending node");
+                    }
                 }
             }
             _ => todo!(),

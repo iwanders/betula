@@ -157,6 +157,11 @@ impl<T: std::fmt::Debug + 'static> Default for Input<T> {
 
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct PortName(pub String);
+impl PortName {
+    pub fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 impl From<&str> for PortName {
     fn from(v: &str) -> Self {
         PortName(v.to_owned())
