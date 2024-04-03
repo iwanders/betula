@@ -60,7 +60,7 @@ pub mod nodes;
 
 pub mod prelude {
     pub use crate::{
-        as_any::AsAnyHelper,
+        // as_any::AsAnyHelper,
         //blackboard::Chalkable
         blackboard::Setup,
         NodeConfigLoad,
@@ -71,8 +71,8 @@ pub mod prelude {
 pub use blackboard::Blackboard;
 pub use blackboard::BlackboardInterface;
 
-mod as_any;
-pub use as_any::AsAny;
+pub mod as_any;
+use as_any::AsAny;
 
 use uuid::Uuid;
 

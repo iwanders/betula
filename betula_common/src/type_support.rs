@@ -81,6 +81,7 @@ impl<T: DefaultConfigRequirements> ConfigConverter for DefaultConfigConverter<T>
         &self,
         config: &dyn NodeConfig,
     ) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
+        use betula_core::as_any::AsAnyHelper;
         let v = (*config).downcast_ref::<T>().ok_or("failed to cast")?;
         Ok(Box::new((*v).clone()))
     }
@@ -136,6 +137,7 @@ impl<T: DefaultValueRequirements> ValueConverter for DefaultValueConverter<T> {
         &self,
         value: &dyn Chalkable,
     ) -> Result<Box<dyn erased_serde::Serialize>, BetulaError> {
+        use betula_core::as_any::AsAnyHelper;
         let v = (*value)
             .downcast_ref::<T>()
             .ok_or("failed to cast")?
