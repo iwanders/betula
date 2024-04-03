@@ -56,6 +56,8 @@ use betula_core::{
 };
 use serde::{Deserialize, Serialize};
 
+use std::collections::HashMap;
+
 const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
 const UNKNOWN_COLOR: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
 
@@ -71,103 +73,11 @@ use egui_snarl::{
 use betula_common::control::InteractionCommand;
 use betula_common::{control::TreeClient, TreeSupport};
 
-#[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
-pub enum UiConfigResponse {
-    /// Config has changed, needs to be sent to the server.
-    UnChanged,
-    /// Config is unchanged, no action necessary.
-    Changed,
-}
+use egui::{Color32, Ui};
 
-/// Trait for nodes in the ui.
-///
-/// It will never be executed, but sharing functionality from Node is
-/// useful as it allows reusing the get_config and set_config methods as
-/// well as the ports function.
-pub trait UiNode: Node {
-    fn ui_title(&self) -> String {
-        self.node_type().0.clone()
-    }
-
-    fn ui_child_range(&self) -> std::ops::Range<usize> {
-        0..usize::MAX
-    }
-
-    fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) -> UiConfigResponse {
-        UiConfigResponse::UnChanged
-    }
-
-    fn ui_output_port_count(&self) -> usize {
-        self.ports()
-            .unwrap_or(vec![])
-            .iter()
-            .filter(|p| p.direction() == PortDirection::Output)
-            .count()
-    }
-    fn ui_input_port_count(&self) -> usize {
-        self.ports()
-            .unwrap_or(vec![])
-            .iter()
-            .filter(|p| p.direction() == PortDirection::Input)
-            .count()
-    }
-}
-
-type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;
-struct UiNodeSupport {
-    // node_type: NodeType,
-    display_name: String,
-    node_factory: UiNodeFactory,
-}
-
-pub struct UiSupport {
-    ui: HashMap<NodeType, UiNodeSupport>,
-    tree: TreeSupport,
-}
-impl UiSupport {
-    pub fn new() -> Self {
-        Self {
-            ui: Default::default(),
-            tree: Default::default(),
-        }
-    }
-    pub fn add_node_default<T: Node + UiNode + Default + 'static>(&mut self) {
-        self.tree.add_node_default::<T>();
-        let ui_support = UiNodeSupport {
-            display_name: T::static_type().0.clone(),
-            node_factory: Box::new(|| Box::new(T::default())),
-        };
-        self.ui.insert(T::static_type(), ui_support);
-    }
-
-    pub fn add_node_default_with_config<
-        N: Node + UiNode + Default + 'static,
-        C: betula_common::type_support::DefaultConfigRequirements,
-    >(
-        &mut self,
-    ) {
-        self.tree.add_node_default_with_config::<N, C>();
-        self.add_node_default::<N>();
-    }
-
-    pub fn node_types(&self) -> Vec<NodeType> {
-        self.ui.keys().cloned().collect()
-    }
-    pub fn display_name(&self, node_type: &NodeType) -> String {
-        if let Some(node_support) = self.ui.get(node_type) {
-            node_support.display_name.clone()
-        } else {
-            "Unknown Node".into()
-        }
-    }
-    pub fn create_ui_node(&self, node_type: &NodeType) -> Result<Box<dyn UiNode>, BetulaError> {
-        if let Some(node_support) = self.ui.get(node_type) {
-            Ok((node_support.node_factory)())
-        } else {
-            Err("no ui node support for {node_type:?}".into())
-        }
-    }
-}
+mod ui;
+use ui::UiConfigResponse;
+pub use ui::{UiNode, UiSupport};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerNode {
@@ -360,7 +270,6 @@ pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
 }
-use std::collections::HashMap;
 
 pub struct BetulaViewer {
     // Some ui support... for stuff like configs.
@@ -580,7 +489,7 @@ impl BetulaViewer {
                             // Serialize the configuration.
                             let config = self
                                 .ui_support
-                                .tree
+                                .tree_support()
                                 .config_serialize(ui_node.node_type(), &*config)?;
                             // Now send it off!
                             let cmd = InteractionCommand::set_config(node.id, config);
@@ -627,7 +536,8 @@ impl BetulaViewer {
                         let ui_node = viewer_node.ui_node.as_mut().unwrap();
                         // Oh, and set the config if we got one
                         if let Some(config) = v.config {
-                            let config = self.ui_support.tree.config_deserialize(config)?;
+                            let config =
+                                self.ui_support.tree_support().config_deserialize(config)?;
                             ui_node.set_config(&*config)?;
                             viewer_node.clear_config_needs_send();
                         }
@@ -694,8 +604,6 @@ impl BetulaViewer {
         Ok(())
     }
 }
-
-use egui::{Color32, Ui};
 
 impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     fn title(&mut self, node: &BetulaViewerNode) -> std::string::String {
