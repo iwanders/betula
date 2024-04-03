@@ -18,18 +18,22 @@ pub enum UiConfigResponse {
 /// useful as it allows reusing the get_config and set_config methods as
 /// well as the ports function.
 pub trait UiNode: Node {
+    /// The title for this ui node.
     fn ui_title(&self) -> String {
         self.node_type().0.clone()
     }
 
+    /// The range of children this node has.
     fn ui_child_range(&self) -> std::ops::Range<usize> {
         0..usize::MAX
     }
 
+    /// Function to render the ui, responds whether changes were made.
     fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) -> UiConfigResponse {
         UiConfigResponse::UnChanged
     }
 
+    /// The number of output ports this node has in the ui.
     fn ui_output_port_count(&self) -> usize {
         self.ports()
             .unwrap_or(vec![])
@@ -37,6 +41,8 @@ pub trait UiNode: Node {
             .filter(|p| p.direction() == PortDirection::Output)
             .count()
     }
+
+    /// The number of input ports this node has in the ui.
     fn ui_input_port_count(&self) -> usize {
         self.ports()
             .unwrap_or(vec![])
@@ -47,10 +53,9 @@ pub trait UiNode: Node {
 }
 
 type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;
-struct UiNodeSupport {
-    // node_type: NodeType,
-    display_name: String,
-    node_factory: UiNodeFactory,
+pub struct UiNodeSupport {
+    pub display_name: String,
+    pub node_factory: UiNodeFactory,
 }
 
 pub struct UiSupport {
@@ -69,7 +74,15 @@ impl UiSupport {
         &self.tree
     }
 
-    pub fn add_node_default<T: Node + UiNode + Default + 'static>(&mut self) {
+    pub fn ui_support(&self, node_type: &NodeType) -> Option<&UiNodeSupport> {
+        self.ui.get(node_type)
+    }
+
+    pub fn add_node_default<
+        T: UiNode + betula_common::type_support::DefaultNodeFactoryRequirements,
+    >(
+        &mut self,
+    ) {
         self.tree.add_node_default::<T>();
         let ui_support = UiNodeSupport {
             display_name: T::static_type().0.clone(),
@@ -79,7 +92,7 @@ impl UiSupport {
     }
 
     pub fn add_node_default_with_config<
-        N: Node + UiNode + Default + 'static,
+        N: UiNode + betula_common::type_support::DefaultNodeFactoryRequirements,
         C: betula_common::type_support::DefaultConfigRequirements,
     >(
         &mut self,
@@ -93,7 +106,7 @@ impl UiSupport {
     }
 
     pub fn display_name(&self, node_type: &NodeType) -> String {
-        if let Some(node_support) = self.ui.get(node_type) {
+        if let Some(node_support) = self.ui_support(node_type) {
             node_support.display_name.clone()
         } else {
             "Unknown Node".into()
@@ -101,7 +114,7 @@ impl UiSupport {
     }
 
     pub fn create_ui_node(&self, node_type: &NodeType) -> Result<Box<dyn UiNode>, BetulaError> {
-        if let Some(node_support) = self.ui.get(node_type) {
+        if let Some(node_support) = self.ui_support(node_type) {
             Ok((node_support.node_factory)())
         } else {
             Err("no ui node support for {node_type:?}".into())
