@@ -120,7 +120,7 @@ struct UiNodeSupport {
     node_factory: UiNodeFactory,
 }
 
-struct UiSupport {
+pub struct UiSupport {
     ui: HashMap<NodeType, UiNodeSupport>,
     tree: TreeSupport,
 }
@@ -376,15 +376,7 @@ impl BetulaViewer {
         &*self.client
     }
 
-    pub fn new(client: Box<dyn TreeClient>) -> Self {
-        let mut ui_support = UiSupport::new();
-        // ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
-        // ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
-        // ui_support.add_node_default::<betula_core::nodes::FailureNode>();
-        // ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-        ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
-        // ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode>();
-        // ui_support.add_node_default::<betula_common::nodes::TimeNode>();
+    pub fn new(client: Box<dyn TreeClient>, ui_support: UiSupport) -> Self {
         BetulaViewer {
             client,
             ui_support,
