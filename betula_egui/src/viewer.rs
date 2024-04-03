@@ -195,9 +195,18 @@ impl ViewerNode {
             Some(outpin.output - output_count)
         }
     }
+
     fn pin_to_input(&self, input: &InPinId) -> Option<usize> {
         if input.input >= 1 {
             Some(input.input - 1)
+        } else {
+            None
+        }
+    }
+
+    fn pin_to_output(&self, output: &OutPinId) -> Option<usize> {
+        if output.output >= self.children_local.len() {
+            Some(output.output - self.children_local.len())
         } else {
             None
         }
@@ -775,7 +784,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     fn show_output(
         &mut self,
         pin: &OutPin,
-        _: &mut Ui,
+        ui: &mut Ui,
         _: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
@@ -793,7 +802,24 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                         PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
                     }
                 } else {
-                    PinInfo::circle().with_fill(BLACKBOARD_COLOR)
+                    if let Some(ui_node) = &node.ui_node {
+                        if let Some(input_port) = node.pin_to_output(&pin.id) {
+                            if let Some(port) = ui_node.ui_output_port(input_port) {
+                                ui.label(format!(
+                                    "{:} [{:?}]",
+                                    port.name().as_ref(),
+                                    port.port_type()
+                                ));
+                                PinInfo::triangle().with_fill(BLACKBOARD_COLOR)
+                            } else {
+                                unreachable!("tried to get pin for input beyond range");
+                            }
+                        } else {
+                            unreachable!("tried to get non input pin");
+                        }
+                    } else {
+                        unreachable!("cant show input for pending node");
+                    }
                 }
             }
             _ => todo!(),

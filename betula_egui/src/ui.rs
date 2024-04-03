@@ -51,13 +51,23 @@ pub trait UiNode: Node {
             .count()
     }
 
-    /// The port to show at this input number.
+    /// The input to show at this input number.
     fn ui_input_port(&self, input: usize) -> Option<Port> {
         self.ports()
             .unwrap_or(vec![])
             .iter()
             .filter(|p| p.direction() == PortDirection::Input)
             .nth(input)
+            .cloned()
+    }
+
+    /// The output port to show at this output number.
+    fn ui_output_port(&self, output: usize) -> Option<Port> {
+        self.ports()
+            .unwrap_or(vec![])
+            .iter()
+            .filter(|p| p.direction() == PortDirection::Output)
+            .nth(output)
             .cloned()
     }
 }
