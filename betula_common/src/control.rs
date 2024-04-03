@@ -106,6 +106,10 @@ impl InteractionCommand {
         InteractionCommand::TreeCall(TreeCallWrapper::new(f))
     }
 
+    pub fn set_config(id: NodeId, config: SerializedConfig) -> Self {
+        InteractionCommand::SetConfig(SetConfigCommand { id, config })
+    }
+
     fn node_information(
         tree_support: &TreeSupport,
         node_id: NodeId,
@@ -182,10 +186,17 @@ impl InteractionCommand {
                 let real_config = tree_support.config_deserialize(config_cmd.config.clone())?;
                 // And set the config.
                 node_mut.set_config(&*real_config)?;
-                Ok(vec![InteractionEvent::CommandResult(CommandResult {
-                    command: self.clone(),
-                    error: None,
-                })])
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::NodeInformation(Self::node_information(
+                        tree_support,
+                        node_id,
+                        tree,
+                    )?),
+                ])
             }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;

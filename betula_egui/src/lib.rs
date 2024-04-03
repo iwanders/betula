@@ -71,6 +71,7 @@ use egui_snarl::{
 use betula_common::control::InteractionCommand;
 use betula_common::{control::TreeClient, TreeSupport};
 
+#[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
 pub enum UiConfigResponse {
     /// Config has changed, needs to be sent to the server.
     UnChanged,
@@ -133,12 +134,22 @@ impl UiSupport {
     pub fn add_node_default<T: Node + UiNode + Default + 'static>(&mut self) {
         self.tree.add_node_default::<T>();
         let ui_support = UiNodeSupport {
-            // node_type: T::static_type(),
             display_name: T::static_type().0.clone(),
             node_factory: Box::new(|| Box::new(T::default())),
         };
         self.ui.insert(T::static_type(), ui_support);
     }
+
+    pub fn add_node_default_with_config<
+        N: Node + UiNode + Default + 'static,
+        C: betula_common::type_support::DefaultConfigRequirements,
+    >(
+        &mut self,
+    ) {
+        self.tree.add_node_default_with_config::<N, C>();
+        self.add_node_default::<N>();
+    }
+
     pub fn node_types(&self) -> Vec<NodeType> {
         self.ui.keys().cloned().collect()
     }
@@ -190,6 +201,14 @@ pub struct ViewerNode {
     /// snarl state.
     #[serde(skip)]
     children_dirty: bool,
+
+    /// Denotes whether the configuration needs to be send to the server.
+    ///
+    /// If the ui_config returns Changed, this is set the true, it is then
+    /// sent to the server. After the server sends back a configuration and
+    /// that is set to the node, it is set to false again.
+    #[serde(skip)]
+    config_needs_send: bool,
 }
 
 impl ViewerNode {
@@ -200,6 +219,7 @@ impl ViewerNode {
             children_local: vec![],
             children_remote: vec![],
             children_dirty: false,
+            config_needs_send: false,
         }
     }
 
@@ -271,7 +291,18 @@ impl ViewerNode {
         self.children_dirty = false;
     }
 
-    pub fn is_up_to_date(&self) -> bool {
+    pub fn clear_config_needs_send(&mut self) {
+        self.config_needs_send = false;
+    }
+
+    pub fn set_config_needs_send(&mut self) {
+        self.config_needs_send = true;
+    }
+    pub fn config_needs_send(&self) -> bool {
+        self.config_needs_send
+    }
+
+    pub fn children_is_up_to_date(&self) -> bool {
         let ours = self.children_local.iter().flatten();
         let theirs = self.children_remote.iter();
         ours.eq(theirs)
@@ -351,7 +382,8 @@ impl BetulaViewer {
         // ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
         // ui_support.add_node_default::<betula_core::nodes::FailureNode>();
         // ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-        ui_support.add_node_default::<betula_common::nodes::DelayNode>();
+        ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
+        // ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode>();
         // ui_support.add_node_default::<betula_common::nodes::TimeNode>();
         BetulaViewer {
             client,
@@ -500,7 +532,7 @@ impl BetulaViewer {
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
         for node in node_ids {
             if let BetulaViewerNode::Node(node) = &snarl[node] {
-                if !node.is_up_to_date() {
+                if !node.children_is_up_to_date() {
                     let cmd = InteractionCommand::set_children(node.id, node.desired_children());
                     self.client.send_command(cmd)?;
                 }
@@ -543,6 +575,34 @@ impl BetulaViewer {
         Ok(())
     }
 
+    fn send_configs_to_server(
+        &mut self,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
+        for node in node_ids {
+            if let BetulaViewerNode::Node(node) = &snarl[node] {
+                if node.config_needs_send() {
+                    if let Some(ui_node) = &node.ui_node {
+                        if let Some(config) = ui_node.get_config()? {
+                            // Serialize the configuration.
+                            let config = self
+                                .ui_support
+                                .tree
+                                .config_serialize(ui_node.node_type(), &*config)?;
+                            // Now send it off!
+                            let cmd = InteractionCommand::set_config(node.id, config);
+                            self.client.send_command(cmd)?;
+                        } else {
+                            unreachable!("node reported dirty config but no config returned");
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Service routine to handle communication and update state.
     #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
@@ -556,6 +616,9 @@ impl BetulaViewer {
         // Process any dirty nodes and update the snarl state.
         self.update_snarl_dirty_nodes(snarl)?;
 
+        // Check if any configurations need to be sent to the server.
+        self.send_configs_to_server(snarl)?;
+
         // Handle any incoming events.
         loop {
             if let Some(event) = self.client.get_event()? {
@@ -567,6 +630,16 @@ impl BetulaViewer {
                             viewer_node.ui_node =
                                 Some(self.ui_support.create_ui_node(&v.node_type)?);
                         }
+
+                        // Update the configuration if we have one.
+                        let ui_node = viewer_node.ui_node.as_mut().unwrap();
+                        // Oh, and set the config if we got one
+                        if let Some(config) = v.config {
+                            let config = self.ui_support.tree.config_deserialize(config)?;
+                            ui_node.set_config(&*config)?;
+                            viewer_node.clear_config_needs_send();
+                        }
+
                         viewer_node.update_children_remote(&v.children);
                         // Pins may have changed, so we must update the snarl state.
                         // Todo: just this node instead of all of them.
@@ -932,7 +1005,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
-                node.ui_node.as_mut().map(|e| e.ui_config(ui, scale));
+                let r = node.ui_node.as_mut().map(|e| e.ui_config(ui, scale));
+                if let Some(response) = r {
+                    if response == UiConfigResponse::Changed {
+                        node.set_config_needs_send()
+                    }
+                }
             }
             _ => todo!(),
         };

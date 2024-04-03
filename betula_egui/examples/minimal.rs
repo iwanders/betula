@@ -75,7 +75,6 @@ fn main() -> eframe::Result<()> {
         tree_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>(
             );
         tree_support.add_node_default::<betula_common::nodes::TimeNode>();
-        tree_support.add_node_default::<betula_common::nodes::DelayNode>();
         tree_support.add_value_default::<f64>();
 
         loop {

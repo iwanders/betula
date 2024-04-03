@@ -438,8 +438,12 @@ impl TreeSupport {
         let converter = self.node_support.get(&node_type);
         let converter = converter
             .map(|v| v.config_converter.as_ref())
-            .flatten()
-            .ok_or(format!("could not get support for {node_type:?}"))?;
+            .ok_or(format!(
+                "config_serialize: could not get support for {node_type:?}"
+            ))?
+            .ok_or(format!(
+                "config_serialize: could not get config serializer for {node_type:?}"
+            ))?;
         let serialize_erased = converter.config_serialize(&*config)?;
         Ok(SerializedConfig {
             node_type: node_type,
@@ -456,8 +460,12 @@ impl TreeSupport {
         let converter = self.node_support.get(&node_type);
         let converter = converter
             .map(|v| v.config_converter.as_ref())
-            .flatten()
-            .ok_or(format!("could not get support for {node_type:?}"))?;
+            .ok_or(format!(
+                "config_deserialize: could not get support for {node_type:?}"
+            ))?
+            .ok_or(format!(
+                "config_deserialize: could not get config serializer for {node_type:?}"
+            ))?;
         let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(config.data));
         Ok(converter.config_deserialize(&mut erased)?)
     }
