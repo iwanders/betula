@@ -1,12 +1,10 @@
 use crate::{UiConfigResponse, UiNode, UiSupport};
 use egui::{Color32, Ui};
 
-use betula_core::{
-    BetulaError, BlackboardId, Node, NodeId as BetulaNodeId, NodeType, PortDirection,
-};
+use betula_core::{BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeType};
 
 use betula_common::control::InteractionCommand;
-use betula_common::{control::TreeClient, TreeSupport};
+use betula_common::control::TreeClient;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

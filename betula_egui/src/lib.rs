@@ -51,17 +51,8 @@ For nodes:
 
 // use betula_core::prelude::*;
 // , NodeType
-use betula_core::{
-    BetulaError, BlackboardId, Node, NodeId as BetulaNodeId, NodeType, PortDirection,
-};
-use serde::{Deserialize, Serialize};
-
-use std::collections::HashMap;
-use uuid::Uuid;
 
 pub mod nodes;
-
-use egui::{Color32, Ui};
 
 mod ui;
 use ui::UiConfigResponse;

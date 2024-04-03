@@ -1,10 +1,8 @@
 use betula_common::TreeSupport;
-use egui::{Color32, Ui};
+use egui::Ui;
 use std::collections::HashMap;
 
-use betula_core::{
-    BetulaError, BlackboardId, Node, NodeId as BetulaNodeId, NodeType, PortDirection,
-};
+use betula_core::{BetulaError, Node, NodeType, PortDirection};
 
 #[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
 pub enum UiConfigResponse {
