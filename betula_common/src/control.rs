@@ -74,7 +74,8 @@ pub enum InteractionCommand {
 
     SetChildren(SetChildren),
 
-    // AddBlackboard(BlackboardId),
+    AddBlackboard(BlackboardId),
+
     SetConfig(SetConfigCommand),
 
     // RequestNodes,
@@ -91,6 +92,11 @@ impl InteractionCommand {
     pub fn add_node(id: NodeId, node_type: NodeType) -> Self {
         InteractionCommand::AddNode(AddNodeCommand { id, node_type })
     }
+
+    pub fn add_blackboard(id: BlackboardId) -> Self {
+        InteractionCommand::AddBlackboard(id)
+    }
+
     pub fn remove_node(id: NodeId) -> Self {
         InteractionCommand::RemoveNode(id)
     }
@@ -171,6 +177,16 @@ impl InteractionCommand {
             }
             InteractionCommand::RemoveNode(v) => {
                 tree.remove_node(*v)?;
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
+            }
+            InteractionCommand::AddBlackboard(v) => {
+                let blackboard = tree_support
+                    .create_blackboard()
+                    .ok_or(format!("cannot create blackboard, no factory"))?;
+                tree.add_blackboard_boxed(*v, blackboard)?;
                 Ok(vec![InteractionEvent::CommandResult(CommandResult {
                     command: self.clone(),
                     error: None,

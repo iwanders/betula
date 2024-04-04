@@ -121,7 +121,7 @@ impl TreeSupport {
         self.blackboard_factory = Some(blackboard_factory);
     }
 
-    fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
+    pub fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
         self.blackboard_factory.as_ref().map(|v| v())
     }
 

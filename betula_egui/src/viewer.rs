@@ -55,13 +55,13 @@ For nodes:
 use crate::{UiConfigResponse, UiNode, UiSupport};
 use egui::{Color32, Ui};
 
-use betula_core::{BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeType};
+use betula_core::{BetulaError, Blackboard, BlackboardId, NodeId as BetulaNodeId, NodeType};
 
 use betula_common::control::InteractionCommand;
 use betula_common::control::TreeClient;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
 const BLACKBOARD_COLOR: Color32 = Color32::from_rgb(0xb0, 0x00, 0xb0);
@@ -283,10 +283,33 @@ impl ViewerNode {
     }
 }
 
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
+type BlackboardRc = Rc<RefCell<Box<dyn Blackboard>>>;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerBlackboard {
     id: BlackboardId,
-    // Full, or just a single?
+
+    #[serde(skip)]
+    blackboard: Option<BlackboardRc>,
+}
+
+impl ViewerBlackboard {
+    pub fn new(id: BlackboardId) -> Self {
+        Self {
+            id,
+            blackboard: None,
+        }
+    }
+    pub fn inputs(&self) -> usize {
+        0
+    }
+    pub fn outputs(&self) -> usize {
+        0
+    }
+    pub fn blackboard_ref(&self) -> Option<Ref<'_, Box<dyn Blackboard>>> {
+        self.blackboard.as_ref().map(|z| z.borrow())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -307,6 +330,13 @@ pub struct BetulaViewer {
 
     /// Ui support to create new nodes.
     ui_support: UiSupport,
+
+    /// The actual blackboards.
+    blackboards: HashMap<BlackboardId, BlackboardRc>,
+
+    // / Mapping between blackboards and snarl ids.
+    blackboard_map: HashMap<BlackboardId, HashSet<SnarlNodeId>>,
+    blackboard_snarl_map: HashMap<SnarlNodeId, BlackboardId>,
 }
 
 impl BetulaViewer {
@@ -320,12 +350,23 @@ impl BetulaViewer {
             ui_support,
             node_map: Default::default(),
             snarl_map: Default::default(),
+            blackboards: Default::default(),
+            blackboard_map: Default::default(),
+            blackboard_snarl_map: Default::default(),
         }
     }
 
     pub fn add_id_mapping(&mut self, betula_id: BetulaNodeId, snarl_id: SnarlNodeId) {
         self.node_map.insert(betula_id, snarl_id);
         self.snarl_map.insert(snarl_id, betula_id);
+    }
+
+    pub fn add_blackboard_mapping(&mut self, blackboard_id: BlackboardId, snarl_id: SnarlNodeId) {
+        self.blackboard_map
+            .entry(blackboard_id)
+            .or_default()
+            .insert(snarl_id);
+        self.blackboard_snarl_map.insert(snarl_id, blackboard_id);
     }
 
     fn get_snarl_id(&self, node_id: BetulaNodeId) -> Result<SnarlNodeId, BetulaError> {
@@ -348,6 +389,20 @@ impl BetulaViewer {
             .ok_or::<BetulaError>(format!("could not find {node_id:?}").into())?;
         self.snarl_map.remove(&snarl_id);
         Ok(snarl_id)
+    }
+
+    fn remove_blackboard_id(
+        &mut self,
+        blackboard_id: BlackboardId,
+    ) -> Result<Vec<SnarlNodeId>, BetulaError> {
+        let mut snarl_id = self
+            .blackboard_map
+            .remove(&blackboard_id)
+            .ok_or::<BetulaError>(format!("could not find {blackboard_id:?}").into())?;
+        for id in &snarl_id {
+            self.blackboard_snarl_map.remove(id);
+        }
+        Ok(snarl_id.drain().collect())
     }
 
     fn get_node_mut<'a>(
@@ -536,6 +591,7 @@ impl BetulaViewer {
     /// Service routine to handle communication and update state.
     #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
+        use betula_common::control::InteractionCommand::AddBlackboard;
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
@@ -581,6 +637,15 @@ impl BetulaViewer {
                             let snarl_id = self.remove_betula_id(node_id)?;
                             snarl.remove_node(snarl_id);
                         }
+                        AddBlackboard(blackboard_id) => {
+                            if let Some(failure_reason) = c.error {
+                                // Yikes, it failed, lets clean up the mess and remove the node.
+                                let ids = self.remove_blackboard_id(blackboard_id)?;
+                                for snarl_id in ids {
+                                    snarl.remove_node(snarl_id);
+                                }
+                            }
+                        }
                         _ => {}
                     },
                 }
@@ -605,6 +670,20 @@ impl BetulaViewer {
             self.add_id_mapping(id, snarl_id);
         }
         id
+    }
+
+    pub fn ui_create_blackboard(
+        &mut self,
+        id: BlackboardId,
+        pos: egui::Pos2,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        let cmd = InteractionCommand::add_blackboard(id);
+        if let Ok(_) = self.client.send_command(cmd) {
+            let snarl_id =
+                snarl.insert_node(pos, BetulaViewerNode::Blackboard(ViewerBlackboard::new(id)));
+            self.add_blackboard_mapping(id, snarl_id);
+        }
     }
 
     #[cfg(test)]
@@ -645,7 +724,14 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     "Pending...".to_owned()
                 }
             }
-            _ => todo!(),
+            BetulaViewerNode::Blackboard(bb) => {
+                // Grab the type support for this node.
+                if let Some(_blackboard) = &bb.blackboard_ref() {
+                    "Blackboard".to_owned()
+                } else {
+                    "Pending...".to_owned()
+                }
+            }
         }
     }
 
@@ -761,7 +847,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
             BetulaViewerNode::Node(ref node) => node.total_outputs(),
-            _ => 0,
+            BetulaViewerNode::Blackboard(ref bb) => bb.outputs(),
         }
     }
 
@@ -840,7 +926,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     fn inputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
             BetulaViewerNode::Node(ref node) => node.total_inputs(),
-            _ => todo!(),
+            BetulaViewerNode::Blackboard(ref bb) => bb.inputs(),
         }
     }
 
@@ -929,6 +1015,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 ui.close_menu();
             }
         }
+        ui.label("Blackboard:");
+        if ui.button("New blackboard").clicked() {
+            self.ui_create_blackboard(BlackboardId(Uuid::new_v4()), pos, snarl);
+            ui.close_menu();
+        }
     }
 
     fn node_menu(
@@ -975,7 +1066,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 }
             }
-            _ => todo!(),
+            BetulaViewerNode::Blackboard(_) => {}
         };
     }
 }
