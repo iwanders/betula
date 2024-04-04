@@ -1,20 +1,26 @@
 /*
 Goals:
-    - We really want the UI to be able to show blackboard values.
-    - As well as possibly inner state of nodes.
-    - Need to be able to modify the node's configuration with a nice ui.
-    - Want the UI to be able to modify the tree, without losing state in the tree.
+    - [x] Need to be able to modify the node's configuration with a nice ui.
+    - [x] Want the UI to be able to modify the tree, without losing state in the tree.
+    - [ ] We really want the UI to be able to show blackboard values.
+    - [ ] As well as possibly inner state of nodes.
 
 Thoughts on interaction:
-    - We don't want the UI to own the tree.
-    - Tree should be able to run quickly in the background.
-    - We don't really want the UI to directly access the tree with a mutex.
+    - [x] We don't want the UI to own the tree.
+    - [ ] Tree should be able to run quickly in the background.
+    - [x] We don't really want the UI to directly access the tree with a mutex.
       Because that'll likely result in contention, as well as a slower running
       tree if we have a UI running.
 
 Future:
-    - Tree needs to be able to run in a different process, where we hook
+    - [x] Tree needs to be able to run in a different process, where we hook
       up the viewer.
+
+
+On the UI:
+    - What about groups / subtree's? Should we put another level of indirection
+      where the viewer shows just a subset of nodes in existance?
+    - Subtree's only have one parent, so technically reduce into a single node.
 
 
 Notes:
@@ -40,10 +46,10 @@ To tree:
 For nodes:
     Outputs:
         Ports are first.
-        Children are second.
+        Children are the remainder.
     Inputs:
         Parent is 0.
-        Ports are second.
+        Ports are the remainder.
 */
 
 use crate::{UiConfigResponse, UiNode, UiSupport};
@@ -290,11 +296,16 @@ pub enum BetulaViewerNode {
 }
 
 pub struct BetulaViewer {
-    // Some ui support... for stuff like configs.
+    /// Client to interact with the server.
     client: Box<dyn TreeClient>,
 
+    /// Node map to go from BetulaNodeId to SnarlNodeId.
     node_map: HashMap<BetulaNodeId, SnarlNodeId>,
+
+    /// Node map to go from SnarlNodeId to BetulaNodeIs
     snarl_map: HashMap<SnarlNodeId, BetulaNodeId>,
+
+    /// Ui support to create new nodes.
     ui_support: UiSupport,
 }
 
