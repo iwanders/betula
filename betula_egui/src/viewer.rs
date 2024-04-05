@@ -283,23 +283,17 @@ impl ViewerNode {
     }
 }
 
-use std::cell::{Ref, RefCell};
-use std::rc::Rc;
-type BlackboardRc = Rc<RefCell<Box<dyn Blackboard>>>;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerBlackboard {
     id: BlackboardId,
 
     #[serde(skip)]
-    blackboard: Option<BlackboardRc>,
+    info: Option<BlackboardInfo>,
 }
 
 impl ViewerBlackboard {
     pub fn new(id: BlackboardId) -> Self {
-        Self {
-            id,
-            blackboard: None,
-        }
+        Self { id, info: None }
     }
     pub fn inputs(&self) -> usize {
         0
@@ -307,8 +301,8 @@ impl ViewerBlackboard {
     pub fn outputs(&self) -> usize {
         0
     }
-    pub fn blackboard_ref(&self) -> Option<Ref<'_, Box<dyn Blackboard>>> {
-        self.blackboard.as_ref().map(|z| z.borrow())
+    pub fn info(&self) -> Option<Ref<'_, BlackboardInfoContainer>> {
+        self.info.as_ref().map(|z| z.borrow())
     }
 }
 
@@ -316,6 +310,16 @@ impl ViewerBlackboard {
 pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
+}
+
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
+type BlackboardInfo = Rc<RefCell<BlackboardInfoContainer>>;
+
+#[derive(Debug)]
+pub struct BlackboardInfoContainer {
+    pub id: BlackboardId,
+    pub blackboard: Box<dyn Blackboard>,
 }
 
 pub struct BetulaViewer {
@@ -332,7 +336,7 @@ pub struct BetulaViewer {
     ui_support: UiSupport,
 
     /// The actual blackboards.
-    blackboards: HashMap<BlackboardId, BlackboardRc>,
+    blackboards: HashMap<BlackboardId, BlackboardInfo>,
 
     // / Mapping between blackboards and snarl ids.
     blackboard_map: HashMap<BlackboardId, HashSet<SnarlNodeId>>,
@@ -369,12 +373,24 @@ impl BetulaViewer {
         self.blackboard_snarl_map.insert(snarl_id, blackboard_id);
     }
 
-    fn get_snarl_id(&self, node_id: BetulaNodeId) -> Result<SnarlNodeId, BetulaError> {
+    fn get_node_snarl_id(&self, node_id: BetulaNodeId) -> Result<SnarlNodeId, BetulaError> {
         self.node_map
             .get(&node_id)
             .ok_or(format!("could not find {node_id:?}").into())
             .copied()
     }
+
+    fn get_blackboard_snarl_ids(
+        &self,
+        blackboard_id: BlackboardId,
+    ) -> Result<Vec<SnarlNodeId>, BetulaError> {
+        let v = self
+            .blackboard_map
+            .get(&blackboard_id)
+            .ok_or(format!("could not find {blackboard_id:?}"))?;
+        Ok(v.iter().cloned().collect())
+    }
+
     fn get_betula_id(&self, snarl_id: &SnarlNodeId) -> Result<BetulaNodeId, BetulaError> {
         self.snarl_map
             .get(&snarl_id)
@@ -459,7 +475,7 @@ impl BetulaViewer {
             .as_ref()
             .ok_or(format!("node is only placeholder"))?;
         let port_output_count = ui_node.ui_output_port_count();
-        let snarl_parent = self.get_snarl_id(node_id).unwrap();
+        let snarl_parent = self.get_node_snarl_id(node_id).unwrap();
         let connected = snarl.out_pins_connected(snarl_parent);
         let mut disconnectables = vec![];
         for p in connected {
@@ -487,7 +503,7 @@ impl BetulaViewer {
             .ok_or(format!("node is only placeholder"))?;
         let port_output_count = ui_node.ui_output_port_count();
         let children = viewer_node.children_local();
-        let snarl_parent = self.get_snarl_id(node_id)?;
+        let snarl_parent = self.get_node_snarl_id(node_id)?;
 
         let mut v = vec![];
         for (i, conn) in children.iter().enumerate() {
@@ -497,7 +513,7 @@ impl BetulaViewer {
                 output: port_id,
             };
             if let Some(child_node) = conn {
-                let snarl_child = self.get_snarl_id(*child_node)?;
+                let snarl_child = self.get_node_snarl_id(*child_node)?;
                 let to = InPinId {
                     node: snarl_child,
                     input: 0,
@@ -593,6 +609,7 @@ impl BetulaViewer {
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::AddBlackboard;
         use betula_common::control::InteractionCommand::RemoveNode;
+        use betula_common::control::InteractionEvent::BlackboardInformation;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
 
@@ -632,22 +649,50 @@ impl BetulaViewer {
                         // Todo: just this node instead of all of them.
                         self.update_snarl_dirty_nodes(snarl)?;
                     }
-                    CommandResult(c) => match c.command {
-                        RemoveNode(node_id) => {
-                            let snarl_id = self.remove_betula_id(node_id)?;
-                            snarl.remove_node(snarl_id);
-                        }
-                        AddBlackboard(blackboard_id) => {
-                            if let Some(failure_reason) = c.error {
-                                // Yikes, it failed, lets clean up the mess and remove the node.
-                                let ids = self.remove_blackboard_id(blackboard_id)?;
-                                for snarl_id in ids {
-                                    snarl.remove_node(snarl_id);
+                    BlackboardInformation(v) => {
+                        if let Some(v) = self.blackboards.get_mut(&v.id) {
+                            // do update things.
+                            let _ = v;
+                        } else {
+                            let blackboard = self
+                                .ui_support
+                                .create_blackboard()
+                                .ok_or(format!("could not create blackboard"))?;
+                            let rc = Rc::new(RefCell::new(BlackboardInfoContainer {
+                                id: v.id,
+                                blackboard,
+                            }));
+                            let cloned_rc = Rc::clone(&rc);
+                            self.blackboards.insert(v.id, cloned_rc);
+                            // Add the reference to any nodes with this id.
+                            let snarl_ids = self.get_blackboard_snarl_ids(v.id)?;
+                            for id in snarl_ids {
+                                let cloned_rc = Rc::clone(&rc);
+                                if let BetulaViewerNode::Blackboard(bb) = &mut snarl[id] {
+                                    bb.info = Some(cloned_rc);
                                 }
                             }
                         }
-                        _ => {}
-                    },
+                    }
+                    CommandResult(c) => {
+                        match c.command {
+                            RemoveNode(node_id) => {
+                                let snarl_id = self.remove_betula_id(node_id)?;
+                                snarl.remove_node(snarl_id);
+                            }
+                            AddBlackboard(blackboard_id) => {
+                                if let Some(failure_reason) = c.error {
+                                    // Yikes, it failed, lets clean up the mess and remove the node.
+                                    println!("Failed to create blackboard: {failure_reason}, cleaning up.");
+                                    let ids = self.remove_blackboard_id(blackboard_id)?;
+                                    for snarl_id in ids {
+                                        snarl.remove_node(snarl_id);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             } else {
                 break;
@@ -698,8 +743,8 @@ impl BetulaViewer {
         let ui_node = viewer_node.ui_node.as_mut().unwrap();
         let port_output_count = ui_node.ui_output_port_count();
         let output_port = port_output_count + position;
-        let from_snarl_id = self.get_snarl_id(parent)?;
-        let to_snarl_id = self.get_snarl_id(child)?;
+        let from_snarl_id = self.get_node_snarl_id(parent)?;
+        let to_snarl_id = self.get_node_snarl_id(child)?;
         let from = snarl.out_pin(egui_snarl::OutPinId {
             node: from_snarl_id,
             output: output_port,
@@ -726,7 +771,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
             BetulaViewerNode::Blackboard(bb) => {
                 // Grab the type support for this node.
-                if let Some(_blackboard) = &bb.blackboard_ref() {
+                if bb.info().is_some() {
                     "Blackboard".to_owned()
                 } else {
                     "Pending...".to_owned()

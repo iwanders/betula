@@ -2,7 +2,7 @@ use betula_common::TreeSupport;
 use egui::Ui;
 use std::collections::HashMap;
 
-use betula_core::{BetulaError, Node, NodeType, Port, PortDirection};
+use betula_core::{BetulaError, Blackboard, Node, NodeType, Port, PortDirection};
 
 #[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
 pub enum UiConfigResponse {
@@ -119,6 +119,17 @@ impl UiSupport {
     ) {
         self.tree.add_node_default_with_config::<N, C>();
         self.add_node_default::<N>();
+    }
+
+    pub fn set_blackboard_factory(
+        &mut self,
+        blackboard_factory: betula_common::tree_support::BlackboardFactory,
+    ) {
+        self.tree.set_blackboard_factory(blackboard_factory);
+    }
+
+    pub fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
+        self.tree.create_blackboard()
     }
 
     pub fn node_types(&self) -> Vec<NodeType> {

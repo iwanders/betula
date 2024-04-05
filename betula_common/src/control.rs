@@ -187,10 +187,13 @@ impl InteractionCommand {
                     .create_blackboard()
                     .ok_or(format!("cannot create blackboard, no factory"))?;
                 tree.add_blackboard_boxed(*v, blackboard)?;
-                Ok(vec![InteractionEvent::CommandResult(CommandResult {
-                    command: self.clone(),
-                    error: None,
-                })])
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::BlackboardInformation(BlackboardInformation { id: *v }),
+                ])
             }
             InteractionCommand::SetConfig(config_cmd) => {
                 // get the node
@@ -249,6 +252,13 @@ pub struct NodeInformationEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BlackboardInformation {
+    pub id: BlackboardId,
+    // pub config: Option<SerializedConfig>,
+    // pub children: Vec<NodeId>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CommandResult {
     pub command: InteractionCommand,
     pub error: Option<String>,
@@ -257,7 +267,7 @@ pub struct CommandResult {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionEvent {
     CommandResult(CommandResult),
-    // BlackboardChange(BlackboardValueEvent),
+    BlackboardInformation(BlackboardInformation),
     // ExecutionResult(ExecutionResult),
     NodeInformation(NodeInformationEvent),
 }
