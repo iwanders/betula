@@ -440,6 +440,9 @@ impl PortConnection {
     pub fn new(node: NodePort, blackboard: BlackboardPort) -> Self {
         Self { node, blackboard }
     }
+    pub fn blackboard_id(&self) -> BlackboardId {
+        self.blackboard.blackboard
+    }
 }
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]

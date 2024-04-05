@@ -1,4 +1,6 @@
-use betula_core::{BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortName};
+use betula_core::{
+    BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortConnection, PortName,
+};
 
 use crate::{tree_support::SerializedConfig, tree_support::SerializedValue};
 
@@ -78,7 +80,8 @@ pub enum InteractionCommand {
 
     SetConfig(SetConfigCommand),
 
-    // RequestNodes,
+    ConnectPort(PortConnection),
+
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
     #[serde(skip)]
@@ -120,7 +123,7 @@ impl InteractionCommand {
         tree_support: &TreeSupport,
         node_id: NodeId,
         tree: &mut dyn Tree,
-    ) -> Result<NodeInformationEvent, BetulaError> {
+    ) -> Result<NodeInformation, BetulaError> {
         let node = tree
             .node_mut(node_id)
             .ok_or(format!("cannot find {node_id:?}"))?;
@@ -132,11 +135,29 @@ impl InteractionCommand {
             None
         };
         let children = tree.children(node_id)?;
-        Ok(NodeInformationEvent {
+        Ok(NodeInformation {
             id: node_id,
             node_type,
             config,
             children,
+        })
+    }
+
+    fn blackboard_information(
+        tree_support: &TreeSupport,
+        blackboard_id: BlackboardId,
+        tree: &mut dyn Tree,
+    ) -> Result<BlackboardInformation, BetulaError> {
+        let _ = tree_support;
+        let bb = tree
+            .blackboard_mut(blackboard_id)
+            .ok_or(format!("cannot find {blackboard_id:?}"))?;
+        let ports = bb.ports();
+        let connections = tree.blackboard_connections(blackboard_id);
+        Ok(BlackboardInformation {
+            id: blackboard_id,
+            ports,
+            connections,
         })
     }
 
@@ -192,7 +213,25 @@ impl InteractionCommand {
                         command: self.clone(),
                         error: None,
                     }),
-                    InteractionEvent::BlackboardInformation(BlackboardInformation { id: *v }),
+                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
+                        tree_support,
+                        *v,
+                        tree,
+                    )?),
+                ])
+            }
+            InteractionCommand::ConnectPort(port_connection) => {
+                tree.connect_port(port_connection)?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
+                        tree_support,
+                        port_connection.blackboard_id(),
+                        tree,
+                    )?),
                 ])
             }
             InteractionCommand::SetConfig(config_cmd) => {
@@ -244,7 +283,7 @@ pub struct ExecutionResult {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct NodeInformationEvent {
+pub struct NodeInformation {
     pub id: NodeId,
     pub node_type: NodeType,
     pub config: Option<SerializedConfig>,
@@ -254,8 +293,8 @@ pub struct NodeInformationEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlackboardInformation {
     pub id: BlackboardId,
-    // pub config: Option<SerializedConfig>,
-    // pub children: Vec<NodeId>,
+    pub ports: Vec<PortName>,
+    pub connections: Vec<PortConnection>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -269,7 +308,7 @@ pub enum InteractionEvent {
     CommandResult(CommandResult),
     BlackboardInformation(BlackboardInformation),
     // ExecutionResult(ExecutionResult),
-    NodeInformation(NodeInformationEvent),
+    NodeInformation(NodeInformation),
 }
 
 //------------------------------------------------------------------------
