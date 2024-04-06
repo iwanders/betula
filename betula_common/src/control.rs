@@ -103,6 +103,9 @@ impl InteractionCommand {
     pub fn remove_node(id: NodeId) -> Self {
         InteractionCommand::RemoveNode(id)
     }
+    pub fn connect_port(port_connection: PortConnection) -> Self {
+        InteractionCommand::ConnectPort(port_connection)
+    }
 
     pub fn set_children(parent: NodeId, children: Vec<NodeId>) -> Self {
         InteractionCommand::SetChildren(SetChildren { parent, children })
