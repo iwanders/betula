@@ -393,6 +393,10 @@ impl BlackboardData {
         let additions = self.connections_local.difference(&self.connections_remote);
         additions.cloned().collect()
     }
+    pub fn local_disconnected_ports(&self) -> Vec<PortConnection> {
+        let removals = self.connections_remote.difference(&self.connections_local);
+        removals.cloned().collect()
+    }
     pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) {
         self.connections_remote = new_remote.iter().cloned().collect();
     }
@@ -620,9 +624,13 @@ impl BetulaViewer {
             let blackboard = blackboard.borrow();
             if !blackboard.is_up_to_date() {
                 let connect_ports = blackboard.local_connected_ports();
-                // let disconnect_ports = blackboard.local_disconnected_ports();
                 for connect_port in connect_ports {
                     let cmd = InteractionCommand::connect_port(connect_port);
+                    self.client.send_command(cmd)?;
+                }
+                let disconnect_ports = blackboard.local_disconnected_ports();
+                for disconnect_port in disconnect_ports {
+                    let cmd = InteractionCommand::disconnect_port(disconnect_port);
                     self.client.send_command(cmd)?;
                 }
             }

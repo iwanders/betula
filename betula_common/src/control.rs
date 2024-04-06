@@ -81,6 +81,7 @@ pub enum InteractionCommand {
     SetConfig(SetConfigCommand),
 
     ConnectPort(PortConnection),
+    DisconnectPort(PortConnection),
 
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
@@ -105,6 +106,9 @@ impl InteractionCommand {
     }
     pub fn connect_port(port_connection: PortConnection) -> Self {
         InteractionCommand::ConnectPort(port_connection)
+    }
+    pub fn disconnect_port(port_connection: PortConnection) -> Self {
+        InteractionCommand::DisconnectPort(port_connection)
     }
 
     pub fn set_children(parent: NodeId, children: Vec<NodeId>) -> Self {
@@ -225,6 +229,20 @@ impl InteractionCommand {
             }
             InteractionCommand::ConnectPort(port_connection) => {
                 tree.connect_port(port_connection)?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
+                        tree_support,
+                        port_connection.blackboard_id(),
+                        tree,
+                    )?),
+                ])
+            }
+            InteractionCommand::DisconnectPort(port_connection) => {
+                tree.disconnect_port(port_connection)?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
                         command: self.clone(),
