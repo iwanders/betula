@@ -154,7 +154,7 @@ impl<T: DefaultValueRequirements> ValueConverter for DefaultValueConverter<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use betula_core::{NodeError, NodeType};
+    use betula_core::{as_any::AsAnyHelper, NodeError, NodeType};
     use serde::Deserialize;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -1,5 +1,5 @@
 use betula_core::prelude::*;
-use betula_core::{BetulaError, Blackboard, Node, NodeConfig, NodeType};
+use betula_core::{blackboard::Chalkable, BetulaError, Blackboard, Node, NodeConfig, NodeType};
 use serde::{Deserialize, Serialize};
 
 use crate::type_support::{
@@ -271,24 +271,13 @@ impl TreeSupport {
                     "could not get value for {port:?}"
                 )))?;
 
-                let value_type = (*value).as_any_type_id();
+                let value = self.value_serialize(&*value).map_err(|e| {
+                    S::Error::custom(format!("failed to serialize {value:?}: {e:?}"))
+                })?;
 
-                let converter =
-                    self.value_support
-                        .get(&value_type)
-                        .ok_or(S::Error::custom(format!(
-                            "could not get converter for {:?}",
-                            (*value).as_any_type_name()
-                        )))?;
-
-                let serialize_erased = converter
-                    .value_converter
-                    .value_serialize(&*value)
-                    .map_err(|e| S::Error::custom(format!("failed with {e}")))?;
                 let t = TypedValue {
-                    type_id: converter.name.clone(),
-                    data: serde_json::to_value(serialize_erased)
-                        .map_err(|e| S::Error::custom(format!("json serialize error {e:?}")))?,
+                    type_id: value.type_id,
+                    data: value.data,
                 };
                 values.insert(port, t);
             }
@@ -319,7 +308,7 @@ impl TreeSupport {
         tree: &mut dyn Tree,
         deserializer: D,
     ) -> Result<(), D::Error> {
-        use betula_core::{blackboard::Chalkable, BlackboardId, PortConnection, PortName};
+        use betula_core::{BlackboardId, PortConnection, PortName};
         use serde::de::Error;
         let config: Config = Config::deserialize(deserializer)?;
 
@@ -373,20 +362,13 @@ impl TreeSupport {
                         values: Default::default(),
                     };
                     for (k, v) in blackboard.values {
-                        let v1::TypedValue { type_id, data } = v;
-                        let support =
-                            self.get_value_type_support(&type_id)
-                                .ok_or(D::Error::custom(format!(
-                                    "could not get value support for {type_id:?}"
-                                )))?;
-                        // Now, convert it to the boxed value.
-                        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(data));
-                        let boxed_value = support
-                            .value_converter
-                            .value_deserialize(&mut erased)
-                            .map_err(|e| {
-                                D::Error::custom(format!("failed deserialize value {e:?}"))
-                            })?;
+                        let v = SerializedValue {
+                            type_id: v.type_id,
+                            data: v.data,
+                        };
+                        let boxed_value = self.value_deserialize(v.clone()).map_err(|e| {
+                            D::Error::custom(format!("failed to deserialize {v:?}: {e:?}"))
+                        })?;
                         deserialized_bb.values.insert(k.clone(), boxed_value);
                     }
                     blackboards.push(deserialized_bb);
@@ -469,6 +451,37 @@ impl TreeSupport {
         let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(config.data));
         Ok(converter.config_deserialize(&mut erased)?)
     }
+
+    pub fn value_serialize(&self, value: &dyn Chalkable) -> Result<SerializedValue, BetulaError> {
+        let value_type = (*value).as_any_type_id();
+        let converter = self.value_support.get(&value_type).ok_or(format!(
+            "could not get converter for {:?}",
+            (*value).as_any_type_name()
+        ))?;
+
+        let serialize_erased = converter
+            .value_converter
+            .value_serialize(&*value)
+            .map_err(|e| format!("failed with {e}"))?;
+        Ok(SerializedValue {
+            type_id: converter.name.clone(),
+            data: serde_json::to_value(serialize_erased)
+                .map_err(|e| format!("json serialize error {e:?}"))?,
+        })
+    }
+    pub fn value_deserialize(
+        &self,
+        value: SerializedValue,
+    ) -> Result<Box<dyn Chalkable>, BetulaError> {
+        let support = self.get_value_type_support(&value.type_id).ok_or(format!(
+            "could not get value support for {:?}",
+            value.type_id
+        ))?;
+        // Now, convert it to the boxed value.
+        let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(value.data));
+        let boxed_value = support.value_converter.value_deserialize(&mut erased)?;
+        Ok(boxed_value)
+    }
 }
 
 pub struct TreeSerializer<'a, 'b> {
@@ -499,7 +512,7 @@ mod test {
     use super::*;
     use betula_core::basic::{BasicBlackboard, BasicTree};
     use betula_core::nodes::{FailureNode, SelectorNode, SuccessNode};
-    use betula_core::{BlackboardId, NodeId};
+    use betula_core::{as_any::AsAnyHelper, BlackboardId, NodeId};
     use uuid::Uuid;
     #[test]
     fn test_config() -> Result<(), BetulaError> {

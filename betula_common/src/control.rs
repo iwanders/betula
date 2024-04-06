@@ -160,10 +160,18 @@ impl InteractionCommand {
             .blackboard_mut(blackboard_id)
             .ok_or(format!("cannot find {blackboard_id:?}"))?;
         let ports = bb.ports();
+        let mut port_values = std::collections::BTreeMap::default();
+        for port in ports.iter() {
+            let serialized_value = tree_support.value_serialize(
+                &*bb.get(port)
+                    .ok_or(format!("could not get value for {port:?}"))?,
+            );
+            port_values.insert(port.clone(), serialized_value?);
+        }
         let connections = tree.blackboard_connections(blackboard_id);
         Ok(BlackboardInformation {
             id: blackboard_id,
-            ports,
+            port_values,
             connections,
         })
     }
@@ -314,8 +322,8 @@ pub struct NodeInformation {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlackboardInformation {
     pub id: BlackboardId,
-    pub ports: Vec<PortName>,
     pub connections: Vec<PortConnection>,
+    pub port_values: std::collections::BTreeMap<PortName, SerializedValue>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
