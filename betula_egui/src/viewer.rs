@@ -314,8 +314,6 @@ pub struct ViewerId(pub Uuid);
 pub struct ViewerBlackboard {
     id: BlackboardId,
 
-    viewer_id: ViewerId,
-
     #[serde(skip)]
     data: Option<BlackboardDataRc>,
 
@@ -330,7 +328,6 @@ impl ViewerBlackboard {
     pub fn new(id: BlackboardId) -> Self {
         Self {
             id,
-            viewer_id: ViewerId(Uuid::new_v4()),
             data: None,
             is_dirty: false,
             visible_ports: None,
@@ -579,24 +576,20 @@ impl BetulaViewer {
 
     fn get_blackboard_snarl_connections(
         &self,
-        blackboard_id: &BlackboardId,
         bb_snarl: SnarlNodeId,
         snarl: &Snarl<BetulaViewerNode>,
     ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
         let connections = {
-            if let BetulaViewerNode::Blackboard(bb) = &snarl[bb_snarl] {
-                if let Some(data) = bb.data() {
-                    let connections = data.connections().into_iter().filter(|z| {
-                        if let Some(visible) = &bb.visible_ports {
-                            visible.contains(&z.blackboard.name())
-                        } else {
-                            true
-                        }
-                    });
-                    Ok(connections.collect::<Vec<_>>())
-                } else {
-                    Err(format!("could not find blackboard"))
-                }
+            let bb = self.get_blackboard_ref_snarl(bb_snarl, snarl)?;
+            if let Some(data) = bb.data() {
+                let connections = data.connections().into_iter().filter(|z| {
+                    if let Some(visible) = &bb.visible_ports {
+                        visible.contains(&z.blackboard.name())
+                    } else {
+                        true
+                    }
+                });
+                Ok(connections.collect::<Vec<_>>())
             } else {
                 Err(format!("could not find blackboard"))
             }
@@ -848,11 +841,7 @@ impl BetulaViewer {
         snarl_id: SnarlNodeId,
         snarl: &Snarl<BetulaViewerNode>,
     ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
-        if let BetulaViewerNode::Blackboard(bb) = &snarl[snarl_id] {
-            Ok(self.get_blackboard_snarl_connections(&bb.id, snarl_id, snarl)?)
-        } else {
-            Ok(vec![])
-        }
+        self.get_blackboard_snarl_connections(snarl_id, snarl)
     }
 
     /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
