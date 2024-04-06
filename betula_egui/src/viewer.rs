@@ -305,7 +305,7 @@ pub struct ViewerBlackboard {
     viewer_id: ViewerId,
 
     #[serde(skip)]
-    data: Option<BlackboardInfo>,
+    data: Option<BlackboardDataRc>,
 
     #[serde(skip)]
     is_dirty: bool,
@@ -334,10 +334,57 @@ impl ViewerBlackboard {
     }
 
     pub fn inputs(&self) -> usize {
-        1
+        let z = self
+            .visible_ports
+            .as_ref()
+            .map(|z| z.len())
+            .unwrap_or_else(|| {
+                self.data
+                    .as_ref()
+                    .map(|d| d.as_ref().borrow().ports().len())
+                    .unwrap_or(0)
+            })
+            + 1;
+        println!("z: {z:?}");
+        z
     }
+
     pub fn outputs(&self) -> usize {
-        1
+        self.visible_ports
+            .as_ref()
+            .map(|z| z.len())
+            .unwrap_or_else(|| {
+                self.data
+                    .as_ref()
+                    .map(|d| d.as_ref().borrow().ports().len())
+                    .unwrap_or(0)
+            })
+            + 1
+    }
+
+    fn port_name(&self, id: usize) -> Option<PortName> {
+        self.visible_ports
+            .as_ref()
+            .map(|z| z.get(id).cloned())
+            .unwrap_or_else(|| {
+                self.data
+                    .as_ref()
+                    .map(|d| d.as_ref().borrow().ports().get(id).cloned())
+                    .flatten()
+            })
+    }
+
+    pub fn ui_show_input(&self, input: &InPinId, ui: &mut Ui) -> PinInfo {
+        if let Some(name) = self.port_name(input.input) {
+            println!("input name: {name:?}");
+            ui.label(format!("{:?}", name));
+            PinInfo::circle().with_fill(BLACKBOARD_COLOR)
+        } else {
+            PinInfo::circle()
+                .with_fill(BLACKBOARD_COLOR)
+                .wiring()
+                .with_gamma(0.5)
+        }
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -374,11 +421,11 @@ pub enum BetulaViewerNode {
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
-type BlackboardInfo = Rc<RefCell<BlackboardData>>;
+type BlackboardDataRc = Rc<RefCell<BlackboardData>>;
 
 #[derive(Debug)]
 pub struct BlackboardData {
-    id: BlackboardId,
+    // id: BlackboardId,
     blackboard: Box<dyn Blackboard>,
     connections_local: std::collections::BTreeSet<PortConnection>,
     connections_remote: std::collections::BTreeSet<PortConnection>,
@@ -400,6 +447,9 @@ impl BlackboardData {
     pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) {
         self.connections_remote = new_remote.iter().cloned().collect();
     }
+    pub fn ports(&self) -> Vec<PortName> {
+        self.blackboard.ports()
+    }
 }
 
 pub struct BetulaViewer {
@@ -416,7 +466,7 @@ pub struct BetulaViewer {
     ui_support: UiSupport,
 
     /// The actual blackboards.
-    blackboards: HashMap<BlackboardId, BlackboardInfo>,
+    blackboards: HashMap<BlackboardId, BlackboardDataRc>,
 
     // / Mapping between blackboards and snarl ids.
     blackboard_map: HashMap<BlackboardId, HashSet<SnarlNodeId>>,
@@ -678,7 +728,7 @@ impl BetulaViewer {
         &mut self,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
-        // todo!();
+        let _ = snarl;
         Ok(())
     }
 
@@ -768,7 +818,7 @@ impl BetulaViewer {
                                 .create_blackboard()
                                 .ok_or(format!("could not create blackboard"))?;
                             let rc = Rc::new(RefCell::new(BlackboardData {
-                                id: v.id,
+                                // id: v.id,
                                 blackboard,
                                 connections_remote: v.connections.iter().cloned().collect(),
                                 connections_local: v.connections.iter().cloned().collect(),
@@ -783,6 +833,7 @@ impl BetulaViewer {
                                     bb.data = Some(cloned_rc);
                                 }
                             }
+                            // The actual blackboard doesn't have the ports right now.
                         }
                     }
                     CommandResult(c) => {
@@ -1092,7 +1143,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 }
             }
-            BetulaViewerNode::Blackboard(ref bb) => {
+            BetulaViewerNode::Blackboard(ref _bb) => {
                 if pin.remotes.is_empty() {
                     PinInfo::circle()
                         .with_fill(BLACKBOARD_COLOR)
@@ -1161,16 +1212,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 }
             }
-            BetulaViewerNode::Blackboard(ref bb) => {
-                if pin.remotes.is_empty() {
-                    PinInfo::circle()
-                        .with_fill(BLACKBOARD_COLOR)
-                        .wiring()
-                        .with_gamma(0.5)
-                } else {
-                    PinInfo::circle().with_fill(BLACKBOARD_COLOR).wiring()
-                }
-            }
+            BetulaViewerNode::Blackboard(ref bb) => bb.ui_show_input(&pin.id, ui),
         }
     }
 

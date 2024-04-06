@@ -159,15 +159,7 @@ impl InteractionCommand {
         let bb = tree
             .blackboard_mut(blackboard_id)
             .ok_or(format!("cannot find {blackboard_id:?}"))?;
-        let ports = bb.ports();
-        let mut port_values = std::collections::BTreeMap::default();
-        for port in ports.iter() {
-            let serialized_value = tree_support.value_serialize(
-                &*bb.get(port)
-                    .ok_or(format!("could not get value for {port:?}"))?,
-            );
-            port_values.insert(port.clone(), serialized_value?);
-        }
+        let port_values = tree_support.blackboard_value_serialize(&*bb)?;
         let connections = tree.blackboard_connections(blackboard_id);
         Ok(BlackboardInformation {
             id: blackboard_id,

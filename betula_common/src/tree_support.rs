@@ -1,5 +1,7 @@
 use betula_core::prelude::*;
-use betula_core::{blackboard::Chalkable, BetulaError, Blackboard, Node, NodeConfig, NodeType};
+use betula_core::{
+    blackboard::Chalkable, BetulaError, Blackboard, Node, NodeConfig, NodeType, PortName,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::type_support::{
@@ -33,8 +35,11 @@ pub struct SerializedValue {
     data: SerializableHolder,
 }
 
+use std::collections::BTreeMap;
+pub type SerializedBlackboardValues = BTreeMap<PortName, SerializedValue>;
+
 mod v1 {
-    use super::SerializableHolder;
+    use super::{SerializableHolder, SerializedValue};
     use betula_core::{BlackboardId, NodeId, PortConnection, PortName};
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
@@ -56,7 +61,7 @@ mod v1 {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Blackboard {
         pub id: BlackboardId,
-        pub values: BTreeMap<PortName, TypedValue>,
+        pub values: BTreeMap<PortName, SerializedValue>,
         pub connections: Vec<PortConnection>,
     }
 
@@ -212,7 +217,6 @@ impl TreeSupport {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         let mut nodes = vec![];
-        use betula_core::PortName;
         use serde::ser::Error;
         use v1::*;
 
@@ -265,22 +269,9 @@ impl TreeSupport {
             let blackboard = blackboard.borrow();
 
             // Collect the values.
-            let mut values: std::collections::BTreeMap<PortName, TypedValue> = Default::default();
-            for port in blackboard.ports() {
-                let value = blackboard.get(&port).ok_or(S::Error::custom(format!(
-                    "could not get value for {port:?}"
-                )))?;
-
-                let value = self.value_serialize(&*value).map_err(|e| {
-                    S::Error::custom(format!("failed to serialize {value:?}: {e:?}"))
-                })?;
-
-                let t = TypedValue {
-                    type_id: value.type_id,
-                    data: value.data,
-                };
-                values.insert(port, t);
-            }
+            let values = self
+                .blackboard_value_serialize(&**blackboard)
+                .map_err(|e| S::Error::custom(format!("failed to serialize blackbard: {e:?}")))?;
 
             let b = Blackboard {
                 id,
@@ -308,7 +299,7 @@ impl TreeSupport {
         tree: &mut dyn Tree,
         deserializer: D,
     ) -> Result<(), D::Error> {
-        use betula_core::{BlackboardId, PortConnection, PortName};
+        use betula_core::{BlackboardId, PortConnection};
         use serde::de::Error;
         let config: Config = Config::deserialize(deserializer)?;
 
@@ -362,10 +353,6 @@ impl TreeSupport {
                         values: Default::default(),
                     };
                     for (k, v) in blackboard.values {
-                        let v = SerializedValue {
-                            type_id: v.type_id,
-                            data: v.data,
-                        };
                         let boxed_value = self.value_deserialize(v.clone()).map_err(|e| {
                             D::Error::custom(format!("failed to deserialize {v:?}: {e:?}"))
                         })?;
@@ -469,6 +456,7 @@ impl TreeSupport {
                 .map_err(|e| format!("json serialize error {e:?}"))?,
         })
     }
+
     pub fn value_deserialize(
         &self,
         value: SerializedValue,
@@ -481,6 +469,22 @@ impl TreeSupport {
         let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(value.data));
         let boxed_value = support.value_converter.value_deserialize(&mut erased)?;
         Ok(boxed_value)
+    }
+
+    pub fn blackboard_value_serialize(
+        &self,
+        blackboard: &dyn Blackboard,
+    ) -> Result<SerializedBlackboardValues, BetulaError> {
+        let mut values: SerializedBlackboardValues = Default::default();
+        for port in blackboard.ports() {
+            let value = blackboard
+                .get(&port)
+                .ok_or(format!("could not get value for {port:?}"))?;
+
+            let value = self.value_serialize(&*value)?;
+            values.insert(port, value);
+        }
+        Ok(values)
     }
 }
 
