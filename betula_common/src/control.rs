@@ -2,7 +2,10 @@ use betula_core::{
     BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortConnection, PortName,
 };
 
-use crate::{tree_support::SerializedConfig, tree_support::SerializedValue};
+use crate::{
+    tree_support::SerializedBlackboardValues, tree_support::SerializedConfig,
+    tree_support::SerializedValue,
+};
 
 use serde::{Deserialize, Serialize};
 // we want asynchronous control & interaction with the tree.
@@ -311,11 +314,12 @@ pub struct NodeInformation {
     pub children: Vec<NodeId>,
 }
 
+// pub type BlackboardMap
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlackboardInformation {
     pub id: BlackboardId,
     pub connections: Vec<PortConnection>,
-    pub port_values: std::collections::BTreeMap<PortName, SerializedValue>,
+    pub port_values: SerializedBlackboardValues,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

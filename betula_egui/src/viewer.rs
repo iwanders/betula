@@ -52,12 +52,12 @@ For nodes:
         Ports are the remainder.
 */
 
-use crate::{UiConfigResponse, UiNode, UiSupport};
+use crate::{UiConfigResponse, UiNode, UiSupport, UiValue};
 use egui::{Color32, Ui};
 
 use betula_core::{
-    BetulaError, Blackboard, BlackboardId, BlackboardPort, NodeId as BetulaNodeId, NodePort,
-    NodeType, PortConnection, PortName,
+    BetulaError, BlackboardId, BlackboardPort, NodeId as BetulaNodeId, NodePort, NodeType,
+    PortConnection, PortName,
 };
 
 use betula_common::control::InteractionCommand;
@@ -334,8 +334,7 @@ impl ViewerBlackboard {
     }
 
     pub fn inputs(&self) -> usize {
-        let z = self
-            .visible_ports
+        self.visible_ports
             .as_ref()
             .map(|z| z.len())
             .unwrap_or_else(|| {
@@ -344,9 +343,7 @@ impl ViewerBlackboard {
                     .map(|d| d.as_ref().borrow().ports().len())
                     .unwrap_or(0)
             })
-            + 1;
-        println!("z: {z:?}");
-        z
+            + 1
     }
 
     pub fn outputs(&self) -> usize {
@@ -374,10 +371,11 @@ impl ViewerBlackboard {
             })
     }
 
-    pub fn ui_show_input(&self, input: &InPinId, ui: &mut Ui) -> PinInfo {
+    pub fn ui_show_input(&self, input: &InPinId, ui: &mut Ui, scale: f32) -> PinInfo {
         if let Some(name) = self.port_name(input.input) {
-            println!("input name: {name:?}");
-            ui.label(format!("{:?}", name));
+            if let Some(data) = self.data.as_ref() {
+                data.borrow_mut().ui_show_input(&name, ui, scale);
+            }
             PinInfo::circle().with_fill(BLACKBOARD_COLOR)
         } else {
             PinInfo::circle()
@@ -425,8 +423,7 @@ type BlackboardDataRc = Rc<RefCell<BlackboardData>>;
 
 #[derive(Debug)]
 pub struct BlackboardData {
-    // id: BlackboardId,
-    blackboard: Box<dyn Blackboard>,
+    ui_values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>,
     connections_local: std::collections::BTreeSet<PortConnection>,
     connections_remote: std::collections::BTreeSet<PortConnection>,
 }
@@ -447,8 +444,16 @@ impl BlackboardData {
     pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) {
         self.connections_remote = new_remote.iter().cloned().collect();
     }
+    pub fn set_values(&mut self, values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>) {
+        self.ui_values = values;
+    }
     pub fn ports(&self) -> Vec<PortName> {
-        self.blackboard.ports()
+        self.ui_values.keys().cloned().collect()
+    }
+    pub fn ui_show_input(&mut self, port: &PortName, ui: &mut Ui, scale: f32) {
+        if let Some(ui_value) = self.ui_values.get_mut(port) {
+            ui_value.ui(ui, scale);
+        }
     }
 }
 
@@ -812,14 +817,13 @@ impl BetulaViewer {
                         if let Some(bb) = self.blackboards.get(&v.id) {
                             // do update things.
                             (*bb).borrow_mut().set_connections_remote(&v.connections);
+                            let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
+                            (*bb).borrow_mut().set_values(ui_values);
                         } else {
-                            let blackboard = self
-                                .ui_support
-                                .create_blackboard()
-                                .ok_or(format!("could not create blackboard"))?;
+                            // Convert the values.
+                            let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
                             let rc = Rc::new(RefCell::new(BlackboardData {
-                                // id: v.id,
-                                blackboard,
+                                ui_values,
                                 connections_remote: v.connections.iter().cloned().collect(),
                                 connections_local: v.connections.iter().cloned().collect(),
                             }));
@@ -1184,7 +1188,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         &mut self,
         pin: &InPin,
         ui: &mut Ui,
-        _: f32,
+        scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
         match snarl[pin.id.node] {
@@ -1212,7 +1216,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 }
             }
-            BetulaViewerNode::Blackboard(ref bb) => bb.ui_show_input(&pin.id, ui),
+            BetulaViewerNode::Blackboard(ref bb) => bb.ui_show_input(&pin.id, ui, scale),
         }
     }
 

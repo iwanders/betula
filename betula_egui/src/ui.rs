@@ -1,8 +1,14 @@
-use betula_common::TreeSupport;
+use betula_common::{
+    tree_support::SerializedBlackboardValues, tree_support::SerializedValue, TreeSupport,
+};
 use egui::Ui;
 use std::collections::HashMap;
 
-use betula_core::{BetulaError, Blackboard, Node, NodeType, Port, PortDirection};
+use betula_core::{
+    blackboard::Chalkable, BetulaError, Node, NodeType, Port, PortDirection, PortName,
+};
+
+use std::collections::BTreeMap;
 
 #[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
 pub enum UiConfigResponse {
@@ -78,14 +84,59 @@ pub struct UiNodeSupport {
     pub node_factory: UiNodeFactory,
 }
 
+type UiValueFactory =
+    Box<dyn Fn(&TreeSupport, SerializedValue) -> Result<Box<dyn UiValue>, BetulaError>>;
+pub struct UiValueSupport {
+    pub type_id: String,
+    pub value_factory: UiValueFactory,
+}
+
+pub trait UiValue: std::fmt::Debug {
+    /// Function to render the ui, responds whether changes were made.
+    fn ui(&mut self, _ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+        UiConfigResponse::UnChanged
+    }
+
+    fn value(&self) -> Box<dyn Chalkable>;
+
+    fn value_type(&self) -> String;
+
+    fn static_type() -> String
+    where
+        Self: Sized;
+}
+
+#[derive(Debug)]
+struct DefaultUiValueHandler<T: Chalkable + std::fmt::Debug> {
+    data: T,
+}
+impl<T: Chalkable + std::fmt::Debug + Clone + 'static> UiValue for DefaultUiValueHandler<T> {
+    fn ui(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+        ui.label(format!("{:?}", self.data));
+        UiConfigResponse::UnChanged
+    }
+    fn value(&self) -> Box<dyn Chalkable> {
+        Box::new(self.data.clone())
+    }
+    fn value_type(&self) -> String {
+        Self::static_type()
+    }
+    fn static_type() -> String {
+        std::any::type_name::<T>().to_owned()
+    }
+}
+
 pub struct UiSupport {
-    ui: HashMap<NodeType, UiNodeSupport>,
+    ui_node: HashMap<NodeType, UiNodeSupport>,
+    ui_value: HashMap<String, UiValueSupport>,
     tree: TreeSupport,
 }
+
 impl UiSupport {
     pub fn new() -> Self {
         Self {
-            ui: Default::default(),
+            ui_value: Default::default(),
+            ui_node: Default::default(),
             tree: Default::default(),
         }
     }
@@ -94,8 +145,11 @@ impl UiSupport {
         &self.tree
     }
 
-    pub fn ui_support(&self, node_type: &NodeType) -> Option<&UiNodeSupport> {
-        self.ui.get(node_type)
+    pub fn node_support(&self, node_type: &NodeType) -> Option<&UiNodeSupport> {
+        self.ui_node.get(node_type)
+    }
+    pub fn value_support(&self, value_type: &str) -> Option<&UiValueSupport> {
+        self.ui_value.get(value_type)
     }
 
     pub fn add_node_default<
@@ -108,7 +162,7 @@ impl UiSupport {
             display_name: T::static_type().0.clone(),
             node_factory: Box::new(|| Box::new(T::default())),
         };
-        self.ui.insert(T::static_type(), ui_support);
+        self.ui_node.insert(T::static_type(), ui_support);
     }
 
     pub fn add_node_default_with_config<
@@ -121,23 +175,41 @@ impl UiSupport {
         self.add_node_default::<N>();
     }
 
-    pub fn set_blackboard_factory(
-        &mut self,
-        blackboard_factory: betula_common::tree_support::BlackboardFactory,
-    ) {
+    pub fn add_value_default<V: betula_common::type_support::DefaultValueRequirements>(&mut self) {
+        self.tree.add_value_default::<V>();
+        use betula_core::as_any::AsAnyHelper;
+        let name = std::any::type_name::<V>().to_owned();
+        let name_for_closure = name.clone();
+        let value_support = UiValueSupport {
+            type_id: name.clone(),
+            value_factory: Box::new(move |tree_support: &TreeSupport, v: SerializedValue| {
+                let z = tree_support.value_deserialize(v.clone())?;
+                if let Some(v) = (*z).downcast_ref::<V>() {
+                    Ok(Box::new(DefaultUiValueHandler::<V> { data: v.clone() }))
+                } else {
+                    Err(format!("failed to downcast {v:?} to {name_for_closure:?}").into())
+                }
+            }),
+        };
+        self.ui_value.insert(name, value_support);
+    }
+
+    /*
+    pub fn set_blackboard_factory(&mut self, blackboard_factory: betula_common::tree_support::BlackboardFactory) {
         self.tree.set_blackboard_factory(blackboard_factory);
     }
+    */
 
-    pub fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
-        self.tree.create_blackboard()
-    }
+    // pub fn create_blackboard(&self) -> Option<Box<dyn Blackboard>> {
+    // self.tree.create_blackboard()
+    // }
 
     pub fn node_types(&self) -> Vec<NodeType> {
-        self.ui.keys().cloned().collect()
+        self.ui_node.keys().cloned().collect()
     }
 
     pub fn display_name(&self, node_type: &NodeType) -> String {
-        if let Some(node_support) = self.ui_support(node_type) {
+        if let Some(node_support) = self.node_support(node_type) {
             node_support.display_name.clone()
         } else {
             "Unknown Node".into()
@@ -145,10 +217,30 @@ impl UiSupport {
     }
 
     pub fn create_ui_node(&self, node_type: &NodeType) -> Result<Box<dyn UiNode>, BetulaError> {
-        if let Some(node_support) = self.ui_support(node_type) {
+        if let Some(node_support) = self.node_support(node_type) {
             Ok((node_support.node_factory)())
         } else {
             Err("no ui node support for {node_type:?}".into())
         }
+    }
+
+    pub fn create_ui_value(&self, value: SerializedValue) -> Result<Box<dyn UiValue>, BetulaError> {
+        let value_type = &value.type_id;
+        if let Some(value_support) = self.value_support(&value_type) {
+            Ok((value_support.value_factory)(&self.tree, value)?)
+        } else {
+            Err("no ui value support for {value_type:?}".into())
+        }
+    }
+
+    pub fn create_ui_values(
+        &self,
+        port_values: &SerializedBlackboardValues,
+    ) -> Result<BTreeMap<PortName, Box<dyn UiValue>>, BetulaError> {
+        let mut res: BTreeMap<PortName, Box<dyn UiValue>> = Default::default();
+        for (k, v) in port_values {
+            res.insert(k.clone(), self.create_ui_value(v.clone())?);
+        }
+        Ok(res)
     }
 }

@@ -31,8 +31,8 @@ pub struct SerializedConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SerializedValue {
-    type_id: String,
-    data: SerializableHolder,
+    pub type_id: String,
+    pub data: SerializableHolder,
 }
 
 use std::collections::BTreeMap;
