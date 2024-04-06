@@ -76,6 +76,14 @@ pub trait UiNode: Node {
             .nth(output)
             .cloned()
     }
+
+    fn ui_port_output(&self, name: &PortName) -> Option<usize> {
+        self.ports()
+            .unwrap_or(vec![])
+            .iter()
+            .filter(|p| p.direction() == PortDirection::Output)
+            .position(|x| x.name() == *name)
+    }
 }
 
 type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;

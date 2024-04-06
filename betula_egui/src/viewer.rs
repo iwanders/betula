@@ -131,21 +131,26 @@ impl ViewerNode {
         }
     }
 
-    pub fn total_outputs(&self) -> usize {
-        let output_count = self
-            .ui_node
+    pub fn output_port_count(&self) -> usize {
+        self.ui_node
             .as_ref()
             .map(|n| n.ui_output_port_count())
-            .unwrap_or(0);
+            .unwrap_or(0)
+    }
+
+    pub fn total_outputs(&self) -> usize {
+        let output_count = self.output_port_count();
         output_count + self.children_local.len()
     }
 
-    pub fn total_inputs(&self) -> usize {
-        let input_count = self
-            .ui_node
+    pub fn input_port_count(&self) -> usize {
+        self.ui_node
             .as_ref()
             .map(|n| n.ui_input_port_count())
-            .unwrap_or(0);
+            .unwrap_or(0)
+    }
+    pub fn total_inputs(&self) -> usize {
+        let input_count = self.input_port_count();
         input_count + 1 // +1 for parent.
     }
 
@@ -293,6 +298,13 @@ impl ViewerNode {
             .flatten()?;
         Some(port.into_node_port(self.id))
     }
+
+    pub fn output_port_to_pin(&self, name: &PortName) -> Option<usize> {
+        self.ui_node
+            .as_ref()
+            .map(|z| z.ui_port_output(name))
+            .flatten()
+    }
 }
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
@@ -371,6 +383,20 @@ impl ViewerBlackboard {
             })
     }
 
+    pub fn port_to_pin(&self, portname: &PortName) -> Option<usize> {
+        if let Some(visible_ports) = &self.visible_ports {
+            // Search in visible ports.
+            visible_ports.iter().position(|z| *z == *portname)
+        } else {
+            let ports = self.data.as_ref().map(|d| d.as_ref().borrow().ports());
+            if let Some(ports) = ports {
+                ports.iter().position(|z| *z == *portname)
+            } else {
+                None
+            }
+        }
+    }
+
     pub fn ui_show_input(&self, input: &InPinId, ui: &mut Ui, scale: f32) -> PinInfo {
         if let Some(name) = self.port_name(input.input) {
             if let Some(data) = self.data.as_ref() {
@@ -389,7 +415,10 @@ impl ViewerBlackboard {
         self.is_dirty
     }
     pub fn set_clean(&mut self) {
-        self.is_dirty = false
+        self.is_dirty = false;
+    }
+    pub fn mark_dirty(&mut self) {
+        self.is_dirty = true;
     }
 
     pub fn blackboard_port(&self, node_port: &NodePort, inpin: &InPinId) -> BlackboardPort {
@@ -416,6 +445,20 @@ pub enum BetulaViewerNode {
     Node(ViewerNode),
     Blackboard(ViewerBlackboard),
 }
+impl BetulaViewerNode {
+    pub fn output_port_count(&self) -> usize {
+        match self {
+            BetulaViewerNode::Node(s) => s.output_port_count(),
+            BetulaViewerNode::Blackboard(bb) => bb.outputs(),
+        }
+    }
+    pub fn input_port_count(&self) -> usize {
+        match self {
+            BetulaViewerNode::Node(s) => s.input_port_count(),
+            BetulaViewerNode::Blackboard(bb) => bb.inputs(),
+        }
+    }
+}
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
@@ -429,9 +472,10 @@ pub struct BlackboardData {
 }
 impl BlackboardData {
     pub fn is_up_to_date(&self) -> bool {
-        self.connections_local
-            .iter()
-            .eq(self.connections_remote.iter())
+        self.connections_local == self.connections_remote
+    }
+    pub fn connections(&self) -> Vec<PortConnection> {
+        self.connections_local.iter().cloned().collect()
     }
     pub fn local_connected_ports(&self) -> Vec<PortConnection> {
         let additions = self.connections_local.difference(&self.connections_remote);
@@ -441,8 +485,15 @@ impl BlackboardData {
         let removals = self.connections_remote.difference(&self.connections_local);
         removals.cloned().collect()
     }
-    pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) {
-        self.connections_remote = new_remote.iter().cloned().collect();
+    /// True if changed.
+    pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) -> bool {
+        let new_remote: std::collections::BTreeSet<PortConnection> =
+            new_remote.iter().cloned().collect();
+        let changed = self.connections_local == new_remote;
+        if changed {
+            self.connections_remote = new_remote;
+        }
+        changed
     }
     pub fn set_values(&mut self, values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>) {
         self.ui_values = values;
@@ -517,13 +568,72 @@ impl BetulaViewer {
 
     fn get_blackboard_snarl_ids(
         &self,
-        blackboard_id: BlackboardId,
+        blackboard_id: &BlackboardId,
     ) -> Result<Vec<SnarlNodeId>, BetulaError> {
         let v = self
             .blackboard_map
             .get(&blackboard_id)
             .ok_or(format!("could not find {blackboard_id:?}"))?;
         Ok(v.iter().cloned().collect())
+    }
+
+    fn get_blackboard_snarl_connections(
+        &self,
+        blackboard_id: &BlackboardId,
+        bb_snarl: SnarlNodeId,
+        snarl: &Snarl<BetulaViewerNode>,
+    ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
+        let connections = {
+            if let BetulaViewerNode::Blackboard(bb) = &snarl[bb_snarl] {
+                if let Some(data) = bb.data() {
+                    let connections = data.connections().into_iter().filter(|z| {
+                        if let Some(visible) = &bb.visible_ports {
+                            visible.contains(&z.blackboard.name())
+                        } else {
+                            true
+                        }
+                    });
+                    Ok(connections.collect::<Vec<_>>())
+                } else {
+                    Err(format!("could not find blackboard"))
+                }
+            } else {
+                Err(format!("could not find blackboard"))
+            }
+        }?;
+        let mut desired: Vec<(OutPinId, InPinId)> = vec![];
+        // Okay, we have the connections of interest, next up is determining the pin ids for all of that.
+        for connection in connections {
+            if connection.node.direction() == betula_core::PortDirection::Output {
+                // From node to this blackboard.
+                let node_id = connection.node.node();
+                let snarl_node_id = self.get_node_snarl_id(node_id)?;
+                let viewer_node = self.get_node_ref(node_id, snarl)?;
+                let name = connection.node.name();
+                let port_pin = viewer_node
+                    .output_port_to_pin(&name)
+                    .ok_or(format!("failed to find port for {name:?}"))?;
+                // Okay, we can now assemble the out pin.
+                let outpin = OutPinId {
+                    node: snarl_node_id,
+                    output: port_pin,
+                };
+
+                // Now, we just have to determine the input pin at this blackboard.
+                let blackboard_node = self.get_blackboard_ref_snarl(bb_snarl, snarl)?;
+                let blackboard_name = connection.blackboard.name();
+                let inpin = InPinId {
+                    node: bb_snarl,
+                    input: blackboard_node
+                        .port_to_pin(&blackboard_name)
+                        .ok_or(format!("failed to find port for {blackboard_name:?}"))?,
+                };
+                desired.push((outpin, inpin));
+            } else {
+                // From this blackboard to a node.
+            }
+        }
+        Ok(desired)
     }
 
     fn get_betula_id(&self, snarl_id: &SnarlNodeId) -> Result<BetulaNodeId, BetulaError> {
@@ -554,6 +664,20 @@ impl BetulaViewer {
             self.blackboard_snarl_map.remove(id);
         }
         Ok(snarl_id.drain().collect())
+    }
+
+    fn mark_blackboards_dirty(
+        &self,
+        blackboard_id: &BlackboardId,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        let snarl_ids = self.get_blackboard_snarl_ids(blackboard_id)?;
+        for id in snarl_ids {
+            if let BetulaViewerNode::Blackboard(ref mut bb) = &mut snarl[id] {
+                bb.mark_dirty()
+            }
+        }
+        Ok(())
     }
 
     fn get_node_mut<'a>(
@@ -598,31 +722,89 @@ impl BetulaViewer {
         }
     }
 
+    fn get_blackboard_ref_snarl<'a>(
+        &self,
+        snarl_id: SnarlNodeId,
+        snarl: &'a Snarl<BetulaViewerNode>,
+    ) -> Result<&'a ViewerBlackboard, BetulaError> {
+        let node = snarl.get_node(snarl_id);
+        if let Some(viewer_node) = node {
+            if let BetulaViewerNode::Blackboard(bb) = viewer_node {
+                return Ok(bb);
+            } else {
+                Err(format!("snarl id {snarl_id:?} is no blackboard").into())
+            }
+        } else {
+            Err(format!("snarl id {snarl_id:?} cannot be found").into())
+        }
+    }
+
+    fn child_port_out(
+        &self,
+        snarl_id: SnarlNodeId,
+        snarl: &Snarl<BetulaViewerNode>,
+    ) -> (Vec<(OutPinId, InPinId)>, Vec<(OutPinId, InPinId)>) {
+        let port_output_count = snarl[snarl_id].output_port_count();
+        let connected = snarl.out_pins_connected(snarl_id);
+        let mut children = vec![];
+        let mut ports = vec![];
+        for p in connected {
+            let from = snarl.out_pin(p);
+            if p.output < port_output_count {
+                for r in from.remotes {
+                    ports.push((p, r));
+                }
+            } else {
+                for r in from.remotes {
+                    children.push((p, r));
+                }
+            }
+        }
+        (children, ports)
+    }
+
+    fn child_port_in(
+        &self,
+        snarl_id: SnarlNodeId,
+        snarl: &Snarl<BetulaViewerNode>,
+    ) -> (Vec<(OutPinId, InPinId)>, Vec<(OutPinId, InPinId)>) {
+        let connected = snarl.in_pins_connected(snarl_id);
+        let mut children = vec![];
+        let mut ports = vec![];
+        for p in connected {
+            let to = snarl.in_pin(p);
+            if p.input == 0 {
+                for from in to.remotes {
+                    children.push((from, p));
+                }
+            } else {
+                for from in to.remotes {
+                    ports.push((from, p));
+                }
+            }
+        }
+        (children, ports)
+    }
+
     /// Obtain the current snarl connections this node has.
     fn child_connections(
         &self,
-        node_id: BetulaNodeId,
+        snarl_id: SnarlNodeId,
         snarl: &Snarl<BetulaViewerNode>,
     ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
-        let viewer_node = self.get_node_ref(node_id, snarl)?;
-        let ui_node = viewer_node
-            .ui_node
-            .as_ref()
-            .ok_or(format!("node is only placeholder"))?;
-        let port_output_count = ui_node.ui_output_port_count();
-        let snarl_parent = self.get_node_snarl_id(node_id).unwrap();
-        let connected = snarl.out_pins_connected(snarl_parent);
-        let mut disconnectables = vec![];
-        for p in connected {
-            if p.output < port_output_count {
-                continue; // blackboard output, skip those.
-            }
-            let from = snarl.out_pin(p);
-            for r in from.remotes {
-                disconnectables.push((p, r));
-            }
-        }
-        Ok(disconnectables)
+        let (children, _ports) = self.child_port_out(snarl_id, snarl);
+        Ok(children)
+    }
+
+    fn port_connections(
+        &self,
+        snarl_id: SnarlNodeId,
+        snarl: &Snarl<BetulaViewerNode>,
+    ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
+        let (_children, mut out_ports) = self.child_port_out(snarl_id, snarl);
+        let (_children, mut in_ports) = self.child_port_in(snarl_id, snarl);
+        in_ports.append(&mut out_ports);
+        Ok(in_ports)
     }
 
     /// Create the desired snarl connections according to the children.
@@ -658,6 +840,19 @@ impl BetulaViewer {
         }
 
         Ok(v)
+    }
+
+    /// Create the desired snarl connections according to the children.
+    fn port_connections_desired(
+        &self,
+        snarl_id: SnarlNodeId,
+        snarl: &Snarl<BetulaViewerNode>,
+    ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
+        if let BetulaViewerNode::Blackboard(bb) = &snarl[snarl_id] {
+            Ok(self.get_blackboard_snarl_connections(&bb.id, snarl_id, snarl)?)
+        } else {
+            Ok(vec![])
+        }
     }
 
     /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
@@ -704,11 +899,12 @@ impl BetulaViewer {
         for node in node_ids {
             let mut disconnections = vec![];
             let mut connections = vec![];
+            let snarl_id = node;
             if let BetulaViewerNode::Node(node) = &snarl[node] {
                 // Now, we need to do snarly things.
                 // Lets just disconnect all connections, then reconnect the ones we care about.
                 if node.is_dirty() {
-                    let mut to_disconnect = self.child_connections(node.id, snarl)?;
+                    let mut to_disconnect = self.child_connections(snarl_id, snarl)?;
                     disconnections.append(&mut to_disconnect);
                     let mut to_connect = self.child_connections_desired(node.id, snarl)?;
                     connections.append(&mut to_connect);
@@ -733,7 +929,33 @@ impl BetulaViewer {
         &mut self,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
-        let _ = snarl;
+        // Draw lines between appropriate ports.
+        // Check for dirty nodes, and update the snarl state.
+        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
+        for snarl_id in node_ids {
+            let mut disconnections = vec![];
+            let mut connections = vec![];
+            if let BetulaViewerNode::Blackboard(bb) = &snarl[snarl_id] {
+                // Now, we need to do snarly things.
+                // Lets just disconnect all connections, then reconnect the ones we care about.
+                if bb.is_dirty() {
+                    let mut to_disconnect = self.port_connections(snarl_id, snarl)?;
+                    disconnections.append(&mut to_disconnect);
+                    let mut to_connect = self.port_connections_desired(snarl_id, snarl)?;
+                    connections.append(&mut to_connect);
+                }
+            }
+            for (from, to) in disconnections {
+                snarl.disconnect(from, to);
+            }
+            for (from, to) in connections {
+                snarl.connect(from, to);
+            }
+            if let BetulaViewerNode::Blackboard(bb) = &mut snarl[snarl_id] {
+                bb.set_clean();
+                // bb.update_children_local();
+            }
+        }
         Ok(())
     }
 
@@ -816,9 +1038,13 @@ impl BetulaViewer {
                     BlackboardInformation(v) => {
                         if let Some(bb) = self.blackboards.get(&v.id) {
                             // do update things.
-                            (*bb).borrow_mut().set_connections_remote(&v.connections);
+                            let mut bb = (*bb).borrow_mut();
+                            let changed = bb.set_connections_remote(&v.connections);
+                            if changed {
+                                self.mark_blackboards_dirty(&v.id, snarl)?;
+                            }
                             let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
-                            (*bb).borrow_mut().set_values(ui_values);
+                            bb.set_values(ui_values);
                         } else {
                             // Convert the values.
                             let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
@@ -830,7 +1056,7 @@ impl BetulaViewer {
                             let cloned_rc = Rc::clone(&rc);
                             self.blackboards.insert(v.id, cloned_rc);
                             // Add the reference to any nodes with this id.
-                            let snarl_ids = self.get_blackboard_snarl_ids(v.id)?;
+                            let snarl_ids = self.get_blackboard_snarl_ids(&v.id)?;
                             for id in snarl_ids {
                                 let cloned_rc = Rc::clone(&rc);
                                 if let BetulaViewerNode::Blackboard(bb) = &mut snarl[id] {
