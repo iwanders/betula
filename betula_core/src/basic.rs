@@ -567,21 +567,30 @@ mod tests {
         tree.set_children(root, &vec![o1, i1])?;
 
         // Add the blackboard.
-        let bb = tree.add_blackboard_boxed(
+        let bb1 = tree.add_blackboard_boxed(
             BlackboardId(crate::Uuid::new_v4()),
             Box::new(BasicBlackboard::default()),
         )?;
 
         let output_ports = tree.node_ports(o1)?;
-        tree.connect_port_to_blackboard(&output_ports[0], bb)?;
+        tree.connect_port_to_blackboard(&output_ports[0], bb1)?;
+
+        const TEST_OUTPUT_TO_MULTIPLE: bool = false;
+        if TEST_OUTPUT_TO_MULTIPLE {
+            let bb2 = tree.add_blackboard_boxed(
+                BlackboardId(crate::Uuid::new_v4()),
+                Box::new(BasicBlackboard::default()),
+            )?;
+            tree.connect_port_to_blackboard(&output_ports[0], bb2)?;
+        }
         let input_ports = tree.node_ports(i1)?;
-        tree.connect_port_to_blackboard(&input_ports[0], bb)?;
+        tree.connect_port_to_blackboard(&input_ports[0], bb1)?;
 
         let res = tree.execute(root)?;
         assert_eq!(res, NodeStatus::Success);
 
         // get the value from the blackboard.
-        let bbref = tree.blackboard_ref(bb).unwrap();
+        let bbref = tree.blackboard_ref(bb1).unwrap();
         let entries = bbref.borrow().ports();
         assert_eq!(entries.len(), 1);
         let value = bbref.borrow().get(&entries[0]);
