@@ -64,7 +64,7 @@ fn main() -> eframe::Result<()> {
         use betula_core::basic::BasicTree;
 
         use betula_common::control::CommandResult;
-        use betula_common::control::InteractionEvent;
+        use betula_common::control::{InteractionCommand, InteractionEvent};
 
         let mut tree = BasicTree::new();
         let mut tree_support = TreeSupport::new();
@@ -80,12 +80,19 @@ fn main() -> eframe::Result<()> {
         }));
         tree_support.add_value_default::<f64>();
 
+        let mut run_roots: bool = true;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(10));
             let received = server.get_command()?;
 
             if let Some(command) = received {
                 // println!("    Executing {command:?}");
+                if let InteractionCommand::RunSettings(run_settings) = &command {
+                    if let Some(new_value) = run_settings.run_roots {
+                        println!("Setting run roots to: {new_value}");
+                        run_roots = new_value;
+                    }
+                }
                 let r = command.execute(&tree_support, &mut tree);
                 match r {
                     Ok(v) => {
@@ -98,6 +105,34 @@ fn main() -> eframe::Result<()> {
                             command: command,
                             error: Some(format!("{e:?}")),
                         }))?;
+                    }
+                }
+            }
+
+            if run_roots {
+                use betula_core::Tree;
+                let roots = tree.roots();
+                for r in &roots {
+                    match tree.execute(*r) {
+                        Ok(_v) => {
+                            // println!("Success running {r:?}: {v:?}");
+                        }
+                        Err(_e) => {
+                            // println!("Failed running {r:?}: {e:?}");
+                        }
+                    }
+                }
+
+                // Lets just dump all the blackboard state every cycle.
+                if !roots.is_empty() {
+                    for blackboard_id in tree.blackboards() {
+                        server.send_event(InteractionEvent::BlackboardInformation(
+                            InteractionCommand::blackboard_information(
+                                &tree_support,
+                                blackboard_id,
+                                &tree,
+                            )?,
+                        ))?;
                     }
                 }
             }

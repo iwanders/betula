@@ -27,13 +27,18 @@ impl DelayNode {
 }
 
 impl Node for DelayNode {
-    fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
         let time = self.time.get()?;
         if time < (self.last_time + self.config.interval) {
             return Ok(NodeStatus::Running);
         }
         self.last_time = time;
-        Ok(NodeStatus::Success)
+
+        if ctx.children() == 1 {
+            ctx.run(0)
+        } else {
+            Ok(NodeStatus::Success)
+        }
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {

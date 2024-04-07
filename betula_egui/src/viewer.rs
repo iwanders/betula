@@ -707,9 +707,14 @@ pub struct BetulaViewer {
     /// The actual blackboards.
     blackboards: HashMap<BlackboardId, BlackboardDataRc>,
 
-    // / Mapping between blackboards and snarl ids.
+    /// Mapping between blackboards and snarl ids.
     blackboard_map: HashMap<BlackboardId, HashSet<SnarlNodeId>>,
     blackboard_snarl_map: HashMap<SnarlNodeId, BlackboardId>,
+
+    /// Roots
+    tree_roots_local: Vec<BetulaNodeId>,
+    /// Roots
+    tree_roots_remote: Vec<BetulaNodeId>,
 }
 
 impl BetulaViewer {
@@ -721,12 +726,26 @@ impl BetulaViewer {
         BetulaViewer {
             client,
             ui_support,
+            tree_roots_local: Default::default(),
+            tree_roots_remote: Default::default(),
             node_map: Default::default(),
             snarl_map: Default::default(),
             blackboards: Default::default(),
             blackboard_map: Default::default(),
             blackboard_snarl_map: Default::default(),
         }
+    }
+
+    pub fn root_remove(&mut self, node_id: BetulaNodeId) {
+        let mut z: HashSet<BetulaNodeId> = self.tree_roots_local.iter().cloned().collect();
+        z.remove(&node_id);
+        self.tree_roots_local = z.iter().cloned().collect();
+    }
+
+    pub fn root_add(&mut self, node_id: BetulaNodeId) {
+        let mut z: HashSet<BetulaNodeId> = self.tree_roots_local.iter().cloned().collect();
+        z.insert(node_id);
+        self.tree_roots_local = z.iter().cloned().collect();
     }
 
     pub fn add_id_mapping(&mut self, betula_id: BetulaNodeId, snarl_id: SnarlNodeId) {
@@ -839,6 +858,7 @@ impl BetulaViewer {
             .remove(&node_id)
             .ok_or::<BetulaError>(format!("could not find {node_id:?}").into())?;
         self.snarl_map.remove(&snarl_id);
+        self.root_remove(node_id);
         Ok(snarl_id)
     }
 
@@ -1078,6 +1098,12 @@ impl BetulaViewer {
             }
         }
 
+        if self.tree_roots_remote != self.tree_roots_local {
+            let roots = self.tree_roots_local.iter().cloned().collect::<Vec<_>>();
+            let cmd = InteractionCommand::set_roots(&roots);
+            self.client.send_command(cmd)?;
+        }
+
         Ok(())
     }
 
@@ -1187,6 +1213,7 @@ impl BetulaViewer {
         use betula_common::control::InteractionEvent::BlackboardInformation;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
+        use betula_common::control::InteractionEvent::TreeRoots;
 
         // First, send changes to the server if necessary.
         self.send_changes_to_server(snarl)?;
@@ -1203,7 +1230,7 @@ impl BetulaViewer {
         // Handle any incoming events.
         loop {
             if let Some(event) = self.client.get_event()? {
-                println!("event {event:?}");
+                // println!("event {event:?}");
                 match event {
                     NodeInformation(v) => {
                         let viewer_node = self.get_node_mut(v.id, snarl)?;
@@ -1292,6 +1319,9 @@ impl BetulaViewer {
                             }
                             _ => {}
                         }
+                    }
+                    TreeRoots(roots) => {
+                        self.tree_roots_remote = roots;
                     }
                 }
             } else {
@@ -1741,16 +1771,26 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         ui.label("Node menu");
-        if ui.button("Remove").clicked() {
-            match &mut snarl[node] {
-                BetulaViewerNode::Node(ref mut node) => {
-                    let node_id = node.id;
+        match &mut snarl[node] {
+            BetulaViewerNode::Node(ref mut node) => {
+                let node_id = node.id;
+                if ui.button("Remove").clicked() {
                     let cmd = InteractionCommand::remove_node(node_id);
-                    if let Ok(_) = self.client.send_command(cmd) {}
+                    let _ = self.client.send_command(cmd);
+                    ui.close_menu();
                 }
-                _ => todo!(),
-            };
-            ui.close_menu();
+                let mut is_root = self.tree_roots_local.contains(&node_id);
+                let r = ui.checkbox(&mut is_root, "Root");
+                if r.changed() {
+                    if is_root {
+                        self.root_add(node_id);
+                    } else {
+                        self.root_remove(node_id);
+                    }
+                    ui.close_menu();
+                }
+            }
+            _ => todo!(),
         }
     }
 

@@ -13,7 +13,7 @@ impl UiNode for nodes::DelayNode {
         UiConfigResponse::UnChanged
     }
     fn ui_child_range(&self) -> std::ops::Range<usize> {
-        0..usize::MAX
+        0..1
     }
 }
 

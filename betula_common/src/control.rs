@@ -79,6 +79,12 @@ pub struct PortChanges {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RunSettings {
+    pub run_roots: Option<bool>,
+    pub run_specific: Vec<NodeId>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
     AddNode(AddNodeCommand),
     RemoveNode(NodeId),
@@ -90,6 +96,10 @@ pub enum InteractionCommand {
     SetConfig(SetConfigCommand),
 
     PortDisconnectConnect(PortChanges),
+
+    SetRoots(Vec<NodeId>),
+
+    RunSettings(RunSettings),
 
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
@@ -129,6 +139,10 @@ impl InteractionCommand {
         })
     }
 
+    pub fn set_roots(ids: &[NodeId]) -> Self {
+        InteractionCommand::SetRoots(ids.to_vec())
+    }
+
     pub fn set_children(parent: NodeId, children: Vec<NodeId>) -> Self {
         InteractionCommand::SetChildren(SetChildren { parent, children })
     }
@@ -142,6 +156,25 @@ impl InteractionCommand {
 
     pub fn set_config(id: NodeId, config: SerializedConfig) -> Self {
         InteractionCommand::SetConfig(SetConfigCommand { id, config })
+    }
+
+    pub fn run_pause() -> Self {
+        InteractionCommand::RunSettings(RunSettings {
+            run_roots: Some(false),
+            run_specific: vec![],
+        })
+    }
+    pub fn run_start() -> Self {
+        InteractionCommand::RunSettings(RunSettings {
+            run_roots: Some(true),
+            run_specific: vec![],
+        })
+    }
+    pub fn run_specific(nodes: &[NodeId]) -> Self {
+        InteractionCommand::RunSettings(RunSettings {
+            run_roots: None,
+            run_specific: nodes.to_vec(),
+        })
     }
 
     fn node_information(
@@ -168,16 +201,17 @@ impl InteractionCommand {
         })
     }
 
-    fn blackboard_information(
+    pub fn blackboard_information(
         tree_support: &TreeSupport,
         blackboard_id: BlackboardId,
-        tree: &mut dyn Tree,
+        tree: &dyn Tree,
     ) -> Result<BlackboardInformation, BetulaError> {
         let _ = tree_support;
         let bb = tree
-            .blackboard_mut(blackboard_id)
+            .blackboard_ref(blackboard_id)
             .ok_or(format!("cannot find {blackboard_id:?}"))?;
-        let port_values = tree_support.blackboard_value_serialize(&*bb)?;
+        let bb = bb.borrow_mut();
+        let port_values = tree_support.blackboard_value_serialize(&**bb)?;
         let connections = tree.blackboard_connections(blackboard_id);
         Ok(BlackboardInformation {
             id: blackboard_id,
@@ -291,6 +325,25 @@ impl InteractionCommand {
                     )?),
                 ])
             }
+            InteractionCommand::SetRoots(roots) => {
+                tree.set_roots(&roots)?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::TreeRoots(tree.roots()),
+                ])
+            }
+            InteractionCommand::RunSettings(run_settings) => {
+                for z in &run_settings.run_specific {
+                    let _result = tree.execute(*z)?;
+                }
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
+            }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;
                 Ok(vec![])
@@ -345,6 +398,7 @@ pub enum InteractionEvent {
     BlackboardInformation(BlackboardInformation),
     // ExecutionResult(ExecutionResult),
     NodeInformation(NodeInformation),
+    TreeRoots(Vec<NodeId>),
 }
 
 //------------------------------------------------------------------------
