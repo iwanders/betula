@@ -3,8 +3,8 @@ use crate::prelude::*;
 use std::collections::HashMap;
 
 use crate::{
-    BetulaError, Blackboard, BlackboardId, Node, NodeError, NodeId, NodeStatus, PortConnection,
-    PortName,
+    BetulaError, Blackboard, BlackboardId, Node, NodeError, NodeId, NodePort, NodeStatus,
+    PortConnection, PortDirection, PortName,
 };
 
 struct TreeContext<'a> {
@@ -50,6 +50,22 @@ impl BasicTree {
             blackboards: Default::default(),
             tree_roots: Default::default(),
         }
+    }
+
+    fn node_port_connections(
+        &self,
+        node_port: &NodePort,
+    ) -> Result<Vec<PortConnection>, BetulaError> {
+        let mut v = vec![];
+        for b in self.blackboards.values() {
+            v.extend(
+                b.connections
+                    .iter()
+                    .filter(|z| z.node == *node_port)
+                    .cloned(),
+            );
+        }
+        Ok(v)
     }
 }
 
@@ -156,6 +172,13 @@ impl Tree for BasicTree {
     }
 
     fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
+        // If this is an input port to the node, first disconnect anything associated to that.
+        if connection.node.direction == PortDirection::Input {
+            let connections = self.node_port_connections(&connection.node)?;
+            for connection in connections {
+                self.disconnect_port(&connection)?;
+            }
+        }
         // node_port: &NodePort,
         // blackboard_port: &BlackboardPort,
         let blackboard_id = connection.blackboard.blackboard();

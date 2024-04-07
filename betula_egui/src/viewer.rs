@@ -407,6 +407,23 @@ impl BlackboardData {
             })
             .collect();
     }
+
+    pub fn connect_port(&mut self, connection: &PortConnection) {
+        self.connections_local.insert(connection.clone());
+    }
+
+    pub fn disconnect_port(&mut self, connection: &PortConnection) {
+        self.connections_local.remove(connection);
+    }
+
+    pub fn disconnect_node_port(&mut self, node_port: &NodePort) {
+        self.connections_local = self
+            .connections_local
+            .iter()
+            .filter(|z| z.node != *node_port)
+            .cloned()
+            .collect();
+    }
 }
 
 /// A representation of a blackboard in the viewer.
@@ -567,13 +584,13 @@ impl ViewerBlackboard {
 
     pub fn connect_port(&mut self, port_connection: &PortConnection) {
         if let Some(mut data) = self.data_mut() {
-            data.connections_local.insert(port_connection.clone());
+            data.connect_port(port_connection);
         }
         self.pending_connections.insert(port_connection.clone());
     }
     pub fn disconnect_port(&mut self, port_connection: &PortConnection) {
         if let Some(mut data) = self.data_mut() {
-            data.connections_local.remove(port_connection);
+            data.disconnect_port(port_connection);
         }
     }
 
@@ -895,6 +912,15 @@ impl BetulaViewer {
         }
     }
 
+    pub fn disconnect_node_port(&mut self, node_port: &NodePort) {
+        // Iterate over the blackboards to see if we find one that has
+        // this connection.
+        for (k, v) in &self.blackboards {
+            let mut borrowed = v.borrow_mut();
+            borrowed.disconnect_node_port(node_port);
+        }
+    }
+
     fn get_blackboard_ref_snarl<'a>(
         &self,
         snarl_id: SnarlNodeId,
@@ -1177,7 +1203,7 @@ impl BetulaViewer {
         // Handle any incoming events.
         loop {
             if let Some(event) = self.client.get_event()? {
-                // println!("event {event:?}");
+                println!("event {event:?}");
                 match event {
                     NodeInformation(v) => {
                         let viewer_node = self.get_node_mut(v.id, snarl)?;
@@ -1360,10 +1386,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         let mut child_to_connect = None;
 
         let mut port_to_connect = None;
+        let mut port_to_disconnect = None;
 
         match (&snarl[from.id.node], &snarl[to.id.node]) {
             (BetulaViewerNode::Node(node), BetulaViewerNode::Blackboard(bb)) => {
-                // Setup an output port.
+                // Setup an output port, node to blackboard, multiple allowed.
                 if let Some(node_port) = node.node_output_port(&from.id) {
                     let blackboard_port = bb.blackboard_input_port(&node_port, &to.id);
                     port_to_connect =
@@ -1379,9 +1406,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 child_to_connect = Some((from.id, to.id));
             }
             (BetulaViewerNode::Blackboard(bb), BetulaViewerNode::Node(node)) => {
-                // Setup an input port.
+                // Setup an input port, this requires disconnecting any old ports...
                 let blackboard_port = bb.blackboard_output_port(&from.id);
                 if let Some(node_port) = node.node_input_port(&to.id) {
+                    // Disconnect anytyhing that may be connected to this node port.
+                    port_to_disconnect = Some((to.id.node, node_port.clone()));
                     port_to_connect = Some((
                         from.id.node,
                         PortConnection::new(node_port, blackboard_port),
@@ -1418,6 +1447,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
 
+        if let Some((node_id, node_port)) = port_to_disconnect {
+            self.disconnect_node_port(&node_port);
+        }
         if let Some((id, port_connection)) = port_to_connect {
             match &mut snarl[id] {
                 BetulaViewerNode::Blackboard(bb) => {
