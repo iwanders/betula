@@ -1432,9 +1432,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 if pin.remotes.is_empty() {
                     PinInfo::circle()
                         .with_fill(BLACKBOARD_COLOR)
+                        .wiring()
                         .with_gamma(0.5)
                 } else {
-                    PinInfo::circle().with_fill(BLACKBOARD_COLOR)
+                    PinInfo::circle().with_fill(BLACKBOARD_COLOR).wiring()
                 }
             }
         }

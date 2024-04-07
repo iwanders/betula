@@ -5,7 +5,7 @@ edition = "2021"
 license = "BSD-3-Clause"
 
 [dependencies]
-egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "792eb233b082c6393c28f5414c7e1c1fbb28f787"}
+egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "f0995696fb19305ee133e3fd669b7079bf6ccf0f"}
 betula_common = { workspace = true, default-features = false }
 betula_core = { workspace = true, default-features = false }
 egui = { version = "0.26" }
