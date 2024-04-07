@@ -69,6 +69,7 @@ mod v1 {
     pub struct Root {
         pub nodes: Vec<TreeNode>,
         pub blackboards: Vec<Blackboard>,
+        pub tree_roots: Vec<NodeId>,
     }
 }
 
@@ -287,7 +288,14 @@ impl TreeSupport {
             bb.connections.sort();
         }
         nodes.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
-        let root = Root { nodes, blackboards };
+
+        let tree_roots = tree.roots();
+
+        let root = Root {
+            nodes,
+            blackboards,
+            tree_roots,
+        };
         let config = Config::V1(root);
         Ok(config
             .serialize(serializer)
@@ -393,6 +401,10 @@ impl TreeSupport {
                         tree.connect_port(&connection).map_err(|e| D::Error::custom(format!("failed to make connection {connection:?} for blackboard {id:?}: {e:?}")))?;
                     }
                 }
+
+                // And set the roots.
+                tree.set_roots(&root.tree_roots)
+                    .map_err(|e| D::Error::custom(format!("failed to set roots: {e:?}")))?;
             }
         }
 
@@ -600,6 +612,7 @@ mod test {
             Box::new(crate::nodes::DelayNode::default()),
         )?;
         tree.set_children(root, &vec![time_node, delay_node])?;
+        tree.set_roots(&[root])?;
 
         // Add the blackboard.
         let bb = tree.add_blackboard_boxed(

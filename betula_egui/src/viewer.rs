@@ -67,7 +67,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
-const BLACKBOARD_COLOR: Color32 = Color32::from_rgb(0xb0, 0x00, 0xb0);
+const BLACKBOARD_COLOR: Color32 = Color32::from_rgb(0xb0, 0xb0, 0xb0);
 const UNKNOWN_COLOR: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
 
 use uuid::Uuid;

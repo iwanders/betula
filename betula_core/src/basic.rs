@@ -40,13 +40,15 @@ struct BasicBlackboardEntry {
 pub struct BasicTree {
     nodes: HashMap<NodeId, BasicTreeNode>,
     blackboards: HashMap<BlackboardId, BasicBlackboardEntry>,
+    tree_roots: Vec<NodeId>,
 }
 
 impl BasicTree {
     pub fn new() -> Self {
         BasicTree {
-            nodes: HashMap::default(),
-            blackboards: HashMap::default(),
+            nodes: Default::default(),
+            blackboards: Default::default(),
+            tree_roots: Default::default(),
         }
     }
 }
@@ -259,6 +261,23 @@ impl Tree for BasicTree {
             .get(&id)
             .map(|v| v.connections.iter().cloned().collect::<Vec<_>>())
             .unwrap_or_default()
+    }
+
+    fn roots(&self) -> Vec<NodeId> {
+        self.tree_roots.clone()
+    }
+
+    /// Set the roots of this tree.
+    fn set_roots(&mut self, new_roots: &[NodeId]) -> Result<(), BetulaError> {
+        // Verify that we have these nodes.
+        let nodes = self.nodes();
+        for n in new_roots {
+            if !nodes.contains(&n) {
+                return Err(format!("node {n:?} not present").into());
+            }
+        }
+        self.tree_roots = new_roots.to_vec();
+        Ok(())
     }
 }
 

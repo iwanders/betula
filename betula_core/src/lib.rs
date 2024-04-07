@@ -547,4 +547,14 @@ pub trait Tree: std::fmt::Debug + AsAny {
             .collect::<Vec<_>>();
         Ok(node_ports)
     }
+
+    /// Retrieve the roots of this tree.
+    ///
+    /// Roots aren't special, they're an ordered list of node ids that
+    /// are stored and can act as the list of nodes to be ran when the tree
+    /// is to be executed.
+    fn roots(&self) -> Vec<NodeId>;
+
+    /// Set the roots of this tree.
+    fn set_roots(&mut self, nodes: &[NodeId]) -> Result<(), BetulaError>;
 }
