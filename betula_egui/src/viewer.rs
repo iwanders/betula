@@ -165,7 +165,7 @@ impl ViewerNode {
     /// Update the local children list with the bounds and possible new pins.
     #[track_caller]
     fn update_children_local(&mut self) {
-        // This function could do with a test...
+        // TODO This function could do with a test...
         let allowed = self
             .ui_node
             .as_ref()
@@ -224,6 +224,20 @@ impl ViewerNode {
         } else {
             None
         }
+    }
+
+    pub fn output_port_to_pin(&self, name: &PortName) -> Option<usize> {
+        self.ui_node
+            .as_ref()
+            .map(|z| z.ui_port_output(name))
+            .flatten()
+    }
+    pub fn input_port_to_pin(&self, name: &PortName) -> Option<usize> {
+        self.ui_node
+            .as_ref()
+            .map(|z| z.ui_port_input(name))
+            .flatten()
+            .map(|z| z + 1)
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -291,34 +305,22 @@ impl ViewerNode {
     }
 
     pub fn node_output_port(&self, our_pin: &OutPinId) -> Option<NodePort> {
+        let port_index = self.pin_to_output(our_pin)?;
         let port = self
             .ui_node
             .as_ref()
-            .map(|z| z.ui_output_port(our_pin.output))
+            .map(|z| z.ui_output_port(port_index))
             .flatten()?;
         Some(port.into_node_port(self.id))
     }
     pub fn node_input_port(&self, our_pin: &InPinId) -> Option<NodePort> {
+        let port_index = self.pin_to_input(our_pin)?;
         let port = self
             .ui_node
             .as_ref()
-            .map(|z| z.ui_input_port(our_pin.input - 1))
+            .map(|z| z.ui_input_port(port_index))
             .flatten()?;
         Some(port.into_node_port(self.id))
-    }
-
-    pub fn output_port_to_pin(&self, name: &PortName) -> Option<usize> {
-        self.ui_node
-            .as_ref()
-            .map(|z| z.ui_port_output(name))
-            .flatten()
-    }
-    pub fn input_port_to_pin(&self, name: &PortName) -> Option<usize> {
-        self.ui_node
-            .as_ref()
-            .map(|z| z.ui_port_input(name))
-            .flatten()
-            .map(|z| z + 1)
     }
 }
 
@@ -335,8 +337,11 @@ pub struct ViewerBlackboard {
     #[serde(skip)]
     is_dirty: bool,
 
-    // #[serde(skip)]
+    /// The ports that are shown for this blackboard.
     visible_ports: Option<Vec<PortName>>,
+
+    /// The connections that are asscoated to this blackboard.
+    visible_connections: Vec<PortConnection>,
 }
 
 impl ViewerBlackboard {
@@ -346,7 +351,7 @@ impl ViewerBlackboard {
             data: None,
             is_dirty: false,
             visible_ports: None,
-            // owned_connections: vec![],
+            visible_connections: vec![],
         }
     }
     pub fn data(&self) -> Option<Ref<'_, BlackboardData>> {
