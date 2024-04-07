@@ -85,7 +85,7 @@ fn main() -> eframe::Result<()> {
             let received = server.get_command()?;
 
             if let Some(command) = received {
-                println!("    Executing {command:?}");
+                // println!("    Executing {command:?}");
                 let r = command.execute(&tree_support, &mut tree);
                 match r {
                     Ok(v) => {

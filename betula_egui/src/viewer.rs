@@ -504,6 +504,7 @@ impl ViewerBlackboard {
         if let Some(name) = self.port_name(input.input) {
             let mut do_rename = None;
             if let Some(bb_port) = self.ports.get_mut(&name) {
+                // Show a label if not editing, text edit if we are editing.
                 if let Some(ref mut editor_string) = &mut bb_port.port_name_editor {
                     let edit_box = egui::TextEdit::singleline(editor_string)
                         .desired_width(0.0)
@@ -512,7 +513,6 @@ impl ViewerBlackboard {
                     if r.lost_focus() {
                         // do really smart things to ehm, you know, rename this port on the backend.
                         if name.as_ref() != editor_string {
-                            println!("Remapping {name:?} to {editor_string}");
                             do_rename = Some((name.clone(), PortName(editor_string.clone())));
                         }
                         bb_port.port_name_editor = None;
@@ -527,10 +527,9 @@ impl ViewerBlackboard {
             if let Some((old_name, new_name)) = do_rename {
                 self.rename_port(&old_name, &new_name);
             }
+
+            // And actually render the ui node.
             if let Some(data) = self.data.as_ref() {
-                // let mut value : String = name.0.to_owned();
-                // ui.add(egui::TextEdit::singleline(&mut value));
-                // ui.label(format!("{}", name.as_ref()));
                 data.borrow_mut().ui_show_input(&name, ui, scale);
             }
             PinInfo::circle().with_fill(BLACKBOARD_COLOR)
@@ -804,7 +803,6 @@ impl BetulaViewer {
                     node: snarl_node_id,
                     input: input_pin,
                 };
-                println!("From {outpin:?} to {inpin:?}");
                 desired.push((outpin, inpin));
             }
         }
@@ -1108,20 +1106,16 @@ impl BetulaViewer {
                 // Lets just disconnect all connections, then reconnect the ones we care about.
                 if bb.is_dirty() {
                     let mut to_disconnect = self.port_connections(snarl_id, snarl)?;
-                    println!("to to_disconnect; {to_disconnect:?}");
                     disconnections.append(&mut to_disconnect);
                     let mut to_connect = self.port_connections_desired(snarl_id, snarl)?;
-                    println!("to connect; {to_connect:?}");
                     connections.append(&mut to_connect);
                 }
             }
 
             for (from, to) in disconnections {
-                // println!("disconnections {from:?} to {to:?}");
                 snarl.disconnect(from, to);
             }
             for (from, to) in connections {
-                // println!("connections {from:?} to {to:?}");
                 snarl.connect(from, to);
             }
             if let BetulaViewerNode::Blackboard(bb) = &mut snarl[snarl_id] {
@@ -1183,7 +1177,7 @@ impl BetulaViewer {
         // Handle any incoming events.
         loop {
             if let Some(event) = self.client.get_event()? {
-                println!("event {event:?}");
+                // println!("event {event:?}");
                 match event {
                     NodeInformation(v) => {
                         let viewer_node = self.get_node_mut(v.id, snarl)?;
@@ -1394,9 +1388,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     ));
                 }
             }
-            (_, _) => {
-                // this connection is disallowed.
-                return;
+
+            (BetulaViewerNode::Blackboard(_), BetulaViewerNode::Blackboard(_)) => {
+                // Nothing to do, blackboards can't connect to each other directly.
             }
         }
 
@@ -1460,9 +1454,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     ));
                 }
             }
-            (_, _) => {
-                // this connection is disallowed.
-                todo!();
+            (BetulaViewerNode::Blackboard(_), BetulaViewerNode::Blackboard(_)) => {
+                // Nothing to do, blackboards can't connect to each other directly.
             }
         }
         if let Some(to_disconnect) = child_to_disconnect {
@@ -1471,7 +1464,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
         if let Some((id, port_connection)) = port_to_disconnect {
-            println!("Disconnecting {port_connection:?} on bb {id:?}");
             match &mut snarl[id] {
                 BetulaViewerNode::Blackboard(bb) => {
                     bb.disconnect_port(&port_connection);
