@@ -1450,6 +1450,16 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 }
             }
 
+            (BetulaViewerNode::Blackboard(bb), BetulaViewerNode::Node(node)) => {
+                // Disconnect an input port.
+                let blackboard_port = bb.blackboard_output_port(&from.id);
+                if let Some(node_port) = node.node_input_port(&to.id) {
+                    port_to_disconnect = Some((
+                        from.id.node,
+                        PortConnection::new(node_port, blackboard_port),
+                    ));
+                }
+            }
             (_, _) => {
                 // this connection is disallowed.
                 todo!();
