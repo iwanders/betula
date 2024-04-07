@@ -1035,15 +1035,10 @@ impl BetulaViewer {
             let blackboard = blackboard.borrow();
             if !blackboard.is_up_to_date() {
                 let connect_ports = blackboard.local_connected_ports();
-                for connect_port in connect_ports {
-                    let cmd = InteractionCommand::connect_port(connect_port);
-                    self.client.send_command(cmd)?;
-                }
                 let disconnect_ports = blackboard.local_disconnected_ports();
-                for disconnect_port in disconnect_ports {
-                    let cmd = InteractionCommand::disconnect_port(disconnect_port);
-                    self.client.send_command(cmd)?;
-                }
+                let cmd =
+                    InteractionCommand::port_disconnect_connect(&disconnect_ports, &connect_ports);
+                self.client.send_command(cmd)?;
             }
         }
 

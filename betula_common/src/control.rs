@@ -73,6 +73,12 @@ impl Clone for Box<dyn TreeCall> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PortChanges {
+    pub disconnect: Vec<PortConnection>,
+    pub connect: Vec<PortConnection>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
     AddNode(AddNodeCommand),
     RemoveNode(NodeId),
@@ -83,8 +89,7 @@ pub enum InteractionCommand {
 
     SetConfig(SetConfigCommand),
 
-    ConnectPort(PortConnection),
-    DisconnectPort(PortConnection),
+    PortDisconnectConnect(PortChanges),
 
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
@@ -108,10 +113,20 @@ impl InteractionCommand {
         InteractionCommand::RemoveNode(id)
     }
     pub fn connect_port(port_connection: PortConnection) -> Self {
-        InteractionCommand::ConnectPort(port_connection)
+        Self::port_disconnect_connect(&vec![], &vec![port_connection])
     }
     pub fn disconnect_port(port_connection: PortConnection) -> Self {
-        InteractionCommand::DisconnectPort(port_connection)
+        Self::port_disconnect_connect(&vec![port_connection], &vec![])
+    }
+
+    pub fn port_disconnect_connect(
+        disconnect: &[PortConnection],
+        connect: &[PortConnection],
+    ) -> Self {
+        InteractionCommand::PortDisconnectConnect(PortChanges {
+            disconnect: disconnect.to_vec(),
+            connect: connect.to_vec(),
+        })
     }
 
     pub fn set_children(parent: NodeId, children: Vec<NodeId>) -> Self {
@@ -230,33 +245,29 @@ impl InteractionCommand {
                     )?),
                 ])
             }
-            InteractionCommand::ConnectPort(port_connection) => {
-                tree.connect_port(port_connection)?;
-                Ok(vec![
-                    InteractionEvent::CommandResult(CommandResult {
-                        command: self.clone(),
-                        error: None,
-                    }),
-                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
-                        tree_support,
-                        port_connection.blackboard_id(),
-                        tree,
-                    )?),
-                ])
-            }
-            InteractionCommand::DisconnectPort(port_connection) => {
-                tree.disconnect_port(port_connection)?;
-                Ok(vec![
-                    InteractionEvent::CommandResult(CommandResult {
-                        command: self.clone(),
-                        error: None,
-                    }),
-                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
-                        tree_support,
-                        port_connection.blackboard_id(),
-                        tree,
-                    )?),
-                ])
+            InteractionCommand::PortDisconnectConnect(port_changes) => {
+                let mut involved_blackboards: std::collections::HashSet<BlackboardId> =
+                    Default::default();
+                for port_connection in &port_changes.disconnect {
+                    tree.disconnect_port(port_connection)?;
+                    involved_blackboards.insert(port_connection.blackboard_id());
+                }
+                for port_connection in &port_changes.connect {
+                    tree.connect_port(port_connection)?;
+                    involved_blackboards.insert(port_connection.blackboard_id());
+                }
+                // Create the interaction events.
+                let mut reply = vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })];
+
+                for blackboard_id in involved_blackboards {
+                    reply.push(InteractionEvent::BlackboardInformation(
+                        Self::blackboard_information(tree_support, blackboard_id, tree)?,
+                    ));
+                }
+                Ok(reply)
             }
             InteractionCommand::SetConfig(config_cmd) => {
                 // get the node
