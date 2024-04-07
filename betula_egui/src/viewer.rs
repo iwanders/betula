@@ -506,6 +506,13 @@ impl ViewerBlackboard {
         self.pending_connections.insert(port_connection.clone());
     }
 
+    pub fn update_changes(&mut self) {
+        // Move from pending to real connections if they became real.
+        self.process_pending();
+        // Enforce removal of removed entries
+        self.drop_removed();
+    }
+
     pub fn process_pending(&mut self) {
         let full_connections = self.data().map(|z| z.connections()).unwrap_or(vec![]);
         // println!("Running process pending, full is {full_connections:?}");
@@ -524,8 +531,39 @@ impl ViewerBlackboard {
                 changed = true;
             }
         }
+
         if changed {
             self.mark_dirty();
+        }
+    }
+
+    pub fn drop_removed(&mut self) {
+        let existing_ports = self.data().map(|d| d.ports()).unwrap_or(vec![]);
+
+        // First, remove any elements from self.ports that is not in existing ports.
+        for our_port_name in self.ports.keys().cloned().collect::<Vec<_>>() {
+            if !existing_ports.contains(&our_port_name) {
+                self.ports.remove(&our_port_name);
+            }
+        }
+
+        // Then, iterate over all the remaining connections and remove whatever the real
+        // blackboard doesn't have.
+        let full_connections: BTreeSet<_> = self
+            .data()
+            .map(|d| d.connections())
+            .unwrap_or(vec![])
+            .drain(..)
+            .collect();
+        for our_port_info in self.ports.values_mut() {
+            let should_be_pruned: Vec<_> = our_port_info
+                .connections
+                .difference(&full_connections)
+                .cloned()
+                .collect();
+            for discard in should_be_pruned {
+                our_port_info.connections.remove(&discard);
+            }
         }
     }
 
@@ -997,17 +1035,17 @@ impl BetulaViewer {
                     let mut to_disconnect = self.port_connections(snarl_id, snarl)?;
                     disconnections.append(&mut to_disconnect);
                     let mut to_connect = self.port_connections_desired(snarl_id, snarl)?;
-                    println!("to connect; {to_connect:?}");
+                    // println!("to connect; {to_connect:?}");
                     connections.append(&mut to_connect);
                 }
             }
 
             for (from, to) in disconnections {
-                println!("disconnections {from:?} to {to:?}");
+                // println!("disconnections {from:?} to {to:?}");
                 snarl.disconnect(from, to);
             }
             for (from, to) in connections {
-                println!("connections {from:?} to {to:?}");
+                // println!("connections {from:?} to {to:?}");
                 snarl.connect(from, to);
             }
             if let BetulaViewerNode::Blackboard(bb) = &mut snarl[snarl_id] {
@@ -1115,7 +1153,7 @@ impl BetulaViewer {
                                 if let BetulaViewerNode::Blackboard(ref mut bb) =
                                     &mut snarl[*snarl_id]
                                 {
-                                    bb.process_pending();
+                                    bb.update_changes();
                                 }
                             }
                         } else {
