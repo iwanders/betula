@@ -84,6 +84,15 @@ pub trait UiNode: Node {
             .filter(|p| p.direction() == PortDirection::Output)
             .position(|x| x.name() == *name)
     }
+
+    fn ui_port_input(&self, name: &PortName) -> Option<usize> {
+        self.ports()
+            .unwrap_or(vec![])
+            .iter()
+            .filter(|p| p.direction() == PortDirection::Input)
+            .position(|x| x.name() == *name)
+            .map(|z| z + 1)
+    }
 }
 
 type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;

@@ -290,11 +290,20 @@ impl ViewerNode {
         self.children_dirty = true;
     }
 
-    pub fn node_port(&self, our_pin: &OutPinId) -> Option<NodePort> {
+    pub fn node_output_port(&self, our_pin: &OutPinId) -> Option<NodePort> {
         let port = self
             .ui_node
             .as_ref()
             .map(|z| z.ui_output_port(our_pin.output))
+            .flatten()?;
+        Some(port.into_node_port(self.id))
+    }
+    pub fn node_input_port(&self, our_pin: &InPinId) -> Option<NodePort> {
+        println!("our pin: {our_pin:?}");
+        let port = self
+            .ui_node
+            .as_ref()
+            .map(|z| z.ui_input_port(our_pin.input))
             .flatten()?;
         Some(port.into_node_port(self.id))
     }
@@ -303,6 +312,12 @@ impl ViewerNode {
         self.ui_node
             .as_ref()
             .map(|z| z.ui_port_output(name))
+            .flatten()
+    }
+    pub fn input_port_to_pin(&self, name: &PortName) -> Option<usize> {
+        self.ui_node
+            .as_ref()
+            .map(|z| z.ui_port_input(name))
             .flatten()
     }
 }
@@ -365,7 +380,6 @@ impl ViewerBlackboard {
                     .map(|d| d.as_ref().borrow().ports().len())
                     .unwrap_or(0)
             })
-            + 1
     }
 
     fn port_name(&self, id: usize) -> Option<PortName> {
@@ -403,7 +417,6 @@ impl ViewerBlackboard {
         } else {
             PinInfo::circle()
                 .with_fill(BLACKBOARD_COLOR)
-                .wiring()
                 .with_gamma(0.5)
         }
     }
@@ -418,7 +431,7 @@ impl ViewerBlackboard {
         self.is_dirty = true;
     }
 
-    pub fn blackboard_port(&self, node_port: &NodePort, inpin: &InPinId) -> BlackboardPort {
+    pub fn blackboard_input_port(&self, node_port: &NodePort, inpin: &InPinId) -> BlackboardPort {
         if let Some(visible_ports) = &self.visible_ports {
             if let Some(this_portname) = visible_ports.get(inpin.input) {
                 BlackboardPort::new(self.id, this_portname)
@@ -427,6 +440,21 @@ impl ViewerBlackboard {
             }
         } else {
             BlackboardPort::new(self.id, &node_port.name())
+        }
+    }
+    pub fn blackboard_output_port(&self, outpin: &OutPinId) -> BlackboardPort {
+        if let Some(visible_ports) = &self.visible_ports {
+            if let Some(this_portname) = visible_ports.get(outpin.output) {
+                BlackboardPort::new(self.id, this_portname)
+            } else {
+                unreachable!("cannot get blackboard output port for this pin")
+            }
+        } else {
+            let d = self.data().expect("should only be borrowed once");
+            let port_name = d
+                .port_name(outpin.output)
+                .expect("pin only shown for visible names");
+            BlackboardPort::new(self.id, &port_name)
         }
     }
 
@@ -502,6 +530,9 @@ impl BlackboardData {
         if let Some(ui_value) = self.ui_values.get_mut(port) {
             ui_value.ui(ui, scale);
         }
+    }
+    pub fn port_name(&self, index: usize) -> Option<PortName> {
+        self.ui_values.keys().nth(index).cloned()
     }
 }
 
@@ -624,6 +655,29 @@ impl BetulaViewer {
                 desired.push((outpin, inpin));
             } else {
                 // From this blackboard to a node.
+                let blackboard_name = connection.blackboard.name();
+                let blackboard_node = self.get_blackboard_ref_snarl(bb_snarl, snarl)?;
+                let output = blackboard_node
+                    .port_to_pin(&blackboard_name)
+                    .ok_or(format!("failed to find port for {blackboard_name:?}"))?;
+                let outpin = OutPinId {
+                    node: bb_snarl,
+                    output,
+                };
+
+                let node_input_id = connection.node.node();
+                let input_node = self.get_node_ref(node_input_id, snarl)?;
+                let snarl_node_id = self.get_node_snarl_id(node_input_id)?;
+                let node_port_name = connection.node.name();
+                let input_pin = input_node
+                    .input_port_to_pin(&node_port_name)
+                    .ok_or(format!("failed to find port for {node_port_name:?}"))?;
+                let inpin = InPinId {
+                    node: snarl_node_id,
+                    input: input_pin,
+                };
+                println!("From {outpin:?} to {inpin:?}");
+                desired.push((outpin, inpin));
             }
         }
         Ok(desired)
@@ -918,6 +972,7 @@ impl BetulaViewer {
         &mut self,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
+        // return Ok(());
         // Draw lines between appropriate ports.
         // Check for dirty nodes, and update the snarl state.
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
@@ -931,18 +986,21 @@ impl BetulaViewer {
                     let mut to_disconnect = self.port_connections(snarl_id, snarl)?;
                     disconnections.append(&mut to_disconnect);
                     let mut to_connect = self.port_connections_desired(snarl_id, snarl)?;
+                    println!("to connect; {to_connect:?}");
                     connections.append(&mut to_connect);
                 }
             }
+
             for (from, to) in disconnections {
+                println!("disconnections {from:?} to {to:?}");
                 snarl.disconnect(from, to);
             }
             for (from, to) in connections {
+                println!("connections {from:?} to {to:?}");
                 snarl.connect(from, to);
             }
             if let BetulaViewerNode::Blackboard(bb) = &mut snarl[snarl_id] {
                 bb.set_clean();
-                // bb.update_children_local();
             }
         }
         Ok(())
@@ -1054,6 +1112,7 @@ impl BetulaViewer {
                             }
                             // The actual blackboard doesn't have the ports right now.
                         }
+                        self.update_snarl_dirty_blackboards(snarl)?;
                     }
                     CommandResult(c) => {
                         match c.command {
@@ -1171,8 +1230,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match (&snarl[from.id.node], &snarl[to.id.node]) {
             (BetulaViewerNode::Node(node), BetulaViewerNode::Blackboard(bb)) => {
                 // Setup an output port.
-                if let Some(node_port) = node.node_port(&from.id) {
-                    let blackboard_port = bb.blackboard_port(&node_port, &to.id);
+                if let Some(node_port) = node.node_output_port(&from.id) {
+                    let blackboard_port = bb.blackboard_input_port(&node_port, &to.id);
                     port_to_connect =
                         Some((to.id.node, PortConnection::new(node_port, blackboard_port)));
                 }
@@ -1185,9 +1244,17 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 child_to_disconnect = Some(to.id);
                 child_to_connect = Some((from.id, to.id));
             }
-            (BetulaViewerNode::Blackboard(_), BetulaViewerNode::Node(_)) => {
+            (BetulaViewerNode::Blackboard(bb), BetulaViewerNode::Node(node)) => {
                 // Setup an input port.
-                todo!("Setup an input port.")
+                let blackboard_port = bb.blackboard_output_port(&from.id);
+                println!("blackboard_port things! {blackboard_port:?}");
+                if let Some(node_port) = node.node_input_port(&to.id) {
+                    println!("Input things! {node_port:?}");
+                    port_to_connect = Some((
+                        from.id.node,
+                        PortConnection::new(node_port, blackboard_port),
+                    ));
+                }
             }
             (_, _) => {
                 // this connection is disallowed.
@@ -1220,7 +1287,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
 
         if let Some((id, port_connection)) = port_to_connect {
-            // println!("Connection {from_snarl:?} {from_node_port:?} {to_blackboard_port:?}");
             match &mut snarl[id] {
                 BetulaViewerNode::Blackboard(bb) => {
                     bb.connect_port(&port_connection);
@@ -1366,10 +1432,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 if pin.remotes.is_empty() {
                     PinInfo::circle()
                         .with_fill(BLACKBOARD_COLOR)
-                        .wiring()
                         .with_gamma(0.5)
                 } else {
-                    PinInfo::circle().with_fill(BLACKBOARD_COLOR).wiring()
+                    PinInfo::circle().with_fill(BLACKBOARD_COLOR)
                 }
             }
         }
