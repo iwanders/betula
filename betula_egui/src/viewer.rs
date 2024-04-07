@@ -324,9 +324,85 @@ impl ViewerNode {
     }
 }
 
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
-pub struct ViewerId(pub Uuid);
+// #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
+// pub struct ViewerId(pub Uuid);
 
+use std::cell::{Ref, RefCell, RefMut};
+use std::rc::Rc;
+type BlackboardDataRc = Rc<RefCell<BlackboardData>>;
+
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Container for the actual data the blackboard holds.
+///
+/// This holds the ports that exist on the blackboard, their UiValue and all the
+/// connections that exist in the backend that relate to this blackboard.
+#[derive(Debug)]
+pub struct BlackboardData {
+    ui_values: BTreeMap<PortName, Box<dyn UiValue>>,
+    connections_local: BTreeSet<PortConnection>,
+    connections_remote: BTreeSet<PortConnection>,
+}
+impl BlackboardData {
+    /// Return whether local and remote are identical.
+    pub fn is_up_to_date(&self) -> bool {
+        self.connections_local == self.connections_remote
+    }
+    /// Get all local connections.
+    pub fn connections(&self) -> Vec<PortConnection> {
+        self.connections_remote.iter().cloned().collect()
+    }
+    /// Get ports that exist in local but not in remote.
+    pub fn local_connected_ports(&self) -> Vec<PortConnection> {
+        let additions = self.connections_local.difference(&self.connections_remote);
+        additions.cloned().collect()
+    }
+    /// Get ports that exist in remote but not in local.
+    pub fn local_disconnected_ports(&self) -> Vec<PortConnection> {
+        let removals = self.connections_remote.difference(&self.connections_local);
+        removals.cloned().collect()
+    }
+    /// True if changed.
+    pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) -> bool {
+        let new_remote: std::collections::BTreeSet<PortConnection> =
+            new_remote.iter().cloned().collect();
+        let changed = self.connections_local == new_remote;
+        if changed {
+            self.connections_remote = new_remote;
+        }
+        changed
+    }
+    /// Set the values.
+    pub fn set_values(&mut self, values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>) {
+        self.ui_values = values;
+    }
+    /// Return the list of port names.
+    pub fn ports(&self) -> Vec<PortName> {
+        self.ui_values.keys().cloned().collect()
+    }
+
+    /// Render a port name.
+    pub fn ui_show_input(&mut self, port: &PortName, ui: &mut Ui, scale: f32) {
+        if let Some(ui_value) = self.ui_values.get_mut(port) {
+            ui_value.ui(ui, scale);
+        }
+    }
+
+    /// Return a port name at this index
+    pub fn port_name(&self, index: usize) -> Option<PortName> {
+        self.ui_values.keys().nth(index).cloned()
+    }
+}
+
+/// A representation of a blackboard in the viewer.
+///
+/// One blackboard may have multiple representations.
+/// Connections to the blackboard may not be visible, this does not mean
+/// they don't exist.
+///
+/// ViewerBlackboard can decide which ports to show, and also which connections
+/// they show to other nodes. The ports shows is always a superset of the ports
+/// used by the connections.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerBlackboard {
     id: BlackboardId,
@@ -338,10 +414,17 @@ pub struct ViewerBlackboard {
     is_dirty: bool,
 
     /// The ports that are shown for this blackboard.
-    visible_ports: Option<Vec<PortName>>,
+    ///
+    /// If None, all ports on the blackboard are depicted.
+    ports: BTreeMap<PortName, ViewerBlackboardPort>,
 
-    /// The connections that are asscoated to this blackboard.
-    visible_connections: Vec<PortConnection>,
+    pending_connections: HashSet<PortConnection>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ViewerBlackboardPort {
+    connections: BTreeSet<PortConnection>,
+    value_editor: bool,
 }
 
 impl ViewerBlackboard {
@@ -350,8 +433,8 @@ impl ViewerBlackboard {
             id,
             data: None,
             is_dirty: false,
-            visible_ports: None,
-            visible_connections: vec![],
+            ports: Default::default(),
+            pending_connections: Default::default(),
         }
     }
     pub fn data(&self) -> Option<Ref<'_, BlackboardData>> {
@@ -363,54 +446,19 @@ impl ViewerBlackboard {
     }
 
     pub fn inputs(&self) -> usize {
-        self.visible_ports
-            .as_ref()
-            .map(|z| z.len())
-            .unwrap_or_else(|| {
-                self.data
-                    .as_ref()
-                    .map(|d| d.as_ref().borrow().ports().len())
-                    .unwrap_or(0)
-            })
-            + 1
+        self.ports.len() + 1
     }
 
     pub fn outputs(&self) -> usize {
-        self.visible_ports
-            .as_ref()
-            .map(|z| z.len())
-            .unwrap_or_else(|| {
-                self.data
-                    .as_ref()
-                    .map(|d| d.as_ref().borrow().ports().len())
-                    .unwrap_or(0)
-            })
+        self.ports.len()
     }
 
     fn port_name(&self, id: usize) -> Option<PortName> {
-        self.visible_ports
-            .as_ref()
-            .map(|z| z.get(id).cloned())
-            .unwrap_or_else(|| {
-                self.data
-                    .as_ref()
-                    .map(|d| d.as_ref().borrow().ports().get(id).cloned())
-                    .flatten()
-            })
+        self.ports.keys().nth(id).cloned()
     }
 
     pub fn port_to_pin(&self, portname: &PortName) -> Option<usize> {
-        if let Some(visible_ports) = &self.visible_ports {
-            // Search in visible ports.
-            visible_ports.iter().position(|z| *z == *portname)
-        } else {
-            let ports = self.data.as_ref().map(|d| d.as_ref().borrow().ports());
-            if let Some(ports) = ports {
-                ports.iter().position(|z| *z == *portname)
-            } else {
-                None
-            }
-        }
+        self.ports.keys().position(|z| *z == *portname)
     }
 
     pub fn ui_show_input(&self, input: &InPinId, ui: &mut Ui, scale: f32) -> PinInfo {
@@ -437,36 +485,57 @@ impl ViewerBlackboard {
     }
 
     pub fn blackboard_input_port(&self, node_port: &NodePort, inpin: &InPinId) -> BlackboardPort {
-        if let Some(visible_ports) = &self.visible_ports {
-            if let Some(this_portname) = visible_ports.get(inpin.input) {
-                BlackboardPort::new(self.id, this_portname)
-            } else {
-                BlackboardPort::new(self.id, &node_port.name())
-            }
+        if let Some(port_name) = self.port_name(inpin.input) {
+            BlackboardPort::new(self.id, &port_name)
         } else {
             BlackboardPort::new(self.id, &node_port.name())
         }
     }
+
     pub fn blackboard_output_port(&self, outpin: &OutPinId) -> BlackboardPort {
-        if let Some(visible_ports) = &self.visible_ports {
-            if let Some(this_portname) = visible_ports.get(outpin.output) {
-                BlackboardPort::new(self.id, this_portname)
-            } else {
-                unreachable!("cannot get blackboard output port for this pin")
-            }
-        } else {
-            let d = self.data().expect("should only be borrowed once");
-            let port_name = d
-                .port_name(outpin.output)
-                .expect("pin only shown for visible names");
-            BlackboardPort::new(self.id, &port_name)
-        }
+        let port_name = self
+            .port_name(outpin.output)
+            .expect("cannot get port for non existing output pin");
+        BlackboardPort::new(self.id, &port_name)
     }
 
-    pub fn connect_port(&self, port_connection: &PortConnection) {
+    pub fn connect_port(&mut self, port_connection: &PortConnection) {
         if let Some(mut data) = self.data_mut() {
             data.connections_local.insert(port_connection.clone());
         }
+        self.pending_connections.insert(port_connection.clone());
+    }
+
+    pub fn process_pending(&mut self) {
+        let full_connections = self.data().map(|z| z.connections()).unwrap_or(vec![]);
+        // println!("Running process pending, full is {full_connections:?}");
+        let mut changed = false;
+        for pending in self.pending_connections.drain() {
+            if full_connections.contains(&pending) {
+                // Ensure that this port exists.
+                let v = self
+                    .ports
+                    .entry(pending.blackboard.name())
+                    .or_insert_with(|| ViewerBlackboardPort {
+                        connections: Default::default(),
+                        value_editor: false,
+                    });
+                v.connections.insert(pending);
+                changed = true;
+            }
+        }
+        if changed {
+            self.mark_dirty();
+        }
+    }
+
+    pub fn connections(&self) -> Vec<PortConnection> {
+        self.ports
+            .values()
+            .map(|z| z.connections.iter())
+            .flatten()
+            .cloned()
+            .collect()
     }
 }
 
@@ -487,57 +556,6 @@ impl BetulaViewerNode {
             BetulaViewerNode::Node(s) => s.input_port_count(),
             BetulaViewerNode::Blackboard(bb) => bb.inputs(),
         }
-    }
-}
-
-use std::cell::{Ref, RefCell, RefMut};
-use std::rc::Rc;
-type BlackboardDataRc = Rc<RefCell<BlackboardData>>;
-
-#[derive(Debug)]
-pub struct BlackboardData {
-    ui_values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>,
-    connections_local: std::collections::BTreeSet<PortConnection>,
-    connections_remote: std::collections::BTreeSet<PortConnection>,
-}
-impl BlackboardData {
-    pub fn is_up_to_date(&self) -> bool {
-        self.connections_local == self.connections_remote
-    }
-    pub fn connections(&self) -> Vec<PortConnection> {
-        self.connections_local.iter().cloned().collect()
-    }
-    pub fn local_connected_ports(&self) -> Vec<PortConnection> {
-        let additions = self.connections_local.difference(&self.connections_remote);
-        additions.cloned().collect()
-    }
-    pub fn local_disconnected_ports(&self) -> Vec<PortConnection> {
-        let removals = self.connections_remote.difference(&self.connections_local);
-        removals.cloned().collect()
-    }
-    /// True if changed.
-    pub fn set_connections_remote(&mut self, new_remote: &[PortConnection]) -> bool {
-        let new_remote: std::collections::BTreeSet<PortConnection> =
-            new_remote.iter().cloned().collect();
-        let changed = self.connections_local == new_remote;
-        if changed {
-            self.connections_remote = new_remote;
-        }
-        changed
-    }
-    pub fn set_values(&mut self, values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>) {
-        self.ui_values = values;
-    }
-    pub fn ports(&self) -> Vec<PortName> {
-        self.ui_values.keys().cloned().collect()
-    }
-    pub fn ui_show_input(&mut self, port: &PortName, ui: &mut Ui, scale: f32) {
-        if let Some(ui_value) = self.ui_values.get_mut(port) {
-            ui_value.ui(ui, scale);
-        }
-    }
-    pub fn port_name(&self, index: usize) -> Option<PortName> {
-        self.ui_values.keys().nth(index).cloned()
     }
 }
 
@@ -617,19 +635,8 @@ impl BetulaViewer {
     ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
         let connections = {
             let bb = self.get_blackboard_ref_snarl(bb_snarl, snarl)?;
-            if let Some(data) = bb.data() {
-                let connections = data.connections().into_iter().filter(|z| {
-                    if let Some(visible) = &bb.visible_ports {
-                        visible.contains(&z.blackboard.name())
-                    } else {
-                        true
-                    }
-                });
-                Ok(connections.collect::<Vec<_>>())
-            } else {
-                Err(format!("could not find blackboard"))
-            }
-        }?;
+            bb.connections()
+        };
         let mut desired: Vec<(OutPinId, InPinId)> = vec![];
         // Okay, we have the connections of interest, next up is determining the pin ids for all of that.
         for connection in connections {
@@ -977,7 +984,6 @@ impl BetulaViewer {
         &mut self,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
-        // return Ok(());
         // Draw lines between appropriate ports.
         // Check for dirty nodes, and update the snarl state.
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
@@ -1090,13 +1096,28 @@ impl BetulaViewer {
                     BlackboardInformation(v) => {
                         if let Some(bb) = self.blackboards.get(&v.id) {
                             // do update things.
-                            let mut bb = (*bb).borrow_mut();
-                            let changed = bb.set_connections_remote(&v.connections);
-                            if changed {
-                                self.mark_blackboards_dirty(&v.id, snarl)?;
+                            {
+                                let mut bb = (*bb).borrow_mut();
+                                let changed = bb.set_connections_remote(&v.connections);
+                                if changed {
+                                    self.mark_blackboards_dirty(&v.id, snarl)?;
+                                }
+                                let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
+                                bb.set_values(ui_values);
                             }
-                            let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
-                            bb.set_values(ui_values);
+
+                            // Handle any pending connections.
+                            for snarl_id in self
+                                .blackboard_map
+                                .get(&v.id)
+                                .ok_or("could not find blackboard id in map")?
+                            {
+                                if let BetulaViewerNode::Blackboard(ref mut bb) =
+                                    &mut snarl[*snarl_id]
+                                {
+                                    bb.process_pending();
+                                }
+                            }
                         } else {
                             // Convert the values.
                             let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
