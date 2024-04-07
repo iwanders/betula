@@ -91,7 +91,6 @@ pub trait UiNode: Node {
             .iter()
             .filter(|p| p.direction() == PortDirection::Input)
             .position(|x| x.name() == *name)
-            .map(|z| z + 1)
     }
 }
 

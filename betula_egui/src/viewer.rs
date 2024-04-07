@@ -299,11 +299,10 @@ impl ViewerNode {
         Some(port.into_node_port(self.id))
     }
     pub fn node_input_port(&self, our_pin: &InPinId) -> Option<NodePort> {
-        println!("our pin: {our_pin:?}");
         let port = self
             .ui_node
             .as_ref()
-            .map(|z| z.ui_input_port(our_pin.input))
+            .map(|z| z.ui_input_port(our_pin.input - 1))
             .flatten()?;
         Some(port.into_node_port(self.id))
     }
@@ -319,6 +318,7 @@ impl ViewerNode {
             .as_ref()
             .map(|z| z.ui_port_input(name))
             .flatten()
+            .map(|z| z + 1)
     }
 }
 
