@@ -124,7 +124,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "egui-snarl demo",
+        "Betula Interface",
         native_options,
         Box::new(|cx| Box::new(DemoApp::new(viewer, cx))),
     )
