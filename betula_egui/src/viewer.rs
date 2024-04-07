@@ -915,7 +915,7 @@ impl BetulaViewer {
     pub fn disconnect_node_port(&mut self, node_port: &NodePort) {
         // Iterate over the blackboards to see if we find one that has
         // this connection.
-        for (k, v) in &self.blackboards {
+        for v in self.blackboards.values() {
             let mut borrowed = v.borrow_mut();
             borrowed.disconnect_node_port(node_port);
         }
@@ -1410,7 +1410,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 let blackboard_port = bb.blackboard_output_port(&from.id);
                 if let Some(node_port) = node.node_input_port(&to.id) {
                     // Disconnect anytyhing that may be connected to this node port.
-                    port_to_disconnect = Some((to.id.node, node_port.clone()));
+                    port_to_disconnect = Some(node_port.clone());
                     port_to_connect = Some((
                         from.id.node,
                         PortConnection::new(node_port, blackboard_port),
@@ -1447,7 +1447,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
 
-        if let Some((node_id, node_port)) = port_to_disconnect {
+        if let Some(node_port) = port_to_disconnect {
             self.disconnect_node_port(&node_port);
         }
         if let Some((id, port_connection)) = port_to_connect {
@@ -1534,8 +1534,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     .map(|v| snarl.out_pin(*v))
                     .collect::<Vec<_>>();
             }
-            _ => {
-                todo!();
+            BetulaViewerNode::Blackboard(_) => {
+                println!("Not doing anything!");
+                return;
             }
         }
         for outpin in to_disconnect {
