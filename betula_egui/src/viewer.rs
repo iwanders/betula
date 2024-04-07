@@ -2,12 +2,12 @@
 Goals:
     - [x] Need to be able to modify the node's configuration with a nice ui.
     - [x] Want the UI to be able to modify the tree, without losing state in the tree.
-    - [ ] We really want the UI to be able to show blackboard values.
-    - [ ] As well as possibly inner state of nodes.
+    - [x] We really want the UI to be able to show blackboard values.
+    - [ ] As well as possibly inner state of nodes?
 
 Thoughts on interaction:
     - [x] We don't want the UI to own the tree.
-    - [ ] Tree should be able to run quickly in the background.
+    - [x] Tree should be able to run quickly in the background.
     - [x] We don't really want the UI to directly access the tree with a mutex.
       Because that'll likely result in contention, as well as a slower running
       tree if we have a UI running.
@@ -392,6 +392,21 @@ impl BlackboardData {
     pub fn port_name(&self, index: usize) -> Option<PortName> {
         self.ui_values.keys().nth(index).cloned()
     }
+
+    /// Rename a port by changing local connections.
+    pub fn rename_port(&mut self, current_portname: &PortName, new_portname: &PortName) {
+        self.connections_local = self
+            .connections_local
+            .iter()
+            .cloned()
+            .map(|mut x| {
+                if x.blackboard.name() == *current_portname {
+                    x.blackboard.set_name(new_portname);
+                }
+                x
+            })
+            .collect();
+    }
 }
 
 /// A representation of a blackboard in the viewer.
@@ -425,6 +440,7 @@ pub struct ViewerBlackboard {
 struct ViewerBlackboardPort {
     connections: BTreeSet<PortConnection>,
     value_editor: bool,
+    port_name_editor: Option<String>,
 }
 
 impl ViewerBlackboard {
@@ -461,9 +477,60 @@ impl ViewerBlackboard {
         self.ports.keys().position(|z| *z == *portname)
     }
 
-    pub fn ui_show_input(&self, input: &InPinId, ui: &mut Ui, scale: f32) -> PinInfo {
+    fn rename_port(&mut self, current_portname: &PortName, new_portname: &PortName) {
+        // Okay, so we are doing a rename, to do so we must:
+        // Move all currently displayed connections with current portname to pending with new port name.
+        // Tell the data to rename the blackboard port.
+        if let Some(mut data) = self.data_mut() {
+            data.rename_port(current_portname, new_portname);
+        }
+        // we currently lose the actual ViewerBlackboardPort, but that's fine.
+        if let Some(old_port_state) = self.ports.get(current_portname) {
+            self.pending_connections = old_port_state
+                .connections
+                .iter()
+                .cloned()
+                .map(|mut x| {
+                    if x.blackboard.name() == *current_portname {
+                        x.blackboard.set_name(new_portname);
+                    }
+                    x
+                })
+                .collect();
+        }
+    }
+
+    pub fn ui_show_input(&mut self, input: &InPinId, ui: &mut Ui, scale: f32) -> PinInfo {
         if let Some(name) = self.port_name(input.input) {
+            let mut do_rename = None;
+            if let Some(bb_port) = self.ports.get_mut(&name) {
+                if let Some(ref mut editor_string) = &mut bb_port.port_name_editor {
+                    let edit_box = egui::TextEdit::singleline(editor_string)
+                        .desired_width(0.0)
+                        .clip_text(false);
+                    let r = ui.add(edit_box);
+                    if r.lost_focus() {
+                        // do really smart things to ehm, you know, rename this port on the backend.
+                        if name.as_ref() != editor_string {
+                            println!("Remapping {name:?} to {editor_string}");
+                            do_rename = Some((name.clone(), PortName(editor_string.clone())));
+                        }
+                        bb_port.port_name_editor = None;
+                    }
+                } else {
+                    let r = ui.label(format!("{}", name.as_ref()));
+                    if r.clicked() {
+                        bb_port.port_name_editor = Some(name.clone().into());
+                    }
+                }
+            }
+            if let Some((old_name, new_name)) = do_rename {
+                self.rename_port(&old_name, &new_name);
+            }
             if let Some(data) = self.data.as_ref() {
+                // let mut value : String = name.0.to_owned();
+                // ui.add(egui::TextEdit::singleline(&mut value));
+                // ui.label(format!("{}", name.as_ref()));
                 data.borrow_mut().ui_show_input(&name, ui, scale);
             }
             PinInfo::circle().with_fill(BLACKBOARD_COLOR)
@@ -526,6 +593,7 @@ impl ViewerBlackboard {
                     .or_insert_with(|| ViewerBlackboardPort {
                         connections: Default::default(),
                         value_editor: false,
+                        port_name_editor: None,
                     });
                 v.connections.insert(pending);
                 changed = true;
@@ -1311,9 +1379,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             (BetulaViewerNode::Blackboard(bb), BetulaViewerNode::Node(node)) => {
                 // Setup an input port.
                 let blackboard_port = bb.blackboard_output_port(&from.id);
-                println!("blackboard_port things! {blackboard_port:?}");
                 if let Some(node_port) = node.node_input_port(&to.id) {
-                    println!("Input things! {node_port:?}");
                     port_to_connect = Some((
                         from.id.node,
                         PortConnection::new(node_port, blackboard_port),
@@ -1561,7 +1627,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 }
             }
-            BetulaViewerNode::Blackboard(ref bb) => bb.ui_show_input(&pin.id, ui, scale),
+            BetulaViewerNode::Blackboard(ref mut bb) => bb.ui_show_input(&pin.id, ui, scale),
         }
     }
 

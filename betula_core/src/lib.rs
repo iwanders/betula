@@ -308,6 +308,9 @@ impl BlackboardPort {
     pub fn name(&self) -> PortName {
         self.name.clone()
     }
+    pub fn set_name(&mut self, new_name: &PortName) {
+        self.name = new_name.clone();
+    }
 }
 
 /// Trait the configuration types must implement.
