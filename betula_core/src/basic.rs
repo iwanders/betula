@@ -74,7 +74,7 @@ impl BasicTree {
             v.extend(
                 b.connections
                     .iter()
-                    .filter(|z| z.node.node() == node && z.node.direction == PortDirection::Input)
+                    .filter(|z| z.node.node() == node && z.node.direction() == PortDirection::Input)
                     .cloned(),
             );
         }
@@ -86,7 +86,9 @@ impl BasicTree {
             v.extend(
                 b.connections
                     .iter()
-                    .filter(|z| z.node.node() == node && z.node.direction == PortDirection::Output)
+                    .filter(|z| {
+                        z.node.node() == node && z.node.direction() == PortDirection::Output
+                    })
                     .cloned(),
             );
         }
@@ -380,7 +382,7 @@ impl Tree for BasicTree {
 
     fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
         let node_id = connection.node.node();
-        if connection.node.direction == PortDirection::Input {
+        if connection.node.direction() == PortDirection::Input {
             // If this is an input port to the node, first disconnect anything associated to that.
             let connections = self.node_port_connections(&connection.node)?;
             for connection in connections {
@@ -446,7 +448,7 @@ impl Tree for BasicTree {
         let mut remapped_interface = Disconnecter {};
         let r = node_mut.port_setup(
             &connection.node.name(),
-            connection.node.direction,
+            connection.node.direction(),
             &mut remapped_interface,
         );
         if r.is_ok() {

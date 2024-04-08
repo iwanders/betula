@@ -70,6 +70,10 @@ pub mod prelude {
 }
 pub use blackboard::Blackboard;
 pub use blackboard::BlackboardInterface;
+pub use blackboard::{
+    BlackboardId, BlackboardPort, Input, NodePort, Output, Port, PortConnection, PortDirection,
+    PortName,
+};
 
 pub mod as_any;
 use as_any::AsAny;
@@ -105,213 +109,6 @@ pub type BetulaError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Error type for results from node execution.
 pub type NodeError = BetulaError;
-
-/// Output trait for nodes that set values.
-pub trait OutputTrait: std::fmt::Debug {
-    type OutputItem;
-    fn set(&self, v: Self::OutputItem) -> Result<(), NodeError>;
-}
-
-/// Input trait for nodes that get values.
-pub trait InputTrait: std::fmt::Debug {
-    type InputItem;
-    fn get(&self) -> Result<Self::InputItem, NodeError>;
-}
-
-#[derive(Debug)]
-struct DefaultOutputInput<T> {
-    z: std::marker::PhantomData<T>,
-}
-impl<T: std::fmt::Debug + 'static> OutputTrait for DefaultOutputInput<T> {
-    type OutputItem = T;
-    fn set(&self, _v: Self::OutputItem) -> Result<(), NodeError> {
-        Err("output is not initialised".into())
-    }
-}
-impl<T: std::fmt::Debug + 'static> InputTrait for DefaultOutputInput<T> {
-    type InputItem = T;
-    fn get(&self) -> Result<Self::InputItem, NodeError> {
-        Err("input is not initialised".into())
-    }
-}
-
-/// The boxed trait that nodes should use to provide values to the blackboard.
-pub type Output<T> = Box<dyn OutputTrait<OutputItem = T>>;
-impl<T: std::fmt::Debug + 'static> Default for Output<T> {
-    fn default() -> Self {
-        Box::new(DefaultOutputInput::<T> {
-            z: std::marker::PhantomData,
-        })
-    }
-}
-
-/// The boxed trait that nodes should use to consume values from the blackboard.
-pub type Input<T> = Box<dyn InputTrait<InputItem = T>>;
-impl<T: std::fmt::Debug + 'static> Default for Input<T> {
-    fn default() -> Self {
-        Box::new(DefaultOutputInput::<T> {
-            z: std::marker::PhantomData,
-        })
-    }
-}
-
-#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
-pub struct PortName(pub String);
-impl PortName {
-    pub fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-impl From<&str> for PortName {
-    fn from(v: &str) -> Self {
-        PortName(v.to_owned())
-    }
-}
-impl std::ops::Deref for PortName {
-    type Target = str;
-    fn deref(&self) -> &<Self as std::ops::Deref>::Target {
-        self.0.as_ref()
-    }
-}
-
-impl From<String> for PortName {
-    fn from(v: String) -> Self {
-        PortName(v.clone())
-    }
-}
-impl Into<String> for PortName {
-    fn into(self) -> std::string::String {
-        self.0.clone()
-    }
-}
-
-/// The type going across the port.
-#[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub struct PortType {
-    id: std::any::TypeId,
-    type_name: &'static str,
-}
-impl PortType {
-    pub fn new<T: 'static>() -> Self {
-        PortType {
-            id: std::any::TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
-        }
-    }
-}
-
-impl std::fmt::Debug for PortType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{0}", self.type_name)
-    }
-}
-
-/// A port with a directionality.
-///
-/// Input ports on a node take inputs by this name. Output ports provide an
-/// output by the specified name.
-#[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum PortDirection {
-    /// The port consumes the value, it is an input to the node.
-    Input,
-    /// The port provides the value, it is an output from the node.
-    Output,
-}
-
-/// A port for a node.
-///
-/// Ports have a name, direction and type.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub struct Port {
-    port_type: PortType,
-    direction: PortDirection,
-    name: PortName,
-}
-
-impl Port {
-    pub fn input<T: 'static>(name: &str) -> Self {
-        Port {
-            port_type: PortType::new::<T>(),
-            direction: PortDirection::Input,
-            name: name.into(),
-        }
-    }
-    pub fn output<T: 'static>(name: &str) -> Self {
-        Port {
-            port_type: PortType::new::<T>(),
-            direction: PortDirection::Output,
-            name: name.into(),
-        }
-    }
-
-    pub fn into_node_port(self, node: NodeId) -> NodePort {
-        NodePort {
-            node,
-            direction: self.direction,
-            name: self.name,
-        }
-    }
-
-    pub fn port_type(&self) -> PortType {
-        self.port_type.clone()
-    }
-    pub fn direction(&self) -> PortDirection {
-        self.direction.clone()
-    }
-    pub fn name(&self) -> PortName {
-        self.name.clone()
-    }
-}
-
-/// An untyped identifier for a node's port.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct NodePort {
-    node: NodeId,
-    direction: PortDirection,
-    name: PortName,
-}
-impl NodePort {
-    pub fn new(node: NodeId, name: &PortName, direction: PortDirection) -> Self {
-        NodePort {
-            node,
-            direction,
-            name: name.clone(),
-        }
-    }
-    pub fn node(&self) -> NodeId {
-        self.node.clone()
-    }
-    pub fn name(&self) -> PortName {
-        self.name.clone()
-    }
-    pub fn direction(&self) -> PortDirection {
-        self.direction.clone()
-    }
-}
-
-/// An untyped identifier for a node's output port.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct BlackboardPort {
-    blackboard: BlackboardId,
-    name: PortName,
-}
-impl BlackboardPort {
-    pub fn new(blackboard: BlackboardId, name: &PortName) -> Self {
-        BlackboardPort {
-            blackboard,
-            name: name.clone(),
-        }
-    }
-    pub fn blackboard(&self) -> BlackboardId {
-        self.blackboard.clone()
-    }
-    pub fn name(&self) -> PortName {
-        self.name.clone()
-    }
-    pub fn set_name(&mut self, new_name: &PortName) {
-        self.name = new_name.clone();
-    }
-}
 
 /// Trait the configuration types must implement.
 pub trait NodeConfig: std::fmt::Debug + AsAny + Send {
@@ -400,7 +197,7 @@ pub trait Node: std::fmt::Debug + AsAny {
         Ok(())
     }
 
-    fn output_setup(&mut self, interface: &mut dyn BlackboardInterface) -> Result<(), NodeError> {
+    fn setup_outputs(&mut self, interface: &mut dyn BlackboardInterface) -> Result<(), NodeError> {
         let _ = interface;
         Ok(())
     }
@@ -438,23 +235,6 @@ pub trait Node: std::fmt::Debug + AsAny {
     where
         Self: Sized;
 }
-
-#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
-pub struct PortConnection {
-    pub node: NodePort,
-    pub blackboard: BlackboardPort,
-}
-impl PortConnection {
-    pub fn new(node: NodePort, blackboard: BlackboardPort) -> Self {
-        Self { node, blackboard }
-    }
-    pub fn blackboard_id(&self) -> BlackboardId {
-        self.blackboard.blackboard
-    }
-}
-
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
-pub struct BlackboardId(pub Uuid);
 
 /// Node ids are represented as UUIDs.
 ///
