@@ -67,6 +67,212 @@ impl BasicTree {
         }
         Ok(v)
     }
+
+    fn node_input_connections(&self, node: NodeId) -> Result<Vec<PortConnection>, BetulaError> {
+        let mut v = vec![];
+        for b in self.blackboards.values() {
+            v.extend(
+                b.connections
+                    .iter()
+                    .filter(|z| z.node.node() == node && z.node.direction == PortDirection::Input)
+                    .cloned(),
+            );
+        }
+        Ok(v)
+    }
+    fn node_output_connections(&self, node: NodeId) -> Result<Vec<PortConnection>, BetulaError> {
+        let mut v = vec![];
+        for b in self.blackboards.values() {
+            v.extend(
+                b.connections
+                    .iter()
+                    .filter(|z| z.node.node() == node && z.node.direction == PortDirection::Output)
+                    .cloned(),
+            );
+        }
+        Ok(v)
+    }
+
+    fn setup_node_outputs(
+        &self,
+        node: NodeId,
+        connections: &[PortConnection],
+    ) -> Result<(), BetulaError> {
+        // Okay, so for all ports that we don't know, we're going to return a dummy function.
+        // Outputs can map to multiple blackboards.
+        // First check if we only got outputs...
+        for c in connections {
+            if c.node.direction() == PortDirection::Input {
+                return Err(format!("got input port for output setup").into());
+            }
+        }
+
+        // Assembly the desired functions.
+        let mut by_portname: HashMap<PortName, Vec<PortConnection>> = Default::default();
+        for connection in connections {
+            let mut z = by_portname
+                .entry(connection.node.name().clone())
+                .or_default();
+            z.push(connection.clone());
+        }
+
+        struct Remapper<'a, 'b> {
+            by_portname: &'a HashMap<PortName, Vec<PortConnection>>,
+            blackboards: &'b HashMap<BlackboardId, BasicBlackboardEntry>,
+        }
+        impl<'a, 'b> BlackboardInterface for Remapper<'a, 'b> {
+            fn writer(
+                &mut self,
+                id: TypeId,
+                key: &PortName,
+                default: &ValueCreator,
+            ) -> Result<Write, NodeError> {
+                let connections = self.by_portname.get(key);
+                if let Some(connections) = connections {
+                    // Collect the writers from all the blackboards.
+                    let mut writers = vec![];
+                    for connection in connections {
+                        let blackboard_id = connection.blackboard.blackboard();
+                        let blackboard_name = connection.blackboard.name();
+                        let blackboard = self.blackboards.get(&blackboard_id).ok_or_else(|| {
+                            format!("blackboard {blackboard_id:?} does not exist").to_string()
+                        })?;
+                        let mut blackboard_mut = blackboard.blackboard.try_borrow_mut()?;
+                        writers.push(blackboard_mut.writer(id, &blackboard_name, default)?);
+                    }
+                    let one_setter: Write = Box::new(move |v| {
+                        for w in &writers {
+                            (*w)(v.clone())?;
+                        }
+                        Ok(())
+                    });
+                    Ok(one_setter)
+                } else {
+                    let v = |_| Err(format!("writing to disconnected port").into());
+                    Ok(Box::new(v))
+                }
+            }
+
+            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
+                let _ = key;
+                // self.blackboard.reader(id, self.new_name)
+                todo!()
+            }
+        }
+
+        let mut remapped_interface = Remapper {
+            by_portname: &by_portname,
+            blackboards: &self.blackboards,
+        };
+
+        let node = self
+            .nodes
+            .get(&node)
+            .ok_or_else(|| format!("node {node:?} does not exist").to_string())?;
+        let mut node_mut = node.node.try_borrow_mut()?;
+
+        // let r = node_mut.output_setup(
+        // &mut remapped_interface,
+        // );
+
+        // &connection.node.name(),
+        // connection.node.direction,
+        for (portname, connections) in by_portname.iter() {
+            let r = node_mut.port_setup(
+                &portname,
+                connections.first().unwrap().node.direction(),
+                &mut remapped_interface,
+            )?;
+        }
+
+        Ok(())
+    }
+    fn setup_node_inputs(
+        &self,
+        node: NodeId,
+        connections: &[PortConnection],
+    ) -> Result<(), BetulaError> {
+        // Okay, so for all ports that we don't know, we're going to return a dummy function.
+        // Outputs can map to multiple blackboards.
+        // First check if we only got outputs...
+        for c in connections {
+            if c.node.direction() == PortDirection::Output {
+                return Err(format!("got output port for input setup").into());
+            }
+        }
+
+        // Assembly the desired functions.
+        let mut by_portname: HashMap<PortName, Option<PortConnection>> = Default::default();
+        for connection in connections {
+            let portname = connection.node.name();
+            let mut z = by_portname.entry(portname.clone()).or_default();
+            if z.is_some() {
+                return Err(format!("got two inputs for port {portname:?}").into());
+            }
+            *z = Some(connection.clone());
+        }
+
+        struct Remapper<'a, 'b> {
+            by_portname: &'a HashMap<PortName, Option<PortConnection>>,
+            blackboards: &'b HashMap<BlackboardId, BasicBlackboardEntry>,
+        }
+        impl<'a, 'b> BlackboardInterface for Remapper<'a, 'b> {
+            fn writer(
+                &mut self,
+                id: TypeId,
+                key: &PortName,
+                default: &ValueCreator,
+            ) -> Result<Write, NodeError> {
+                let v = |_| Err(format!("writing to disconnected port").into());
+                Ok(Box::new(v))
+            }
+
+            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
+                let input_connection = self.by_portname.get(key);
+                if let Some(found_entry) = input_connection {
+                    if let Some(connection) = found_entry {
+                        // Collect the writers from all the blackboards.
+                        let blackboard_id = connection.blackboard.blackboard();
+                        let blackboard_name = connection.blackboard.name();
+                        let blackboard = self.blackboards.get(&blackboard_id).ok_or_else(|| {
+                            format!("blackboard {blackboard_id:?} does not exist").to_string()
+                        })?;
+                        let mut blackboard_mut = blackboard.blackboard.try_borrow_mut()?;
+                        blackboard_mut.reader(id, &blackboard_name)
+                    } else {
+                        let v = || Err(format!("reading from disconnected port").into());
+                        Ok(Box::new(v))
+                    }
+                } else {
+                    let v = || Err(format!("reading from disconnected port").into());
+                    Ok(Box::new(v))
+                }
+            }
+        }
+
+        let mut remapped_interface = Remapper {
+            by_portname: &by_portname,
+            blackboards: &self.blackboards,
+        };
+
+        let node = self
+            .nodes
+            .get(&node)
+            .ok_or_else(|| format!("node {node:?} does not exist").to_string())?;
+        let mut node_mut = node.node.try_borrow_mut()?;
+
+        for (portname, connection) in by_portname.iter() {
+            if let Some(connection) = connection {
+                let r = node_mut.port_setup(
+                    &portname,
+                    connection.node.direction(),
+                    &mut remapped_interface,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Tree for BasicTree {
@@ -159,6 +365,7 @@ impl Tree for BasicTree {
         );
         Ok(id)
     }
+
     fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
         // First, disconnect all connections.
         let connections = self.blackboards.get(&id)?.connections.clone();
@@ -172,64 +379,34 @@ impl Tree for BasicTree {
     }
 
     fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
-        // If this is an input port to the node, first disconnect anything associated to that.
+        let node_id = connection.node.node();
         if connection.node.direction == PortDirection::Input {
+            // If this is an input port to the node, first disconnect anything associated to that.
             let connections = self.node_port_connections(&connection.node)?;
             for connection in connections {
                 self.disconnect_port(&connection)?;
             }
+            let mut inputs = self.node_input_connections(node_id)?;
+            inputs.push(connection.clone());
+            self.setup_node_inputs(node_id, &inputs)?;
+        } else {
+            // Outputs, we can write to multiple blackboards.
+            let mut outputs = self.node_output_connections(node_id)?;
+            outputs.push(connection.clone());
+            self.setup_node_outputs(node_id, &outputs)?;
         }
-        // node_port: &NodePort,
-        // blackboard_port: &BlackboardPort,
+
+        // if r.is_ok() {
+        // Connection was added.
         let blackboard_id = connection.blackboard.blackboard();
         let blackboard = self
             .blackboards
             .get_mut(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
-        let mut blackboard_mut = blackboard.blackboard.try_borrow_mut()?;
-        let node_id = connection.node.node();
-        let node = self
-            .nodes
-            .get(&node_id)
-            .ok_or_else(|| format!("node {node_id:?} does not exist").to_string())?;
-        let mut node_mut = node.node.try_borrow_mut()?;
-
-        struct Remapper<'a, 'b> {
-            new_name: &'a PortName,
-            blackboard: &'b mut dyn Blackboard,
-        }
-        impl<'a, 'b> BlackboardInterface for Remapper<'a, 'b> {
-            fn writer(
-                &mut self,
-                id: TypeId,
-                key: &PortName,
-                default: ValueCreator,
-            ) -> Result<Write, NodeError> {
-                let _ = key;
-                self.blackboard.writer(id, self.new_name, default)
-            }
-
-            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
-                let _ = key;
-                self.blackboard.reader(id, self.new_name)
-            }
-        }
-        let blackboard_name = connection.blackboard.name();
-        let mut remapped_interface = Remapper {
-            new_name: &blackboard_name,
-            blackboard: &mut **blackboard_mut,
-        };
-
-        let r = node_mut.port_setup(
-            &connection.node.name(),
-            connection.node.direction,
-            &mut remapped_interface,
-        );
-        if r.is_ok() {
-            // Connection was added.
-            blackboard.connections.insert(connection.clone());
-        }
-        r
+        blackboard.connections.insert(connection.clone());
+        // }
+        // r
+        Ok(())
     }
 
     fn disconnect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
@@ -252,7 +429,7 @@ impl Tree for BasicTree {
                 &mut self,
                 id: TypeId,
                 key: &PortName,
-                default: ValueCreator,
+                default: &ValueCreator,
             ) -> Result<Write, NodeError> {
                 let _ = (id, key, default);
                 let v = |_| Err(format!("writing to disconnected port").into());
@@ -320,7 +497,7 @@ impl BlackboardInterface for BasicBlackboard {
         &mut self,
         id: TypeId,
         key: &PortName,
-        default: ValueCreator,
+        default: &ValueCreator,
     ) -> Result<Write, NodeError> {
         let (typeid, rc) = self
             .values
@@ -575,7 +752,7 @@ mod tests {
         let output_ports = tree.node_ports(o1)?;
         tree.connect_port_to_blackboard(&output_ports[0], bb1)?;
 
-        const TEST_OUTPUT_TO_MULTIPLE: bool = false;
+        const TEST_OUTPUT_TO_MULTIPLE: bool = true;
         if TEST_OUTPUT_TO_MULTIPLE {
             let bb2 = tree.add_blackboard_boxed(
                 BlackboardId(crate::Uuid::new_v4()),

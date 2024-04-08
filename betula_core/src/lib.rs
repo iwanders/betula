@@ -400,6 +400,11 @@ pub trait Node: std::fmt::Debug + AsAny {
         Ok(())
     }
 
+    fn output_setup(&mut self, interface: &mut dyn BlackboardInterface) -> Result<(), NodeError> {
+        let _ = interface;
+        Ok(())
+    }
+
     /// Allow the node to express what ports it has.
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
         Ok(vec![])

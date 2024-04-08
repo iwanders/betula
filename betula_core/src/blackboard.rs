@@ -52,7 +52,7 @@ impl Clone for Box<dyn Chalkable> {
 pub type Value = Box<dyn Chalkable>;
 
 /// Function type for allocating storage on the blackboard.
-pub type ValueCreator = Box<dyn FnOnce() -> Value>;
+pub type ValueCreator = Box<dyn Fn() -> Value>;
 
 /// Boxed function to read values from the blackboard.
 pub type Read = Box<dyn Fn() -> Result<Value, NodeError>>;
@@ -70,7 +70,7 @@ pub trait BlackboardInterface {
         &mut self,
         id: TypeId,
         key: &PortName,
-        default: ValueCreator,
+        default: &ValueCreator,
     ) -> Result<Write, NodeError>;
 
     fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError>;
@@ -89,16 +89,17 @@ pub trait Setup: BlackboardInterface {
         key: &PortName,
         default: T,
     ) -> Result<Output<T>, NodeError> {
-        self.output_or_else::<T, _>(key, || Box::new(default))
+        let x: ValueCreator = Box::new(move || Box::new(default.clone()));
+        self.output_or_else::<T, _>(key, x)
     }
 
-    fn output_or_else<T: 'static + Chalkable + Clone, Z: FnOnce() -> Value + 'static>(
+    fn output_or_else<T: 'static + Chalkable + Clone, Z: Fn() -> Value + 'static>(
         &mut self,
         key: &PortName,
         default_maker: Z,
     ) -> Result<Output<T>, NodeError> {
-        let writer =
-            BlackboardInterface::writer(self, TypeId::of::<T>(), key, Box::new(default_maker))?;
+        let x: ValueCreator = Box::new(default_maker);
+        let writer = BlackboardInterface::writer(self, TypeId::of::<T>(), key, &x)?;
         struct OutputFor<TT> {
             key: PortName,
             type_name: String,
