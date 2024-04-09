@@ -62,17 +62,18 @@ pub mod prelude {
     pub use crate::{
         // as_any::AsAnyHelper,
         //blackboard::Chalkable
-        blackboard::Setup,
+        blackboard::SetupInput,
+        blackboard::SetupOutput,
         NodeConfigLoad,
         RunContext,
         Tree,
     };
 }
-pub use blackboard::Blackboard;
-pub use blackboard::BlackboardInterface;
+
 pub use blackboard::{
-    BlackboardId, BlackboardPort, Input, NodePort, Output, Port, PortConnection, PortDirection,
-    PortName,
+    Blackboard, BlackboardId, BlackboardInputInterface, BlackboardOutputInterface, BlackboardPort,
+    Input, NodePort, Output, Port, PortConnection, PortDirection, PortName, SetupInput,
+    SetupOutput,
 };
 
 pub mod as_any;
@@ -182,22 +183,18 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///   tree: The context in which this node is being ran.
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
 
-    /// Setup method for the node to obtain outputs and inputs from the
-    /// blackboard. Setup should happen mostly through the [`blackboard::Setup`] trait.
-    /// The node should ONLY use the interface to register the specified port.
-    /// This needs to be for a specific port such that we can setup outputs
-    /// first, and then when the inputs are setup there's strict typechecking.
-    fn port_setup(
+    fn setup_outputs(
         &mut self,
-        port: &PortName,
-        direction: PortDirection,
-        interface: &mut dyn BlackboardInterface,
+        interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
-        let _ = (port, direction, interface);
+        let _ = interface;
         Ok(())
     }
 
-    fn setup_outputs(&mut self, interface: &mut dyn BlackboardInterface) -> Result<(), NodeError> {
+    fn setup_inputs(
+        &mut self,
+        interface: &mut dyn BlackboardInputInterface,
+    ) -> Result<(), NodeError> {
         let _ = interface;
         Ok(())
     }

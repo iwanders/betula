@@ -288,25 +288,29 @@ pub type Write = Box<dyn Fn(Value) -> Result<(), NodeError>>;
 
 /// The object safe blackboard interface, providing access to the getters and setters.
 /// Interation through BlackboardSetup is very much recommended.
-pub trait BlackboardInterface {
+pub trait BlackboardOutputInterface {
     fn writer(
         &mut self,
         id: TypeId,
         key: &PortName,
         default: &ValueCreator,
     ) -> Result<Write, NodeError>;
+}
 
+pub trait BlackboardInputInterface {
     fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError>;
 }
 
-pub trait Blackboard: std::fmt::Debug + AsAny + BlackboardInterface {
+pub trait Blackboard:
+    std::fmt::Debug + AsAny + BlackboardOutputInterface + BlackboardInputInterface
+{
     fn ports(&self) -> Vec<PortName>;
     fn clear(&mut self);
     fn get(&self, port: &PortName) -> Option<Value>;
     fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError>;
 }
 
-pub trait Setup: BlackboardInterface {
+pub trait SetupOutput: BlackboardOutputInterface {
     fn output<T: 'static + Chalkable + Clone>(
         &mut self,
         key: &PortName,
@@ -322,7 +326,7 @@ pub trait Setup: BlackboardInterface {
         default_maker: Z,
     ) -> Result<Output<T>, NodeError> {
         let x: ValueCreator = Box::new(default_maker);
-        let writer = BlackboardInterface::writer(self, TypeId::of::<T>(), key, &x)?;
+        let writer = BlackboardOutputInterface::writer(self, TypeId::of::<T>(), key, &x)?;
         struct OutputFor<TT> {
             key: PortName,
             type_name: String,
@@ -350,12 +354,17 @@ pub trait Setup: BlackboardInterface {
             key: key.clone(),
         }))
     }
+}
 
+impl<T: BlackboardOutputInterface> SetupOutput for T {}
+impl SetupOutput for dyn BlackboardOutputInterface + '_ {}
+
+pub trait SetupInput: BlackboardInputInterface {
     fn input<T: 'static + Chalkable + Clone>(
         &mut self,
         key: &PortName,
     ) -> Result<Input<T>, NodeError> {
-        let reader = BlackboardInterface::reader(self, &TypeId::of::<T>(), key)?;
+        let reader = BlackboardInputInterface::reader(self, &TypeId::of::<T>(), key)?;
 
         struct InputFor<TT> {
             key: PortName,
@@ -392,9 +401,8 @@ pub trait Setup: BlackboardInterface {
         }))
     }
 }
-
-impl<T: BlackboardInterface> Setup for T {}
-impl Setup for dyn BlackboardInterface + '_ {}
+impl<T: BlackboardInputInterface> SetupInput for T {}
+impl SetupInput for dyn BlackboardInputInterface + '_ {}
 
 #[cfg(test)]
 mod tests {

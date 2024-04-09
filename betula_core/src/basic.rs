@@ -122,7 +122,7 @@ impl BasicTree {
             by_portname: &'a HashMap<PortName, Vec<PortConnection>>,
             blackboards: &'b HashMap<BlackboardId, BasicBlackboardEntry>,
         }
-        impl<'a, 'b> BlackboardInterface for Remapper<'a, 'b> {
+        impl<'a, 'b> BlackboardOutputInterface for Remapper<'a, 'b> {
             fn writer(
                 &mut self,
                 id: TypeId,
@@ -154,12 +154,6 @@ impl BasicTree {
                     Ok(Box::new(v))
                 }
             }
-
-            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
-                let _ = key;
-                // self.blackboard.reader(id, self.new_name)
-                todo!()
-            }
         }
 
         let mut remapped_interface = Remapper {
@@ -180,11 +174,7 @@ impl BasicTree {
         // &connection.node.name(),
         // connection.node.direction,
         for (portname, connections) in by_portname.iter() {
-            let r = node_mut.port_setup(
-                &portname,
-                connections.first().unwrap().node.direction(),
-                &mut remapped_interface,
-            )?;
+            let r = node_mut.setup_outputs(&mut remapped_interface)?;
         }
 
         Ok(())
@@ -218,17 +208,7 @@ impl BasicTree {
             by_portname: &'a HashMap<PortName, Option<PortConnection>>,
             blackboards: &'b HashMap<BlackboardId, BasicBlackboardEntry>,
         }
-        impl<'a, 'b> BlackboardInterface for Remapper<'a, 'b> {
-            fn writer(
-                &mut self,
-                id: TypeId,
-                key: &PortName,
-                default: &ValueCreator,
-            ) -> Result<Write, NodeError> {
-                let v = |_| Err(format!("writing to disconnected port").into());
-                Ok(Box::new(v))
-            }
-
+        impl<'a, 'b> BlackboardInputInterface for Remapper<'a, 'b> {
             fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
                 let input_connection = self.by_portname.get(key);
                 if let Some(found_entry) = input_connection {
@@ -265,11 +245,7 @@ impl BasicTree {
 
         for (portname, connection) in by_portname.iter() {
             if let Some(connection) = connection {
-                let r = node_mut.port_setup(
-                    &portname,
-                    connection.node.direction(),
-                    &mut remapped_interface,
-                )?;
+                let r = node_mut.setup_inputs(&mut remapped_interface)?;
             }
         }
 
@@ -426,7 +402,7 @@ impl Tree for BasicTree {
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
 
         struct Disconnecter {}
-        impl BlackboardInterface for Disconnecter {
+        impl BlackboardOutputInterface for Disconnecter {
             fn writer(
                 &mut self,
                 id: TypeId,
@@ -437,7 +413,8 @@ impl Tree for BasicTree {
                 let v = |_| Err(format!("writing to disconnected port").into());
                 Ok(Box::new(v))
             }
-
+        }
+        impl BlackboardInputInterface for Disconnecter {
             fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
                 let _ = (id, key);
                 let v = || Err(format!("reading from disconnected port").into());
@@ -446,11 +423,8 @@ impl Tree for BasicTree {
         }
 
         let mut remapped_interface = Disconnecter {};
-        let r = node_mut.port_setup(
-            &connection.node.name(),
-            connection.node.direction(),
-            &mut remapped_interface,
-        );
+        let r = node_mut.setup_inputs(&mut remapped_interface);
+        let r = node_mut.setup_outputs(&mut remapped_interface);
         if r.is_ok() {
             // Connection was added.
             blackboard.connections.remove(connection);
@@ -486,7 +460,9 @@ impl Tree for BasicTree {
 use std::any::Any;
 use std::rc::Rc;
 
-use crate::blackboard::{BlackboardInterface, Read, Value, ValueCreator, Write};
+use crate::blackboard::{
+    BlackboardInputInterface, BlackboardOutputInterface, Read, Value, ValueCreator, Write,
+};
 
 use std::any::TypeId;
 #[derive(Default, Debug)]
@@ -494,7 +470,7 @@ pub struct BasicBlackboard {
     values: HashMap<PortName, (TypeId, Rc<RefCell<Value>>)>,
 }
 use crate::as_any::AsAny;
-impl BlackboardInterface for BasicBlackboard {
+impl BlackboardOutputInterface for BasicBlackboard {
     fn writer(
         &mut self,
         id: TypeId,
@@ -537,7 +513,9 @@ impl BlackboardInterface for BasicBlackboard {
             }))
         }
     }
+}
 
+impl BlackboardInputInterface for BasicBlackboard {
     fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
         let (typeid, rc) = self
             .values
@@ -668,14 +646,13 @@ mod tests {
         fn ports(&self) -> Result<Vec<Port>, NodeError> {
             Ok(vec![Port::output::<f64>("a")])
         }
-        fn port_setup(
+
+        fn setup_outputs(
             &mut self,
-            port: &PortName,
-            direction: PortDirection,
-            interface: &mut dyn BlackboardInterface,
+            interface: &mut dyn BlackboardOutputInterface,
         ) -> Result<(), NodeError> {
-            let _ = direction;
-            let z = interface.output::<f64>(&port, 0.0)?;
+            // let _ = direction;
+            let z = interface.output::<f64>(&"a".into(), 0.0)?;
             self.a_output = z;
             Ok(())
         }
@@ -707,14 +684,12 @@ mod tests {
         fn ports(&self) -> Result<Vec<Port>, NodeError> {
             Ok(vec![Port::input::<f64>("a")])
         }
-        fn port_setup(
+
+        fn setup_inputs(
             &mut self,
-            port: &PortName,
-            direction: PortDirection,
-            interface: &mut dyn BlackboardInterface,
+            interface: &mut dyn BlackboardInputInterface,
         ) -> Result<(), NodeError> {
-            let _ = direction;
-            self.a_input = interface.input::<f64>(&port)?;
+            self.a_input = interface.input::<f64>(&"a".into())?;
             Ok(())
         }
 
