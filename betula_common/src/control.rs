@@ -1,5 +1,6 @@
 use betula_core::{
-    BetulaError, BlackboardId, NodeId, NodeStatus, NodeType, PortConnection, PortName,
+    blackboard::{BlackboardId, PortConnection, PortName},
+    BetulaError, NodeId, NodeStatus, NodeType,
 };
 
 use crate::{

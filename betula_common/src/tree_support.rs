@@ -1,6 +1,7 @@
 use betula_core::prelude::*;
 use betula_core::{
-    blackboard::Chalkable, BetulaError, Blackboard, Node, NodeConfig, NodeType, PortName,
+    blackboard::{Chalkable, PortConnection, PortName},
+    BetulaError, Blackboard, BlackboardId, Node, NodeConfig, NodeType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +41,10 @@ pub type SerializedBlackboardValues = BTreeMap<PortName, SerializedValue>;
 
 mod v1 {
     use super::{SerializableHolder, SerializedValue};
-    use betula_core::{BlackboardId, NodeId, PortConnection, PortName};
+    use betula_core::{
+        blackboard::{PortConnection, PortName},
+        BlackboardId, NodeId,
+    };
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
 
@@ -307,7 +311,6 @@ impl TreeSupport {
         tree: &mut dyn Tree,
         deserializer: D,
     ) -> Result<(), D::Error> {
-        use betula_core::{BlackboardId, PortConnection};
         use serde::de::Error;
         let config: Config = Config::deserialize(deserializer)?;
 

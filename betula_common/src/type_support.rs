@@ -1,5 +1,5 @@
 use betula_core::BetulaError;
-use betula_core::{Node, NodeConfig};
+use betula_core::{IsNodeConfig, Node, NodeConfig};
 use serde::Serialize;
 
 /// Trait to create nodes out of thin air.
@@ -46,11 +46,17 @@ pub trait ConfigConverter: std::fmt::Debug {
 }
 
 pub trait DefaultConfigRequirements:
-    Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone + Send
+    Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone + Send + IsNodeConfig
 {
 }
 impl<T> DefaultConfigRequirements for T where
-    T: Serialize + serde::de::DeserializeOwned + 'static + std::fmt::Debug + Clone + Send
+    T: Serialize
+        + serde::de::DeserializeOwned
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + IsNodeConfig
 {
 }
 
@@ -162,6 +168,7 @@ mod test {
         nonzero: f32,
         interval: f64,
     }
+    impl IsNodeConfig for DummyConfig {}
 
     impl Default for DummyConfig {
         fn default() -> Self {

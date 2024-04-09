@@ -58,23 +58,35 @@ pub mod basic;
 pub mod blackboard;
 pub mod nodes;
 
+/// Prelude with only traits.
 pub mod prelude {
     pub use crate::{
-        // as_any::AsAnyHelper,
-        //blackboard::Chalkable
-        blackboard::SetupInput,
-        blackboard::SetupOutput,
-        // blackboard::BlackboardInputInterface,
-        // blackboard::BlackboardOutputInterface,
-        NodeConfigLoad,
-        RunContext,
-        Tree,
+        blackboard::BlackboardInputInterface, blackboard::BlackboardOutputInterface,
+        blackboard::SetupInput, blackboard::SetupOutput, NodeConfigLoad, RunContext, Tree,
     };
 }
 
+/// All imports necessary to create a node.
+pub mod node_prelude {
+    pub use crate::{
+        //
+        blackboard::{Input, Output, Port},
+        prelude::*,
+        IsNodeConfig,
+        Node,
+        //
+        NodeConfig,
+        NodeError,
+        NodeStatus,
+        NodeType,
+    };
+}
+
+pub use blackboard::{Blackboard, BlackboardId};
+
 use blackboard::{
-    Blackboard, BlackboardId, BlackboardInputInterface, BlackboardOutputInterface, BlackboardPort,
-    NodePort, Port, PortConnection, PortDirection, PortName,
+    BlackboardInputInterface, BlackboardOutputInterface, BlackboardPort, NodePort, Port,
+    PortConnection,
 };
 
 pub mod as_any;
@@ -116,7 +128,8 @@ pub type NodeError = BetulaError;
 pub trait NodeConfig: std::fmt::Debug + AsAny + Send {
     fn clone_boxed(&self) -> Box<dyn NodeConfig>;
 }
-impl<T: std::fmt::Debug + 'static + Send + Clone> NodeConfig for T {
+pub trait IsNodeConfig {}
+impl<T: std::fmt::Debug + 'static + Send + Clone + IsNodeConfig> NodeConfig for T {
     fn clone_boxed(&self) -> Box<dyn NodeConfig> {
         Box::new(self.clone())
     }
@@ -150,7 +163,7 @@ pub trait NodeConfigLoad: NodeConfig {
         Ok(())
     }
 }
-impl<T: NodeConfig> NodeConfigLoad for T {}
+impl<T: NodeConfig + IsNodeConfig> NodeConfigLoad for T {}
 impl NodeConfigLoad for dyn NodeConfig + '_ {}
 
 /// The type of a particular node.

@@ -1,14 +1,11 @@
-use betula_core::prelude::*;
-use betula_core::{
-    BlackboardInterface, Input, Node, NodeConfig, NodeError, NodeStatus, NodeType, Port,
-    PortDirection, PortName,
-};
+use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DelayNodeConfig {
     pub interval: f64,
 }
+impl IsNodeConfig for DelayNodeConfig {}
 
 #[derive(Debug, Default)]
 pub struct DelayNode {
@@ -45,14 +42,11 @@ impl Node for DelayNode {
         Ok(vec![Port::input::<f64>("time")])
     }
 
-    fn port_setup(
+    fn setup_inputs(
         &mut self,
-        port: &PortName,
-        direction: PortDirection,
-        interface: &mut dyn BlackboardInterface,
+        interface: &mut dyn BlackboardInputInterface,
     ) -> Result<(), NodeError> {
-        let _ = direction;
-        self.time = interface.input::<f64>(port)?;
+        self.time = interface.input::<f64>(&"time".into())?;
         Ok(())
     }
 
@@ -92,13 +86,10 @@ mod tests {
 
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(DelayNode::new(5.0)))?;
         let ports = tree.node_mut(root).ok_or("node not found")?.ports()?;
-        for p in ports {
-            tree.node_mut(root).ok_or("node not found")?.port_setup(
-                &p.name(),
-                PortDirection::Input,
-                &mut bb,
-            )?;
-        }
+        assert!(ports.len() == 1);
+        tree.node_mut(root)
+            .ok_or("node not found")?
+            .setup_inputs(&mut bb)?;
         assert!(tree.execute(root)? == NodeStatus::Running);
         time.set(2.0)?;
         assert!(tree.execute(root)? == NodeStatus::Running);

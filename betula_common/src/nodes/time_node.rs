@@ -1,8 +1,4 @@
-use betula_core::prelude::*;
-use betula_core::{
-    BlackboardInterface, Node, NodeError, NodeStatus, NodeType, Output, Port, PortDirection,
-    PortName,
-};
+use betula_core::node_prelude::*;
 
 #[derive(Debug, Default)]
 pub struct TimeNode {
@@ -25,14 +21,11 @@ impl Node for TimeNode {
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
         Ok(vec![Port::output::<f64>("time")])
     }
-    fn port_setup(
+    fn setup_outputs(
         &mut self,
-        port: &PortName,
-        direction: PortDirection,
-        interface: &mut dyn BlackboardInterface,
+        interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
-        let _ = direction;
-        self.time_output = interface.output::<f64>(&port, 0.0)?;
+        self.time_output = interface.output::<f64>(&"time".into(), 0.0)?;
         Ok(())
     }
 
@@ -62,13 +55,10 @@ mod tests {
         let mut bb = BasicBlackboard::default();
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(TimeNode::default()))?;
         let ports = tree.node_mut(root).ok_or("node not found")?.ports()?;
-        for p in ports {
-            tree.node_mut(root).ok_or("node not found")?.port_setup(
-                &p.name(),
-                PortDirection::Output,
-                &mut bb,
-            )?;
-        }
+        assert!(ports.len() == 1);
+        tree.node_mut(root)
+            .ok_or("node not found")?
+            .setup_outputs(&mut bb)?;
         tree.execute(root)?;
 
         let v = bb.input::<f64>(&"time".into())?;

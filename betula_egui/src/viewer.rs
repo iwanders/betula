@@ -56,12 +56,11 @@ use crate::{UiConfigResponse, UiNode, UiSupport, UiValue};
 use egui::{Color32, Ui};
 
 use betula_core::{
-    BetulaError, BlackboardId, BlackboardPort, NodeId as BetulaNodeId, NodePort, NodeType,
-    PortConnection, PortName,
+    blackboard::{BlackboardPort, NodePort, PortConnection, PortDirection, PortName},
+    BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeType,
 };
 
-use betula_common::control::InteractionCommand;
-use betula_common::control::TreeClient;
+use betula_common::control::{InteractionCommand, TreeClient};
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -791,7 +790,7 @@ impl BetulaViewer {
         let mut desired: Vec<(OutPinId, InPinId)> = vec![];
         // Okay, we have the connections of interest, next up is determining the pin ids for all of that.
         for connection in connections {
-            if connection.node.direction() == betula_core::PortDirection::Output {
+            if connection.node.direction() == PortDirection::Output {
                 // From node to this blackboard.
                 let node_id = connection.node.node();
                 let snarl_node_id = self.get_node_snarl_id(node_id)?;

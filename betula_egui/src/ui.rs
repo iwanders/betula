@@ -5,7 +5,8 @@ use egui::Ui;
 use std::collections::HashMap;
 
 use betula_core::{
-    blackboard::Chalkable, BetulaError, Node, NodeType, Port, PortDirection, PortName,
+    blackboard::{Chalkable, Port, PortDirection, PortName},
+    BetulaError, Node, NodeType,
 };
 
 use std::collections::BTreeMap;

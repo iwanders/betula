@@ -3,8 +3,8 @@ use crate::prelude::*;
 use std::collections::HashMap;
 
 use crate::{
+    blackboard::{PortConnection, PortDirection, PortName},
     BetulaError, Blackboard, BlackboardId, Node, NodeError, NodeId, NodePort, NodeStatus,
-    PortConnection, PortDirection, PortName,
 };
 
 struct TreeContext<'a> {
