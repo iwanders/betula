@@ -112,7 +112,7 @@ impl BasicTree {
         // Assembly the desired functions.
         let mut by_portname: HashMap<PortName, Vec<PortConnection>> = Default::default();
         for connection in connections {
-            let mut z = by_portname
+            let z = by_portname
                 .entry(connection.node.name().clone())
                 .or_default();
             z.push(connection.clone());
@@ -167,15 +167,7 @@ impl BasicTree {
             .ok_or_else(|| format!("node {node:?} does not exist").to_string())?;
         let mut node_mut = node.node.try_borrow_mut()?;
 
-        // let r = node_mut.output_setup(
-        // &mut remapped_interface,
-        // );
-
-        // &connection.node.name(),
-        // connection.node.direction,
-        for (portname, connections) in by_portname.iter() {
-            let r = node_mut.setup_outputs(&mut remapped_interface)?;
-        }
+        node_mut.setup_outputs(&mut remapped_interface)?;
 
         Ok(())
     }
@@ -197,7 +189,7 @@ impl BasicTree {
         let mut by_portname: HashMap<PortName, Option<PortConnection>> = Default::default();
         for connection in connections {
             let portname = connection.node.name();
-            let mut z = by_portname.entry(portname.clone()).or_default();
+            let z = by_portname.entry(portname.clone()).or_default();
             if z.is_some() {
                 return Err(format!("got two inputs for port {portname:?}").into());
             }
@@ -243,11 +235,7 @@ impl BasicTree {
             .ok_or_else(|| format!("node {node:?} does not exist").to_string())?;
         let mut node_mut = node.node.try_borrow_mut()?;
 
-        for (portname, connection) in by_portname.iter() {
-            if let Some(connection) = connection {
-                let r = node_mut.setup_inputs(&mut remapped_interface)?;
-            }
-        }
+        node_mut.setup_inputs(&mut remapped_interface)?;
 
         Ok(())
     }
@@ -423,13 +411,11 @@ impl Tree for BasicTree {
         }
 
         let mut remapped_interface = Disconnecter {};
-        let r = node_mut.setup_inputs(&mut remapped_interface);
-        let r = node_mut.setup_outputs(&mut remapped_interface);
-        if r.is_ok() {
-            // Connection was added.
-            blackboard.connections.remove(connection);
-        }
-        r
+        node_mut.setup_inputs(&mut remapped_interface)?;
+        node_mut.setup_outputs(&mut remapped_interface)?;
+        // Connection was added.
+        blackboard.connections.remove(connection);
+        Ok(())
     }
 
     fn blackboard_connections(&self, id: BlackboardId) -> Vec<PortConnection> {
@@ -632,7 +618,7 @@ mod tests {
         println!("value: {:?}", z);
     }
 
-    use crate::{Input, NodeType, Output, Port};
+    use crate::{blackboard::Input, blackboard::Output, NodeType, Port};
 
     #[derive(Debug, Default)]
     pub struct OutputNode {

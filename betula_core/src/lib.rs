@@ -74,8 +74,7 @@ pub mod prelude {
 
 use blackboard::{
     Blackboard, BlackboardId, BlackboardInputInterface, BlackboardOutputInterface, BlackboardPort,
-    Input, NodePort, Output, Port, PortConnection, PortDirection, PortName, SetupInput,
-    SetupOutput,
+    NodePort, Port, PortConnection, PortDirection, PortName,
 };
 
 pub mod as_any;
@@ -187,12 +186,12 @@ pub trait Node: std::fmt::Debug + AsAny {
 
     /// Called for the node to setup its outputs.
     ///
-    /// Use [`crate::SetupOutput`] to interact with the `interface`, so you construct inputs like so:
+    /// Use [`crate::prelude::SetupOutput`] to interact with the `interface`, so you construct inputs like so:
     /// ```
     ///  # use betula_core::prelude::*;
     ///  # use betula_core::{blackboard::SetupOutput, blackboard::BlackboardOutputInterface, blackboard::Output, NodeError};
     ///  # fn setup_outputs(/*&mut self,*/ interface: &mut dyn BlackboardOutputInterface) -> Result<(), NodeError> {
-    ///  let my_value_output : Output<f64>  = interface.output::<f64>(&"a".into(), 3.3)?;
+    ///  let my_value_output : Output<f64>  = interface.output::<f64>(&"my_value_portname".into(), 3.3)?;
     ///  my_value_output.set(1337.0f64)?;
     ///  # Ok(())}
     /// ```
@@ -206,12 +205,12 @@ pub trait Node: std::fmt::Debug + AsAny {
 
     /// Called for the node to setup its outputs.
     ///
-    /// Use [`crate::SetupInput`] to interact with the `interface`, so you construct inputs like so:
+    /// Use [`crate::prelude::SetupInput`] to interact with the `interface`, so you construct inputs like so:
     /// ```
     ///  # use betula_core::prelude::*;
     ///  # use betula_core::{blackboard::SetupInput, blackboard::BlackboardInputInterface, blackboard::Input, NodeError};
     ///  # fn setup_inputs(/*&mut self,*/ interface: &mut dyn BlackboardInputInterface) -> Result<(), NodeError> {
-    ///  let my_value_input : Input<f64>  = interface.input::<f64>(&"a".into())?;
+    ///  let my_value_input : Input<f64>  = interface.input::<f64>(&"my_value_portname".into())?;
     ///  let my_value : f64 = my_value_input.get()?;
     ///  # Ok(())}
     /// ```

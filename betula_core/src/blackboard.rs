@@ -3,9 +3,11 @@ use crate::{BetulaError, NodeError, NodeId, Uuid};
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 
+/// Id for blackboards.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct BlackboardId(pub Uuid);
 
+/// A name for an input or outuput port.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct PortName(pub String);
 impl PortName {
@@ -114,7 +116,7 @@ impl Port {
     }
 }
 
-/// An untyped identifier for a node's port.
+/// An untyped identifier for a specific node's port.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct NodePort {
     node: NodeId,
@@ -140,7 +142,7 @@ impl NodePort {
     }
 }
 
-/// An untyped identifier for a node's output port.
+/// An untyped identifier for a port on the blackboard.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct BlackboardPort {
     blackboard: BlackboardId,
@@ -164,6 +166,7 @@ impl BlackboardPort {
     }
 }
 
+/// A port connection is an untyped connection between a [`NodePort`] and [`BlackboardPort`].
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct PortConnection {
     pub node: NodePort,
@@ -267,13 +270,7 @@ impl Clone for Box<dyn Chalkable> {
     }
 }
 
-// Disable this for now, it feels fragile.
-// impl PartialEq<Box<dyn Chalkable>> for Box<dyn Chalkable> {
-// fn eq(&self, rhs: &Box<dyn Chalkable> ) -> bool {
-// (**self).is_equal(&**rhs)
-// }
-// }
-
+/// A value on the blackboard.
 pub type Value = Box<dyn Chalkable>;
 
 /// Function type for allocating storage on the blackboard.
@@ -286,8 +283,9 @@ pub type Read = Box<dyn Fn() -> Result<Value, NodeError>>;
 /// return the previous value to ensure purity.
 pub type Write = Box<dyn Fn(Value) -> Result<(), NodeError>>;
 
-/// The object safe blackboard interface, providing access to the getters and setters.
-/// Interation through BlackboardSetup is very much recommended.
+/// The object safe blackboard output interface, provides [`Write`] functions.
+///
+/// Don't interact with this directly, do so through [`SetupOutput`].
 pub trait BlackboardOutputInterface {
     fn writer(
         &mut self,
@@ -297,19 +295,36 @@ pub trait BlackboardOutputInterface {
     ) -> Result<Write, NodeError>;
 }
 
+/// The object safe blackboard output interface, provides [`Read`] functions.
+///
+/// Don't interact with this directly, do so through [`SetupInput`].
 pub trait BlackboardInputInterface {
     fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError>;
 }
 
+/// Interface blackboards must provide.
 pub trait Blackboard:
     std::fmt::Debug + AsAny + BlackboardOutputInterface + BlackboardInputInterface
 {
+    /// The current ports on this blackboard.
     fn ports(&self) -> Vec<PortName>;
+
+    /// Clear the entire blackboard, ports is empty after this.
     fn clear(&mut self);
+
+    /// Get the value for the provided port name.
     fn get(&self, port: &PortName) -> Option<Value>;
+
+    /// Set a value to the provided port name.
+    ///
+    /// Returns `Err` if the type that already exists on the blackboard is different
+    /// from the type of the value that is provided.
     fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError>;
 }
 
+/// Helper trait to interact with [`BlackboardOutputInterface`].
+///
+/// See [`crate::Node::setup_outputs`] for an example.
 pub trait SetupOutput: BlackboardOutputInterface {
     fn output<T: 'static + Chalkable + Clone>(
         &mut self,
@@ -359,6 +374,9 @@ pub trait SetupOutput: BlackboardOutputInterface {
 impl<T: BlackboardOutputInterface> SetupOutput for T {}
 impl SetupOutput for dyn BlackboardOutputInterface + '_ {}
 
+/// Helper trait to interact with [`BlackboardInputInterface`].
+///
+/// See [`crate::Node::setup_inputs`] for an example.
 pub trait SetupInput: BlackboardInputInterface {
     fn input<T: 'static + Chalkable + Clone>(
         &mut self,
