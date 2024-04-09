@@ -632,7 +632,7 @@ mod tests {
         println!("value: {:?}", z);
     }
 
-    use crate::{Input, NodeType, Output, Port, PortDirection, PortName};
+    use crate::{Input, NodeType, Output, Port};
 
     #[derive(Debug, Default)]
     pub struct OutputNode {

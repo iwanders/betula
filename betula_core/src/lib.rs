@@ -64,13 +64,15 @@ pub mod prelude {
         //blackboard::Chalkable
         blackboard::SetupInput,
         blackboard::SetupOutput,
+        // blackboard::BlackboardInputInterface,
+        // blackboard::BlackboardOutputInterface,
         NodeConfigLoad,
         RunContext,
         Tree,
     };
 }
 
-pub use blackboard::{
+use blackboard::{
     Blackboard, BlackboardId, BlackboardInputInterface, BlackboardOutputInterface, BlackboardPort,
     Input, NodePort, Output, Port, PortConnection, PortDirection, PortName, SetupInput,
     SetupOutput,
@@ -183,6 +185,17 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///   tree: The context in which this node is being ran.
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
 
+    /// Called for the node to setup its outputs.
+    ///
+    /// Use [`crate::SetupOutput`] to interact with the `interface`, so you construct inputs like so:
+    /// ```
+    ///  # use betula_core::prelude::*;
+    ///  # use betula_core::{blackboard::SetupOutput, blackboard::BlackboardOutputInterface, blackboard::Output, NodeError};
+    ///  # fn setup_outputs(/*&mut self,*/ interface: &mut dyn BlackboardOutputInterface) -> Result<(), NodeError> {
+    ///  let my_value_output : Output<f64>  = interface.output::<f64>(&"a".into(), 3.3)?;
+    ///  my_value_output.set(1337.0f64)?;
+    ///  # Ok(())}
+    /// ```
     fn setup_outputs(
         &mut self,
         interface: &mut dyn BlackboardOutputInterface,
@@ -191,6 +204,17 @@ pub trait Node: std::fmt::Debug + AsAny {
         Ok(())
     }
 
+    /// Called for the node to setup its outputs.
+    ///
+    /// Use [`crate::SetupInput`] to interact with the `interface`, so you construct inputs like so:
+    /// ```
+    ///  # use betula_core::prelude::*;
+    ///  # use betula_core::{blackboard::SetupInput, blackboard::BlackboardInputInterface, blackboard::Input, NodeError};
+    ///  # fn setup_inputs(/*&mut self,*/ interface: &mut dyn BlackboardInputInterface) -> Result<(), NodeError> {
+    ///  let my_value_input : Input<f64>  = interface.input::<f64>(&"a".into())?;
+    ///  let my_value : f64 = my_value_input.get()?;
+    ///  # Ok(())}
+    /// ```
     fn setup_inputs(
         &mut self,
         interface: &mut dyn BlackboardInputInterface,
