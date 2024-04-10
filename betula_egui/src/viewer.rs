@@ -1071,6 +1071,11 @@ impl BetulaViewer {
         self.get_blackboard_snarl_connections(snarl_id, snarl)
     }
 
+    fn send_remove_node(&self, node_id: BetulaNodeId) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::remove_node(node_id);
+        self.client.send_command(cmd)
+    }
+
     /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
     fn send_changes_to_server(
         &mut self,
@@ -1383,6 +1388,45 @@ impl BetulaViewer {
             input: 0,
         });
         self.connect(&from, &to, snarl);
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn connect_node_blackboard_port(
+        &mut self,
+        node_port: NodePort,
+        blackboard: BlackboardPort,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        let viewer_node = self.get_node_mut(node_port.node(), snarl)?;
+        let ui_node = viewer_node.ui_node.as_mut().unwrap();
+        // println!("viewer_node: {viewer_node:?}");
+        println!("ui_node: {ui_node:?}");
+        if node_port.direction() == PortDirection::Input {
+            // let input_pin = viewer_node.input_port_to_pin(&node_port.name()).ok_or("failed")?;
+            todo!();
+        } else {
+            let output_pin = viewer_node
+                .output_port_to_pin(&node_port.name())
+                .ok_or("failed")?;
+            let from_snarl_id = self.get_node_snarl_id(node_port.node())?;
+            let to_snarl_id = self.get_blackboard_snarl_ids(&blackboard.blackboard())?;
+            // Lets just connect to the first one here.
+            let to_snarl_id = to_snarl_id
+                .first()
+                .expect("should get one blackboard to connect to");
+
+            let from = snarl.out_pin(egui_snarl::OutPinId {
+                node: from_snarl_id,
+                output: output_pin,
+            });
+            let to = snarl.in_pin(egui_snarl::InPinId {
+                node: *to_snarl_id,
+                input: 0,
+            });
+            self.connect(&from, &to, snarl);
+        }
+
         Ok(())
     }
 }
@@ -1777,8 +1821,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_id = node.id;
                 if ui.button("Remove").clicked() {
-                    let cmd = InteractionCommand::remove_node(node_id);
-                    let _ = self.client.send_command(cmd);
+                    if let Err(v) = self.send_remove_node(node_id) {
+                        println!("Failed to send node removal {v:?}");
+                    }
                     ui.close_menu();
                 }
                 let mut is_root = self.tree_roots_local.contains(&node_id);
@@ -1829,6 +1874,18 @@ mod test {
 
     use betula_core::{BetulaError, Node};
 
+    fn service_for_ms(
+        viewer: &mut BetulaViewer,
+        snarl: &mut Snarl<BetulaViewerNode>,
+        ms: usize,
+    ) -> Result<(), betula_core::BetulaError> {
+        for _i in 0..ms {
+            viewer.service(snarl)?;
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        Ok(())
+    }
+
     fn make_server_check(
         server: InProcessControlServer,
     ) -> std::thread::JoinHandle<Result<(), betula_core::BetulaError>> {
@@ -1850,6 +1907,9 @@ mod test {
                 );
             tree_support.add_node_default::<betula_common::nodes::TimeNode>();
             tree_support.add_node_default::<betula_common::nodes::DelayNode>();
+            tree_support.set_blackboard_factory(Box::new(|| {
+                Box::new(betula_core::basic::BasicBlackboard::default())
+            }));
             tree_support.add_value_default::<f64>();
 
             loop {
@@ -1876,7 +1936,7 @@ mod test {
                         }
                     }
                 } else {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    std::thread::sleep(std::time::Duration::from_millis(1));
                 }
             }
             Ok(())
@@ -1956,6 +2016,76 @@ mod test {
                     assert!(tree.children(delay1)? == vec![delay2, delay3]);
                     Ok(())
                 }))?;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(server_thing.join().is_ok());
+        Ok(())
+    }
+    #[test]
+    fn test_node_removal() -> Result<(), BetulaError> {
+        // Create time, attach to blackboard.
+        // Remove time.
+        // Create new time, attach to blackboard.
+        use betula_common::control::InProcessControl;
+        let (server, client) = InProcessControl::new();
+        use uuid::uuid;
+        let time1 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000001"));
+        let blackboard = BlackboardId(uuid!("00000000-0000-0000-0000-ffff00000002"));
+        let time2 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000003"));
+
+        let server_thing = make_server_check(server);
+
+        let mut snarl = Snarl::<BetulaViewerNode>::new();
+        {
+            let mut ui_support = UiSupport::new();
+
+            ui_support.add_node_default::<betula_common::nodes::TimeNode>();
+            ui_support.add_value_default::<f64>();
+            let mut viewer = BetulaViewer::new(Box::new(client), ui_support);
+            viewer
+                .client()
+                .send_command(InteractionCommand::tree_call(move |tree| {
+                    assert!(tree.nodes().len() == 0);
+                    Ok(())
+                }))?;
+            viewer.ui_create_node(
+                time1,
+                egui::pos2(0.0, 0.0),
+                betula_common::nodes::TimeNode::static_type(),
+                &mut snarl,
+            );
+            service_for_ms(&mut viewer, &mut snarl, 50)?;
+
+            viewer.ui_create_blackboard(blackboard, egui::pos2(0.0, 0.0), &mut snarl);
+            service_for_ms(&mut viewer, &mut snarl, 50)?;
+
+            let portname = "time".into();
+            viewer.connect_node_blackboard_port(
+                NodePort::new(time1, &portname, PortDirection::Output),
+                BlackboardPort::new(blackboard, &portname),
+                &mut snarl,
+            )?;
+            service_for_ms(&mut viewer, &mut snarl, 50)?;
+
+            // Now, discard node time1.
+            viewer.send_remove_node(time1).expect("send should succeed");
+            service_for_ms(&mut viewer, &mut snarl, 50)?;
+
+            viewer.ui_create_node(
+                time2,
+                egui::pos2(0.0, 0.0),
+                betula_common::nodes::TimeNode::static_type(),
+                &mut snarl,
+            );
+            service_for_ms(&mut viewer, &mut snarl, 50)?;
+            println!("Making the problematic connection");
+            viewer.connect_node_blackboard_port(
+                NodePort::new(time2, &portname, PortDirection::Output),
+                BlackboardPort::new(blackboard, &portname),
+                &mut snarl,
+            )?;
+
+            service_for_ms(&mut viewer, &mut snarl, 50)?;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert!(server_thing.join().is_ok());
