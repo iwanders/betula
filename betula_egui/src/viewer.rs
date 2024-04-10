@@ -407,6 +407,21 @@ impl BlackboardData {
             .collect();
     }
 
+    pub fn remove_node_connections(&mut self, node_id: &BetulaNodeId) {
+        self.connections_remote = self
+            .connections_remote
+            .iter()
+            .cloned()
+            .filter(|c| c.node.node() != *node_id)
+            .collect();
+        self.connections_local = self
+            .connections_local
+            .iter()
+            .cloned()
+            .filter(|c| c.node.node() != *node_id)
+            .collect();
+    }
+
     pub fn connect_port(&mut self, connection: &PortConnection) {
         self.connections_local.insert(connection.clone());
     }
@@ -852,6 +867,12 @@ impl BetulaViewer {
     }
 
     fn remove_betula_id(&mut self, node_id: BetulaNodeId) -> Result<SnarlNodeId, BetulaError> {
+        // We also need to remove this node from the blackboard maps.
+        for blackboard in self.blackboards.values() {
+            let mut blackboard = blackboard.borrow_mut();
+            blackboard.remove_node_connections(&node_id);
+        }
+
         let snarl_id = self
             .node_map
             .remove(&node_id)
@@ -1308,6 +1329,7 @@ impl BetulaViewer {
                     CommandResult(c) => {
                         match c.command {
                             RemoveNode(node_id) => {
+                                println!("Node removal command");
                                 let snarl_id = self.remove_betula_id(node_id)?;
                                 snarl.remove_node(snarl_id);
                             }
@@ -2030,8 +2052,8 @@ mod test {
         let (server, client) = InProcessControl::new();
         use uuid::uuid;
         let time1 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000001"));
-        let blackboard = BlackboardId(uuid!("00000000-0000-0000-0000-ffff00000002"));
-        let time2 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000003"));
+        let blackboard = BlackboardId(uuid!("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"));
+        let time2 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000002"));
 
         let server_thing = make_server_check(server);
 
@@ -2085,7 +2107,15 @@ mod test {
                 &mut snarl,
             )?;
 
-            service_for_ms(&mut viewer, &mut snarl, 50)?;
+            service_for_ms(&mut viewer, &mut snarl, 4)?;
+
+            // we should've definitely converged now.
+            for blackboard in viewer.blackboards.values() {
+                let blackboard = blackboard.borrow();
+                if !blackboard.is_up_to_date() {
+                    assert!(false, "did not converge");
+                }
+            }
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert!(server_thing.join().is_ok());
