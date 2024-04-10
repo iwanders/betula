@@ -5,7 +5,7 @@ use betula_core::{
 
 use crate::{
     tree_support::SerializedBlackboardValues, tree_support::SerializedConfig,
-    tree_support::SerializedValue,
+    tree_support::SerializedValue, tree_support::TreeConfig,
 };
 
 use serde::{Deserialize, Serialize};
@@ -102,7 +102,7 @@ pub enum InteractionCommand {
 
     RunSettings(RunSettings),
 
-    Serialize,
+    RequestTreeConfig,
 
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
@@ -347,13 +347,15 @@ impl InteractionCommand {
                     error: None,
                 })])
             }
-            InteractionCommand::Serialize => {
-                // tree_support
-                todo!();
-                Ok(vec![InteractionEvent::CommandResult(CommandResult {
-                    command: self.clone(),
-                    error: None,
-                })])
+            InteractionCommand::RequestTreeConfig => {
+                let config = tree_support.export_tree_config(tree)?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::TreeConfig(config),
+                ])
             }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;
@@ -410,6 +412,7 @@ pub enum InteractionEvent {
     // ExecutionResult(ExecutionResult),
     NodeInformation(NodeInformation),
     TreeRoots(Vec<NodeId>),
+    TreeConfig(TreeConfig),
 }
 
 //------------------------------------------------------------------------

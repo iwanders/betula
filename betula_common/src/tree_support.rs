@@ -48,7 +48,7 @@ mod v1 {
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub struct TreeNode {
         pub id: NodeId,
         pub node_type: String,
@@ -56,20 +56,20 @@ mod v1 {
         pub children: Vec<NodeId>,
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub struct TypedValue {
         pub type_id: String,
         pub data: SerializableHolder,
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub struct Blackboard {
         pub id: BlackboardId,
         pub values: BTreeMap<PortName, SerializedValue>,
         pub connections: Vec<PortConnection>,
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub struct Root {
         pub nodes: Vec<TreeNode>,
         pub blackboards: Vec<Blackboard>,
@@ -77,7 +77,7 @@ mod v1 {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TreeConfig {
     V1(v1::Root),
 }
