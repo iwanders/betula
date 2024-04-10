@@ -68,6 +68,19 @@ impl BasicTree {
         Ok(v)
     }
 
+    fn node_connections(&self, node_id: &NodeId) -> Result<Vec<PortConnection>, BetulaError> {
+        let mut v = vec![];
+        for b in self.blackboards.values() {
+            v.extend(
+                b.connections
+                    .iter()
+                    .filter(|z| z.node.node() == *node_id)
+                    .cloned(),
+            );
+        }
+        Ok(v)
+    }
+
     fn node_input_connections(&self, node: NodeId) -> Result<Vec<PortConnection>, BetulaError> {
         let mut v = vec![];
         for b in self.blackboards.values() {
@@ -171,6 +184,7 @@ impl BasicTree {
 
         Ok(())
     }
+
     fn setup_node_inputs(
         &self,
         node: NodeId,
@@ -239,6 +253,46 @@ impl BasicTree {
 
         Ok(())
     }
+
+    fn disconnect_node_ports(
+        &self,
+        node_id: &NodeId,
+        direction: PortDirection,
+    ) -> Result<(), BetulaError> {
+        let node = self
+            .nodes
+            .get(&node_id)
+            .ok_or_else(|| format!("node {node_id:?} does not exist").to_string())?;
+        let mut node_mut = node.node.try_borrow_mut()?;
+        struct Disconnecter {}
+        impl BlackboardOutputInterface for Disconnecter {
+            fn writer(
+                &mut self,
+                id: TypeId,
+                key: &PortName,
+                default: &ValueCreator,
+            ) -> Result<Write, NodeError> {
+                let _ = (id, key, default);
+                let v = |_| Err(format!("writing to disconnected port").into());
+                Ok(Box::new(v))
+            }
+        }
+        impl BlackboardInputInterface for Disconnecter {
+            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
+                let _ = (id, key);
+                let v = || Err(format!("reading from disconnected port").into());
+                Ok(Box::new(v))
+            }
+        }
+
+        let mut remapped_interface = Disconnecter {};
+        if direction == PortDirection::Input {
+            node_mut.setup_inputs(&mut remapped_interface)?;
+        } else {
+            node_mut.setup_outputs(&mut remapped_interface)?;
+        }
+        Ok(())
+    }
 }
 
 impl Tree for BasicTree {
@@ -253,6 +307,12 @@ impl Tree for BasicTree {
         Some(&mut **m.node.get_mut())
     }
     fn remove_node(&mut self, id: NodeId) -> Result<Box<dyn Node>, BetulaError> {
+        // First, disconnect all ports associated to this node.
+        for connection in self.node_connections(&id)? {
+            self.disconnect_port(&connection)?;
+        }
+
+        // then, actually discard this node.
         for (_k, v) in self.nodes.iter_mut() {
             v.children.retain(|&x| x != id);
         }
@@ -347,22 +407,27 @@ impl Tree for BasicTree {
     fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
         let node_id = connection.node.node();
         if connection.node.direction() == PortDirection::Input {
-            // If this is an input port to the node, first disconnect anything associated to that.
-            let connections = self.node_port_connections(&connection.node)?;
-            for connection in connections {
-                self.disconnect_port(&connection)?;
+            // If this is an input port to the node, first disconnect anything associated to that, each node
+            // can only have one input afterall.
+            let current_connections = self.node_port_connections(&connection.node)?;
+            assert!(current_connections.len() <= 1);
+            for existing_connection in current_connections {
+                self.disconnect_port(&existing_connection)?;
             }
+
+            let node_id = connection.node.node();
+            self.disconnect_node_ports(&node_id, PortDirection::Input)?;
             let mut inputs = self.node_input_connections(node_id)?;
             inputs.push(connection.clone());
             self.setup_node_inputs(node_id, &inputs)?;
         } else {
             // Outputs, we can write to multiple blackboards.
             let mut outputs = self.node_output_connections(node_id)?;
+            self.disconnect_node_ports(&node_id, PortDirection::Output)?;
             outputs.push(connection.clone());
             self.setup_node_outputs(node_id, &outputs)?;
         }
 
-        // if r.is_ok() {
         // Connection was added.
         let blackboard_id = connection.blackboard.blackboard();
         let blackboard = self
@@ -370,51 +435,34 @@ impl Tree for BasicTree {
             .get_mut(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
         blackboard.connections.insert(connection.clone());
-        // }
-        // r
         Ok(())
     }
 
     fn disconnect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {
         let node_id = connection.node.node();
-        let node = self
-            .nodes
-            .get(&node_id)
-            .ok_or_else(|| format!("node {node_id:?} does not exist").to_string())?;
-        let mut node_mut = node.node.try_borrow_mut()?;
+        // First disconnect all ports of this direction.
+        self.disconnect_node_ports(&node_id, connection.node.direction())?;
+
+        // Disconnect cannot really fail, as the connect can only fail on type mismatches.
+        if connection.node.direction() == PortDirection::Input {
+            // And then setup the inputs again.
+            let mut inputs = self.node_input_connections(node_id)?;
+            inputs = inputs.drain(..).filter(|c| *c != *connection).collect();
+            self.setup_node_inputs(node_id, &inputs)?;
+        } else {
+            // And the outputs.
+            let mut outputs = self.node_output_connections(node_id)?;
+            outputs = outputs.drain(..).filter(|c| *c != *connection).collect();
+            self.setup_node_outputs(node_id, &outputs)?;
+        }
 
         let blackboard_id = connection.blackboard.blackboard();
         let blackboard = self
             .blackboards
             .get_mut(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
-
-        struct Disconnecter {}
-        impl BlackboardOutputInterface for Disconnecter {
-            fn writer(
-                &mut self,
-                id: TypeId,
-                key: &PortName,
-                default: &ValueCreator,
-            ) -> Result<Write, NodeError> {
-                let _ = (id, key, default);
-                let v = |_| Err(format!("writing to disconnected port").into());
-                Ok(Box::new(v))
-            }
-        }
-        impl BlackboardInputInterface for Disconnecter {
-            fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
-                let _ = (id, key);
-                let v = || Err(format!("reading from disconnected port").into());
-                Ok(Box::new(v))
-            }
-        }
-
-        let mut remapped_interface = Disconnecter {};
-        node_mut.setup_inputs(&mut remapped_interface)?;
-        node_mut.setup_outputs(&mut remapped_interface)?;
-        // Connection was added.
         blackboard.connections.remove(connection);
+
         Ok(())
     }
 

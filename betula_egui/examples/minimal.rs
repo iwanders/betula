@@ -86,7 +86,7 @@ fn main() -> eframe::Result<()> {
             let received = server.get_command()?;
 
             if let Some(command) = received {
-                // println!("    Executing {command:?}");
+                println!("    Executing {command:?}");
                 if let InteractionCommand::RunSettings(run_settings) = &command {
                     if let Some(new_value) = run_settings.run_roots {
                         println!("Setting run roots to: {new_value}");

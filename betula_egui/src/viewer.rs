@@ -1229,7 +1229,7 @@ impl BetulaViewer {
         // Handle any incoming events.
         loop {
             if let Some(event) = self.client.get_event()? {
-                // println!("event {event:?}");
+                println!("event {event:?}");
                 match event {
                     NodeInformation(v) => {
                         let viewer_node = self.get_node_mut(v.id, snarl)?;
