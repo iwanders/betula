@@ -1649,6 +1649,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 }
             }
             BetulaViewerNode::Blackboard(ref _bb) => {
+                // Do not remove this empty label, it ensures that vertical height of
+                // inputs and outputs is equal
+                ui.label("");
                 if pin.remotes.is_empty() {
                     PinInfo::circle()
                         .with_fill(BLACKBOARD_COLOR)
