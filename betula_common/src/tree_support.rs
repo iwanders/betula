@@ -78,7 +78,7 @@ mod v1 {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum Config {
+pub enum TreeConfig {
     V1(v1::Root),
 }
 
@@ -216,7 +216,7 @@ impl TreeSupport {
             .insert(std::any::TypeId::of::<V>(), support);
     }
 
-    pub fn export_tree_config(&self, tree: &dyn Tree) -> Result<Config, BetulaError> {
+    pub fn export_tree_config(&self, tree: &dyn Tree) -> Result<TreeConfig, BetulaError> {
         let mut nodes = vec![];
         use v1::*;
 
@@ -283,7 +283,7 @@ impl TreeSupport {
             blackboards,
             tree_roots,
         };
-        Ok(Config::V1(root))
+        Ok(TreeConfig::V1(root))
     }
 
     pub fn tree_serialize<S: serde::Serializer>(
@@ -298,49 +298,33 @@ impl TreeSupport {
         Ok(config.serialize(serializer)?)
     }
 
-    pub fn tree_deserialize<'de, D: serde::Deserializer<'de>>(
+    pub fn import_tree_config(
         &self,
         tree: &mut dyn Tree,
-        deserializer: D,
-    ) -> Result<(), D::Error> {
-        use serde::de::Error;
-        let config: Config = Config::deserialize(deserializer)?;
-
+        config: &TreeConfig,
+    ) -> Result<(), BetulaError> {
         match config {
-            Config::V1(root) => {
+            TreeConfig::V1(root) => {
                 let mut relations = vec![];
                 let mut new_nodes = vec![];
 
                 // First, deserialize everything.
-                for node in root.nodes {
-                    let node_type = node.node_type.into();
+                for node in &root.nodes {
+                    let node_type = node.node_type.clone().into();
 
-                    let mut new_node = self
-                        .create_node(&node_type)
-                        .map_err(|e| D::Error::custom(format!("failed to construct node {e:?}")))?;
+                    let mut new_node = self.create_node(&node_type)?;
 
-                    if let Some(config) = node.config {
-                        let node_support = self.get_node_support(&node_type).map_err(|e| {
-                            D::Error::custom(format!(
-                                "failed to get node support for {node_type:?}: {e:?}"
-                            ))
-                        })?;
+                    if let Some(config) = &node.config {
+                        let node_support = self.get_node_support(&node_type)?;
                         if let Some(config_support) = node_support.config_converter.as_ref() {
                             let mut erased =
                                 Box::new(<dyn erased_serde::Deserializer>::erase(config));
-                            let new_config = config_support
-                                .config_deserialize(&mut erased)
-                                .map_err(|e| {
-                                    D::Error::custom(format!("failed deserialize config {e:?}"))
-                                })?;
-                            println!("new_config: {new_config:?}");
-                            new_node.set_config(&*new_config).map_err(|e| {
-                                D::Error::custom(format!("failed set config {e:?}"))
-                            })?;
+                            let new_config = config_support.config_deserialize(&mut erased)?;
+                            new_node.set_config(&*new_config)?;
                         }
                     }
                     new_nodes.push((node.id, new_node));
-                    relations.push((node.id, node.children));
+                    relations.push((node.id, node.children.clone()));
                 }
                 // deserialize the blackboards.
                 struct BlackboardDeserialized {
@@ -349,16 +333,14 @@ impl TreeSupport {
                     pub connections: Vec<PortConnection>,
                 }
                 let mut blackboards: Vec<BlackboardDeserialized> = vec![];
-                for blackboard in root.blackboards {
+                for blackboard in &root.blackboards {
                     let mut deserialized_bb = BlackboardDeserialized {
                         id: blackboard.id,
                         connections: blackboard.connections.clone(),
                         values: Default::default(),
                     };
-                    for (k, v) in blackboard.values {
-                        let boxed_value = self.value_deserialize(v.clone()).map_err(|e| {
-                            D::Error::custom(format!("failed to deserialize {v:?}: {e:?}"))
-                        })?;
+                    for (k, v) in &blackboard.values {
+                        let boxed_value = self.value_deserialize(v.clone())?;
                         deserialized_bb.values.insert(k.clone(), boxed_value);
                     }
                     blackboards.push(deserialized_bb);
@@ -366,14 +348,12 @@ impl TreeSupport {
 
                 // Serialization is all done, now add the nodes to the tree.
                 for (node_id, node) in new_nodes {
-                    tree.add_node_boxed(node_id, node)
-                        .map_err(|e| D::Error::custom(format!("failed to add new node {e:?}")))?;
+                    tree.add_node_boxed(node_id, node)?;
                 }
 
                 // Create the connections.
                 for (parent, children) in relations {
-                    tree.set_children(parent, &children)
-                        .map_err(|e| D::Error::custom(format!("failed to relation {e:?}")))?;
+                    tree.set_children(parent, &children)?;
                 }
 
                 // Add the blackboards
@@ -381,28 +361,33 @@ impl TreeSupport {
                     let id = blackboard.id;
                     let mut bb = self
                         .create_blackboard()
-                        .ok_or(D::Error::custom(format!("no blackboard factory function")))?;
+                        .ok_or::<BetulaError>(format!("no blackboard factory function").into())?;
                     for (k, v) in blackboard.values {
-                        bb.set(&k, v.clone()).map_err(|e| {
-                            D::Error::custom(format!(
-                                "failed to set {k:?} to {v:?} on {id:?}: {e:?}"
-                            ))
-                        })?;
+                        bb.set(&k, v.clone())?;
                     }
-                    tree.add_blackboard_boxed(id, bb).map_err(|e| {
-                        D::Error::custom(format!("failed to add blackboard with {id:?}: {e:?}"))
-                    })?;
+                    tree.add_blackboard_boxed(id, bb)?;
                     for connection in blackboard.connections {
-                        tree.connect_port(&connection).map_err(|e| D::Error::custom(format!("failed to make connection {connection:?} for blackboard {id:?}: {e:?}")))?;
+                        tree.connect_port(&connection)?;
                     }
                 }
 
                 // And set the roots.
-                tree.set_roots(&root.tree_roots)
-                    .map_err(|e| D::Error::custom(format!("failed to set roots: {e:?}")))?;
+                tree.set_roots(&root.tree_roots)?;
             }
         }
 
+        Ok(())
+    }
+
+    pub fn tree_deserialize<'de, D: serde::Deserializer<'de>>(
+        &self,
+        tree: &mut dyn Tree,
+        deserializer: D,
+    ) -> Result<(), D::Error> {
+        use serde::de::Error;
+        let config: TreeConfig = TreeConfig::deserialize(deserializer)?;
+        self.import_tree_config(tree, &config)
+            .map_err(|e| D::Error::custom(format!("failed to set config: {e:?}")))?;
         Ok(())
     }
 
