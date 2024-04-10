@@ -102,6 +102,8 @@ pub enum InteractionCommand {
 
     RunSettings(RunSettings),
 
+    Serialize,
+
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
     #[serde(skip)]
@@ -340,6 +342,14 @@ impl InteractionCommand {
                 for z in &run_settings.run_specific {
                     let _result = tree.execute(*z)?;
                 }
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
+            }
+            InteractionCommand::Serialize => {
+                // tree_support
+                todo!();
                 Ok(vec![InteractionEvent::CommandResult(CommandResult {
                     command: self.clone(),
                     error: None,

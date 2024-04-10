@@ -26,8 +26,8 @@ type SerializableHolder = serde_json::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SerializedConfig {
-    node_type: NodeType,
-    data: SerializableHolder,
+    pub node_type: NodeType,
+    pub data: SerializableHolder,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -78,7 +78,7 @@ mod v1 {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-enum Config {
+pub enum Config {
     V1(v1::Root),
 }
 
@@ -216,46 +216,31 @@ impl TreeSupport {
             .insert(std::any::TypeId::of::<V>(), support);
     }
 
-    pub fn tree_serialize<S: serde::Serializer>(
-        &self,
-        tree: &dyn Tree,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
+    pub fn export_tree_config(&self, tree: &dyn Tree) -> Result<Config, BetulaError> {
         let mut nodes = vec![];
-        use serde::ser::Error;
         use v1::*;
 
         for id in tree.nodes() {
-            let tree_node = tree
-                .node_ref(id)
-                .ok_or(Error::custom(format!("could not get {id:?}")))?;
+            let tree_node = tree.node_ref(id).ok_or(format!("could not get {id:?}"))?;
             let tree_node = tree_node.borrow();
-            let config = tree_node
-                .get_config()
-                .map_err(|e| S::Error::custom(format!("could not get config {e:?}")))?;
+            let config = tree_node.get_config()?;
             let node_type = tree_node.node_type();
             let config: Option<SerializableHolder> = if let Some(config) = config {
                 let converter = self.node_support.get(&node_type);
                 let converter = converter
                     .map(|v| v.config_converter.as_ref())
                     .flatten()
-                    .ok_or(S::Error::custom(format!(
-                        "could not get support for {node_type:?}"
-                    )))?;
-                let serialize_erased = converter
-                    .config_serialize(&*config)
-                    .map_err(|e| S::Error::custom(format!("failed with {e}")))?;
+                    .ok_or(format!("could not get support for {node_type:?}"))?;
+                let serialize_erased = converter.config_serialize(&*config)?;
                 Some(
                     serde_json::to_value(serialize_erased)
-                        .map_err(|e| S::Error::custom(format!("json serialize error {e:?}")))?,
+                        .map_err(|e| format!("json serialize error {e:?}"))?,
                 )
             } else {
                 None
             };
 
-            let children = tree
-                .children(id)
-                .map_err(|e| S::Error::custom(format!("could not get children {e:?}")))?;
+            let children = tree.children(id)?;
             let this_node = TreeNode {
                 id,
                 node_type: node_type.into(),
@@ -270,13 +255,11 @@ impl TreeSupport {
             let connections = tree.blackboard_connections(id);
             let blackboard = tree
                 .blackboard_ref(id)
-                .ok_or(Error::custom(format!("could not get {id:?}")))?;
+                .ok_or(format!("could not get {id:?}"))?;
             let blackboard = blackboard.borrow();
 
             // Collect the values.
-            let values = self
-                .blackboard_value_serialize(&**blackboard)
-                .map_err(|e| S::Error::custom(format!("failed to serialize blackbard: {e:?}")))?;
+            let values = self.blackboard_value_serialize(&**blackboard)?;
 
             let b = Blackboard {
                 id,
@@ -300,10 +283,19 @@ impl TreeSupport {
             blackboards,
             tree_roots,
         };
-        let config = Config::V1(root);
-        Ok(config
-            .serialize(serializer)
-            .map_err(|e| S::Error::custom(format!("serialize failed with {e:?}")))?)
+        Ok(Config::V1(root))
+    }
+
+    pub fn tree_serialize<S: serde::Serializer>(
+        &self,
+        tree: &dyn Tree,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        use serde::ser::Error;
+        let config = self
+            .export_tree_config(tree)
+            .map_err(|e| S::Error::custom(format!("serialize failed with {e:?}")))?;
+        Ok(config.serialize(serializer)?)
     }
 
     pub fn tree_deserialize<'de, D: serde::Deserializer<'de>>(
