@@ -29,10 +29,7 @@ impl Node for TimeNode {
         Ok(())
     }
 
-    fn static_type() -> NodeType
-    where
-        Self: Sized,
-    {
+    fn static_type() -> NodeType {
         "common_time".into()
     }
 
