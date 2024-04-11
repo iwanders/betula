@@ -49,10 +49,9 @@ impl App for BetulaEditor {
                     ui.menu_button("File", |ui| {
                         if ui.button("📂 Open").clicked() {
                             let sender = self.text_channel.0.clone();
-                            let task = rfd::AsyncFileDialog::new().pick_file();
-                            // Context is wrapped in an Arc so it's cheap to clone as per:
-                            // > Context is cheap to clone, and any clones refers to the same mutable data (Context uses refcounting internally).
-                            // Taken from https://docs.rs/egui/0.24.1/egui/struct.Context.html
+                            let task = rfd::AsyncFileDialog::new()
+                                .set_title("Open a tree")
+                                .pick_file();
                             let ctx = ui.ctx().clone();
                             execute(async move {
                                 let file = task.await;
@@ -62,6 +61,7 @@ impl App for BetulaEditor {
                                     ctx.request_repaint();
                                 }
                             });
+                            ui.close_menu();
                         }
 
                         if ui.button("💾 Save").clicked() {
@@ -73,6 +73,7 @@ impl App for BetulaEditor {
                                     _ = file.write(contents.as_bytes()).await;
                                 }
                             });
+                            ui.close_menu();
                         }
                         if ui.button("Quit").clicked() {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close)
