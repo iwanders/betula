@@ -82,14 +82,14 @@ pub struct Port {
 }
 
 impl Port {
-    pub fn input<T: 'static>(name: &str) -> Self {
+    pub fn input<T: 'static>(name: impl Into<PortName>) -> Self {
         Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Input,
             name: name.into(),
         }
     }
-    pub fn output<T: 'static>(name: &str) -> Self {
+    pub fn output<T: 'static>(name: impl Into<PortName>) -> Self {
         Port {
             port_type: PortType::new::<T>(),
             direction: PortDirection::Output,
@@ -333,7 +333,7 @@ pub trait Blackboard:
 pub trait SetupOutput: BlackboardOutputInterface {
     fn output<T: 'static + Chalkable + Clone>(
         &mut self,
-        key: &PortName,
+        key: impl Into<PortName>,
         default: T,
     ) -> Result<Output<T>, NodeError> {
         let x: ValueCreator = Box::new(move || Box::new(default.clone()));
@@ -342,11 +342,12 @@ pub trait SetupOutput: BlackboardOutputInterface {
 
     fn output_or_else<T: 'static + Chalkable + Clone, Z: Fn() -> Value + 'static>(
         &mut self,
-        key: &PortName,
+        key: impl Into<PortName>,
         default_maker: Z,
     ) -> Result<Output<T>, NodeError> {
+        let key: PortName = key.into();
         let x: ValueCreator = Box::new(default_maker);
-        let writer = BlackboardOutputInterface::writer(self, TypeId::of::<T>(), key, &x)?;
+        let writer = BlackboardOutputInterface::writer(self, TypeId::of::<T>(), &key, &x)?;
         struct OutputFor<TT> {
             key: PortName,
             type_name: String,
@@ -385,9 +386,10 @@ impl SetupOutput for dyn BlackboardOutputInterface + '_ {}
 pub trait SetupInput: BlackboardInputInterface {
     fn input<T: 'static + Chalkable + Clone>(
         &mut self,
-        key: &PortName,
+        key: impl Into<PortName>,
     ) -> Result<Input<T>, NodeError> {
-        let reader = BlackboardInputInterface::reader(self, &TypeId::of::<T>(), key)?;
+        let key: PortName = key.into();
+        let reader = BlackboardInputInterface::reader(self, &TypeId::of::<T>(), &key)?;
 
         struct InputFor<TT> {
             key: PortName,

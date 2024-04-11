@@ -25,7 +25,7 @@ impl Node for TimeNode {
         &mut self,
         interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
-        self.time_output = interface.output::<f64>(&"time".into(), 0.0)?;
+        self.time_output = interface.output::<f64>("time", 0.0)?;
         Ok(())
     }
 
@@ -61,7 +61,7 @@ mod tests {
             .setup_outputs(&mut bb)?;
         tree.execute(root)?;
 
-        let v = bb.input::<f64>(&"time".into())?;
+        let v = bb.input::<f64>("time")?;
         assert!(v.get()? != 0.0);
         println!("time: {v:?} -> {}", v.get()?);
         Ok(())

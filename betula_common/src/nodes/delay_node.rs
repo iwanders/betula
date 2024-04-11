@@ -46,7 +46,7 @@ impl Node for DelayNode {
         &mut self,
         interface: &mut dyn BlackboardInputInterface,
     ) -> Result<(), NodeError> {
-        self.time = interface.input::<f64>(&"time".into())?;
+        self.time = interface.input::<f64>("time")?;
         Ok(())
     }
 
@@ -81,7 +81,7 @@ mod tests {
         use uuid::Uuid;
         let mut tree = BasicTree::new();
         let mut bb = BasicBlackboard::default();
-        let time = bb.output::<f64>(&"time".into(), 0.0)?;
+        let time = bb.output::<f64>("time", 0.0)?;
         time.set(1.0)?;
 
         let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(DelayNode::new(5.0)))?;

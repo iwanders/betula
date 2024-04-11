@@ -646,8 +646,8 @@ mod tests {
 
         // let mut w = crate::BlackboardContext::new(&mut bb);
         let v_in = 3i64;
-        let p = bb.output(&"value".into(), v_in);
-        let c = bb.input::<i64>(&"value".into());
+        let p = bb.output("value", v_in);
+        let c = bb.input::<i64>("value");
         assert!(c.is_ok());
         let c = c.unwrap();
         let v = c.get();
@@ -661,14 +661,14 @@ mod tests {
         let p = p.unwrap();
         let res = p.set(5);
         assert!(res.is_ok());
-        let z = bb.output(&"value".into(), 3.3f64);
+        let z = bb.output("value", 3.3f64);
         println!("z: {z:?}");
         assert!(z.is_err());
         // println!("BasicBlackboard: {bb:?}");
         // let r = bb.consumes(&TypeId::of::<i64>(), "value");
         // assert!(r.is_ok());
         // println!("value: {:?}", r.unwrap()());
-        let c = bb.input::<i64>(&"value".into());
+        let c = bb.input::<i64>("value");
         println!("c: {c:?}");
         println!("value: {:?}", z);
     }
@@ -693,7 +693,7 @@ mod tests {
             interface: &mut dyn BlackboardOutputInterface,
         ) -> Result<(), NodeError> {
             // let _ = direction;
-            let z = interface.output::<f64>(&"a".into(), 0.0)?;
+            let z = interface.output::<f64>("a", 0.0)?;
             self.a_output = z;
             Ok(())
         }
@@ -730,7 +730,7 @@ mod tests {
             &mut self,
             interface: &mut dyn BlackboardInputInterface,
         ) -> Result<(), NodeError> {
-            self.a_input = interface.input::<f64>(&"a".into())?;
+            self.a_input = interface.input::<f64>("a")?;
             Ok(())
         }
 

@@ -204,7 +204,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///  # use betula_core::prelude::*;
     ///  # use betula_core::{blackboard::SetupOutput, blackboard::BlackboardOutputInterface, blackboard::Output, NodeError};
     ///  # fn setup_outputs(/*&mut self,*/ interface: &mut dyn BlackboardOutputInterface) -> Result<(), NodeError> {
-    ///  let my_value_output : Output<f64>  = interface.output::<f64>(&"my_value_portname".into(), 3.3)?;
+    ///  let my_value_output : Output<f64>  = interface.output::<f64>("my_value_portname", 3.3)?;
     ///  my_value_output.set(1337.0f64)?;
     ///  # Ok(())}
     /// ```
@@ -223,7 +223,7 @@ pub trait Node: std::fmt::Debug + AsAny {
     ///  # use betula_core::prelude::*;
     ///  # use betula_core::{blackboard::SetupInput, blackboard::BlackboardInputInterface, blackboard::Input, NodeError};
     ///  # fn setup_inputs(/*&mut self,*/ interface: &mut dyn BlackboardInputInterface) -> Result<(), NodeError> {
-    ///  let my_value_input : Input<f64>  = interface.input::<f64>(&"my_value_portname".into())?;
+    ///  let my_value_input : Input<f64>  = interface.input::<f64>("my_value_portname")?;
     ///  let my_value : f64 = my_value_input.get()?;
     ///  # Ok(())}
     /// ```
