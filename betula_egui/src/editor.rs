@@ -60,13 +60,9 @@ impl App for BetulaEditor {
 pub type TreeSupportCreator = Box<dyn Fn() -> TreeSupport + Send>;
 
 /// Function to run a Tree and TreeServer in the background.
-pub fn create_server_thread<
-    T: betula_core::Tree,
-    B: betula_core::Blackboard + 'static,
-    S: TreeServer + std::marker::Send + 'static,
->(
+pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + 'static>(
     tree_support: TreeSupportCreator,
-    server: S,
+    server: impl TreeServer + std::marker::Send + 'static,
 ) -> std::thread::JoinHandle<Result<(), BetulaError>> {
     std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
         use betula_common::control::CommandResult;

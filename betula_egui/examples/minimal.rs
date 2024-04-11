@@ -28,7 +28,7 @@ fn main() -> eframe::Result<()> {
     let (server, client) = InProcessControl::new();
 
     // Create the background runner.
-    let _background_runner = create_server_thread::<BasicTree, BasicBlackboard, _>(
+    let _background_runner = create_server_thread::<BasicTree, BasicBlackboard>(
         Box::new(|| create_ui_support().into_tree_support()),
         server,
     );
