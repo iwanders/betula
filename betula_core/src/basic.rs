@@ -296,6 +296,10 @@ impl BasicTree {
 }
 
 impl Tree for BasicTree {
+    fn new() -> Self {
+        BasicTree::new()
+    }
+
     fn nodes(&self) -> Vec<NodeId> {
         self.nodes.keys().copied().collect()
     }
@@ -572,6 +576,9 @@ impl BlackboardInputInterface for BasicBlackboard {
     }
 }
 impl Blackboard for BasicBlackboard {
+    fn new() -> Self {
+        Self::default()
+    }
     fn ports(&self) -> Vec<PortName> {
         self.values.keys().map(|v| v.clone()).collect::<Vec<_>>()
     }

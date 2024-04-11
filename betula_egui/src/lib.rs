@@ -8,3 +8,5 @@ pub use ui::{UiConfigResponse, UiNode, UiSupport, UiValue};
 
 mod viewer;
 pub use viewer::{BetulaViewer, BetulaViewerNode, ViewerNode};
+
+pub mod editor;

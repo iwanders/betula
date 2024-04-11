@@ -306,6 +306,11 @@ pub trait BlackboardInputInterface {
 pub trait Blackboard:
     std::fmt::Debug + AsAny + BlackboardOutputInterface + BlackboardInputInterface
 {
+    /// Create a new instance of this blackboard.
+    fn new() -> Self
+    where
+        Self: Sized;
+
     /// The current ports on this blackboard.
     fn ports(&self) -> Vec<PortName>;
 

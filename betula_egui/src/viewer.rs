@@ -1215,7 +1215,7 @@ impl BetulaViewer {
                             // Serialize the configuration.
                             let config = self
                                 .ui_support
-                                .tree_support()
+                                .tree_support_ref()
                                 .config_serialize(ui_node.node_type(), &*config)?;
                             // Now send it off!
                             let cmd = InteractionCommand::set_config(node.id, config);
@@ -1238,6 +1238,7 @@ impl BetulaViewer {
         use betula_common::control::InteractionEvent::BlackboardInformation;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
+        use betula_common::control::InteractionEvent::TreeConfig;
         use betula_common::control::InteractionEvent::TreeRoots;
 
         // First, send changes to the server if necessary.
@@ -1268,8 +1269,10 @@ impl BetulaViewer {
                         let ui_node = viewer_node.ui_node.as_mut().unwrap();
                         // Oh, and set the config if we got one
                         if let Some(config) = v.config {
-                            let config =
-                                self.ui_support.tree_support().config_deserialize(config)?;
+                            let config = self
+                                .ui_support
+                                .tree_support_ref()
+                                .config_deserialize(config)?;
                             ui_node.set_config(&*config)?;
                             viewer_node.clear_config_needs_send();
                         }
@@ -1349,6 +1352,7 @@ impl BetulaViewer {
                     TreeRoots(roots) => {
                         self.tree_roots_remote = roots;
                     }
+                    TreeConfig(_) => {}
                 }
             } else {
                 break;

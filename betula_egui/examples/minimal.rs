@@ -1,156 +1,43 @@
-use eframe::{App, CreationContext};
-
 use betula_common::control::InProcessControl;
-use betula_egui::{BetulaViewer, BetulaViewerNode};
-use egui_snarl::{ui::SnarlStyle, Snarl};
+use betula_core::basic::{BasicBlackboard, BasicTree};
+use betula_egui::{
+    editor::{create_server_thread, BetulaEditor},
+    BetulaViewer, UiSupport,
+};
 
-pub struct DemoApp {
-    snarl: Snarl<BetulaViewerNode>,
-    style: SnarlStyle,
-    viewer: BetulaViewer,
-}
-
-impl DemoApp {
-    pub fn new(viewer: BetulaViewer, _cx: &CreationContext) -> Self {
-        let snarl = Snarl::<BetulaViewerNode>::new();
-
-        let mut style = SnarlStyle::new();
-        style.simple_wire = true;
-
-        DemoApp {
-            viewer,
-            snarl,
-            style,
-        }
-    }
-}
-
-impl App for DemoApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let r = self.viewer.service(&mut self.snarl);
-        if r.is_err() {
-            println!("Error servicing: {:?}", r.err());
-        }
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                {
-                    ui.menu_button("File", |ui| {
-                        if ui.button("Quit").clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close)
-                        }
-                    });
-                    ui.add_space(16.0);
-                }
-
-                egui::widgets::global_dark_light_mode_switch(ui);
-            });
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.snarl
-                .show(&mut self.viewer, &self.style, egui::Id::new("snarl"), ui);
-        });
-    }
-
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
+// Factory function for the ui support.
+fn create_ui_support() -> UiSupport {
+    let mut ui_support = UiSupport::new();
+    ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
+    ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
+    ui_support.add_node_default::<betula_core::nodes::FailureNode>();
+    ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
+    ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
+    ui_support
+        .tree_support_mut()
+        .set_blackboard_factory(Box::new(|| {
+            Box::new(betula_core::basic::BasicBlackboard::default())
+        }));
+    ui_support.add_node_default::<betula_common::nodes::TimeNode>();
+    ui_support.add_value_default::<f64>();
+    ui_support
 }
 
 fn main() -> eframe::Result<()> {
+    // Create the control pipes.
     let (server, client) = InProcessControl::new();
 
-    let _server_thing = std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
-        use betula_common::control::TreeServer;
-        use betula_common::TreeSupport;
-        use betula_core::basic::BasicTree;
+    // Create the background runner.
+    let _background_runner = create_server_thread::<BasicTree, BasicBlackboard, _>(
+        Box::new(|| create_ui_support().into_tree_support()),
+        server,
+    );
 
-        use betula_common::control::CommandResult;
-        use betula_common::control::{InteractionCommand, InteractionEvent};
-
-        let mut tree = BasicTree::new();
-        let mut tree_support = TreeSupport::new();
-        tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
-        tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
-        tree_support.add_node_default::<betula_core::nodes::FailureNode>();
-        tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
-        tree_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>(
-            );
-        tree_support.add_node_default::<betula_common::nodes::TimeNode>();
-        tree_support.set_blackboard_factory(Box::new(|| {
-            Box::new(betula_core::basic::BasicBlackboard::default())
-        }));
-        tree_support.add_value_default::<f64>();
-
-        let mut run_roots: bool = true;
-        loop {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            let received = server.get_command()?;
-
-            if let Some(command) = received {
-                println!("    Executing {command:?}");
-                if let InteractionCommand::RunSettings(run_settings) = &command {
-                    if let Some(new_value) = run_settings.run_roots {
-                        println!("Setting run roots to: {new_value}");
-                        run_roots = new_value;
-                    }
-                }
-                let r = command.execute(&tree_support, &mut tree);
-                match r {
-                    Ok(v) => {
-                        for event in v {
-                            server.send_event(event)?;
-                        }
-                    }
-                    Err(e) => {
-                        server.send_event(InteractionEvent::CommandResult(CommandResult {
-                            command: command,
-                            error: Some(format!("{e:?}")),
-                        }))?;
-                    }
-                }
-            }
-
-            if run_roots {
-                use betula_core::Tree;
-                let roots = tree.roots();
-                for r in &roots {
-                    match tree.execute(*r) {
-                        Ok(_v) => {
-                            // println!("Success running {r:?}: {v:?}");
-                        }
-                        Err(_e) => {
-                            // println!("Failed running {r:?}: {e:?}");
-                        }
-                    }
-                }
-
-                // Lets just dump all the blackboard state every cycle.
-                if !roots.is_empty() {
-                    for blackboard_id in tree.blackboards() {
-                        server.send_event(InteractionEvent::BlackboardInformation(
-                            InteractionCommand::blackboard_information(
-                                &tree_support,
-                                blackboard_id,
-                                &tree,
-                            )?,
-                        ))?;
-                    }
-                }
-            }
-        }
-    });
-
-    let mut ui_support = betula_egui::UiSupport::new();
-    ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
-    // ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
-    // ui_support.add_node_default::<betula_core::nodes::FailureNode>();
-    // ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-    ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
-    // ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode>();
-    // ui_support.set_blackboard_factory(Box::new(|| Box::new(betula_core::basic::BasicBlackboard::default())));
-    ui_support.add_node_default::<betula_common::nodes::TimeNode>();
-    ui_support.add_value_default::<f64>();
+    // Create the viewer
+    let ui_support = create_ui_support();
     let viewer = BetulaViewer::new(Box::new(client), ui_support);
 
+    // Run the viewer.
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])
@@ -161,6 +48,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Betula Interface",
         native_options,
-        Box::new(|cx| Box::new(DemoApp::new(viewer, cx))),
+        Box::new(|cx| Box::new(BetulaEditor::new(viewer, cx))),
     )
 }

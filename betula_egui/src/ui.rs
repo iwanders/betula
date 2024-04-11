@@ -158,8 +158,16 @@ impl UiSupport {
         }
     }
 
-    pub fn tree_support(&self) -> &TreeSupport {
+    pub fn into_tree_support(self) -> TreeSupport {
+        self.tree
+    }
+
+    pub fn tree_support_ref(&self) -> &TreeSupport {
         &self.tree
+    }
+
+    pub fn tree_support_mut(&mut self) -> &mut TreeSupport {
+        &mut self.tree
     }
 
     pub fn node_support(&self, node_type: &NodeType) -> Option<&UiNodeSupport> {

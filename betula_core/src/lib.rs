@@ -282,6 +282,10 @@ pub struct NodeId(pub Uuid);
 /// All tree's are directed graphs. There may be multiple disjoint trees
 /// present in one tree.
 pub trait Tree: std::fmt::Debug + AsAny {
+    fn new() -> Self
+    where
+        Self: Sized;
+
     /// Return the ids present in this tree.
     fn nodes(&self) -> Vec<NodeId>;
 
