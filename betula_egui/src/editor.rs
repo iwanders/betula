@@ -1,21 +1,19 @@
 use eframe::{App, CreationContext};
 
-use betula_core::{BetulaError};
-use betula_common::{control::{TreeServer}, TreeSupport};
 use crate::{BetulaViewer, BetulaViewerNode};
+use betula_common::{control::TreeServer, TreeSupport};
+use betula_core::BetulaError;
 use egui_snarl::{ui::SnarlStyle, Snarl};
 
+use std::sync::mpsc::{channel, Receiver, Sender};
 
-// Save / load example from https://github.com/c-git/egui_file_picker_poll_promise/tree/main
-// Through https://github.com/woelper/egui_pick_file and https://github.com/emilk/egui/issues/270
+// Save / load through https://github.com/woelper/egui_pick_file and https://github.com/emilk/egui/issues/270
 
-type SaveLoadPromise = Option<poll_promise::Promise<Option<String>>>;
 pub struct BetulaEditor {
     snarl: Snarl<BetulaViewerNode>,
     style: SnarlStyle,
     viewer: BetulaViewer,
-
-    save_load_promise: SaveLoadPromise,
+    text_channel: (Sender<String>, Receiver<String>),
 }
 
 impl BetulaEditor {
@@ -29,11 +27,10 @@ impl BetulaEditor {
             viewer,
             snarl,
             style,
-            save_load_promise: None,
+            text_channel: channel(),
         }
     }
 }
-
 
 impl App for BetulaEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -42,41 +39,39 @@ impl App for BetulaEditor {
             println!("Error servicing: {:?}", r.err());
         }
 
-        // assign sample text once it comes in
-        if let Some(promise) = &self.save_load_promise {
-            if promise.ready().is_some() {
-                // Clear promise and take the value out
-                // Doesn't matter for string as we can just clone it but depending on the type you have
-                // you may not be able to easily clone it and would prefer get the owned value
-                let mut temp = None;
-                std::mem::swap(&mut temp, &mut self.save_load_promise);
-
-                let owned_promise = temp.expect("we got here because it was some");
-                let inner_option = owned_promise.block_and_take(); // This should be fine because we know it's ready
-
-                if let Some(text) = inner_option {
-                    // self.sample_text = text;
-                    println!("Something was inner");
-                } else {
-                    // User probably cancelled or it was saving but the promise completed either way
-                }
-            }
+        if let Ok(text) = self.text_channel.1.try_recv() {
+            println!("text: {text:?}");
         }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 {
                     ui.menu_button("File", |ui| {
-                        if ui.button("Open").clicked() {
+                        if ui.button("📂 Open").clicked() {
+                            let sender = self.text_channel.0.clone();
+                            let task = rfd::AsyncFileDialog::new().pick_file();
+                            // Context is wrapped in an Arc so it's cheap to clone as per:
+                            // > Context is cheap to clone, and any clones refers to the same mutable data (Context uses refcounting internally).
+                            // Taken from https://docs.rs/egui/0.24.1/egui/struct.Context.html
                             let ctx = ui.ctx().clone();
-                            self.save_load_promise = execute(async move {
-                                let file = rfd::AsyncFileDialog::new().pick_file().await?; // Returns None if file is None
-                                let text = file.read().await;
+                            execute(async move {
+                                let file = task.await;
+                                if let Some(file) = file {
+                                    let text = file.read().await;
+                                    let _ = sender.send(String::from_utf8_lossy(&text).to_string());
+                                    ctx.request_repaint();
+                                }
+                            });
+                        }
 
-                                // If not present screen will not refresh until next paint (comment out to test, works better with the sleep above to demonstrate)
-                                ctx.request_repaint();
-
-                                Some(String::from_utf8_lossy(&text).to_string())
+                        if ui.button("💾 Save").clicked() {
+                            let task = rfd::AsyncFileDialog::new().save_file();
+                            let contents = "kldsjflkdsjfldsf";
+                            execute(async move {
+                                let file = task.await;
+                                if let Some(file) = file {
+                                    _ = file.write(contents.as_bytes()).await;
+                                }
                             });
                         }
                         if ui.button("Quit").clicked() {
@@ -99,35 +94,28 @@ impl App for BetulaEditor {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn execute<F: std::future::Future<Output = ()> + Send + 'static>(f: F) {
+    // this is stupid... use any executor of your choice instead
+    std::thread::spawn(move || smol::block_on(f));
+}
 
 #[cfg(target_arch = "wasm32")]
-fn execute<F>(f: F) -> SaveLoadPromise
-where
-    F: std::future::Future<Output = Option<String>> + 'static,
-{
-    Some(poll_promise::Promise::spawn_local(f))
+fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-fn execute<F>(f: F) -> SaveLoadPromise
-where
-    F: std::future::Future<Output = Option<String>> + std::marker::Send + 'static,
-{
-    Some(poll_promise::Promise::spawn_async(f))
-}
-
 
 /// Function to create the tree support in the background server thread.
 pub type TreeSupportCreator = Box<dyn Fn() -> TreeSupport + Send>;
 
 /// Function to run a Tree and TreeServer in the background.
-pub fn create_server_thread<T: betula_core::Tree, B:betula_core::Blackboard + 'static>(tree_support: TreeSupportCreator, server: impl TreeServer + std::marker::Send + 'static) -> std::thread::JoinHandle<Result<(), BetulaError>> {
-
+pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + 'static>(
+    tree_support: TreeSupportCreator,
+    server: impl TreeServer + std::marker::Send + 'static,
+) -> std::thread::JoinHandle<Result<(), BetulaError>> {
     std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
-
         use betula_common::control::CommandResult;
-        use betula_common::control::{InteractionEvent, InteractionCommand};
-
+        use betula_common::control::{InteractionCommand, InteractionEvent};
 
         let mut tree = T::new();
         let tree_support = tree_support();
@@ -177,7 +165,13 @@ pub fn create_server_thread<T: betula_core::Tree, B:betula_core::Blackboard + 's
                 // Lets just dump all the blackboard state every cycle.
                 if !roots.is_empty() {
                     for blackboard_id in tree.blackboards() {
-                        server.send_event(InteractionEvent::BlackboardInformation(InteractionCommand::blackboard_information(&tree_support, blackboard_id, &tree)?))?;
+                        server.send_event(InteractionEvent::BlackboardInformation(
+                            InteractionCommand::blackboard_information(
+                                &tree_support,
+                                blackboard_id,
+                                &tree,
+                            )?,
+                        ))?;
                     }
                 }
             }
