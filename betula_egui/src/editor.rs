@@ -17,7 +17,7 @@ pub struct BetulaEditor {
     snarl: Snarl<BetulaViewerNode>,
     style: SnarlStyle,
     viewer: BetulaViewer,
-    text_channel: (Sender<String>, Receiver<String>),
+    tree_config_channel: (Sender<TreeConfig>, Receiver<TreeConfig>),
 
     /// Client to interact with the server.
     client: Box<dyn TreeClient>,
@@ -40,7 +40,7 @@ impl BetulaEditor {
             viewer,
             snarl,
             style,
-            text_channel: channel(),
+            tree_config_channel: channel(),
             client,
             viewer_server: Box::new(viewer_server),
         }
@@ -76,8 +76,37 @@ impl BetulaEditor {
         });
     }
 
+    fn load_tree_config(content: &[u8]) -> Result<TreeConfig, BetulaError> {
+        let config: TreeConfig = serde_json::de::from_slice(content)?;
+        Ok(config)
+    }
+    fn load_tree_config_dialog(&self) {
+        let sender = self.tree_config_channel.0.clone();
+        let task = rfd::AsyncFileDialog::new()
+            .set_title("Open a tree")
+            .pick_file();
+        execute(async move {
+            let file = task.await;
+            if let Some(file) = file {
+                let text = file.read().await;
+                let config = Self::load_tree_config(&text);
+                if let Ok(config) = config {
+                    let _ = sender.send(config);
+                } else {
+                    println!("Failed to load config: {config:?}");
+                }
+                // ctx.request_repaint();
+            }
+        });
+    }
+
     fn service(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
         let _ = ctx;
+
+        if let Ok(config) = self.tree_config_channel.1.try_recv() {
+            println!("config: {config:?}");
+        }
+
         loop {
             let viewer_cmd_received = self.viewer_server.get_command()?;
             let backend_event_received = self.client.get_event()?;
@@ -107,7 +136,7 @@ impl BetulaEditor {
                     }
                     _ => Some(backend_event),
                 };
-                // Just pass to the backedn.
+                // Just pass to the backend.
                 if let Some(viewer_event) = c {
                     self.viewer_server.send_event(viewer_event)?;
                 }
@@ -129,35 +158,16 @@ impl App for BetulaEditor {
             println!("Error servicing: {:?}", r.err());
         }
 
-        if let Ok(text) = self.text_channel.1.try_recv() {
-            println!("text: {text:?}");
-        }
-
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 {
                     ui.menu_button("File", |ui| {
                         if ui.button("📂 Open").clicked() {
-                            let sender = self.text_channel.0.clone();
-                            let task = rfd::AsyncFileDialog::new()
-                                .set_title("Open a tree")
-                                .pick_file();
-                            let ctx = ctx.clone();
-                            execute(async move {
-                                let file = task.await;
-                                if let Some(file) = file {
-                                    let text = file.read().await;
-                                    let _ = sender.send(String::from_utf8_lossy(&text).to_string());
-                                    ctx.request_repaint();
-                                }
-                            });
-                            // if let Err(e) = r {
-                            // println!("Failed to request config: {e:?}");
-                            // }
+                            self.load_tree_config_dialog();
                             ui.close_menu();
                         }
 
-                        if ui.button("💾 Save").clicked() {
+                        if ui.button("💾 Save as").clicked() {
                             let r = self.request_tree_config();
                             if let Err(e) = r {
                                 println!("Failed to request config: {e:?}");

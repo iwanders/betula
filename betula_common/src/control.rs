@@ -102,7 +102,9 @@ pub enum InteractionCommand {
 
     RunSettings(RunSettings),
 
+    Clear,
     RequestTreeConfig,
+    LoadTreeConfig(TreeConfig),
 
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
@@ -338,7 +340,9 @@ impl InteractionCommand {
                         command: self.clone(),
                         error: None,
                     }),
-                    InteractionEvent::TreeRoots(tree.roots()),
+                    InteractionEvent::TreeRoots(TreeRoots {
+                        roots: tree.roots(),
+                    }),
                 ])
             }
             InteractionCommand::RunSettings(run_settings) => {
@@ -359,6 +363,43 @@ impl InteractionCommand {
                     }),
                     InteractionEvent::TreeConfig(config),
                 ])
+            }
+            InteractionCommand::LoadTreeConfig(config) => {
+                tree_support.import_tree_config(tree, config)?;
+                let mut blackboards = vec![];
+                let mut nodes = vec![];
+                for blackboard_id in tree.blackboards() {
+                    blackboards.push(Self::blackboard_information(
+                        tree_support,
+                        blackboard_id,
+                        tree,
+                    )?);
+                }
+                for node_id in tree.nodes() {
+                    nodes.push(Self::node_information(tree_support, node_id, tree)?);
+                }
+                let roots = TreeRoots {
+                    roots: tree.roots(),
+                };
+                let tree_state = TreeState {
+                    blackboards,
+                    nodes,
+                    roots,
+                };
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::TreeState(tree_state),
+                ])
+            }
+            InteractionCommand::Clear => {
+                tree.clear()?;
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
             }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;
@@ -409,13 +450,33 @@ pub struct CommandResult {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TreeState {
+    pub nodes: Vec<NodeInformation>,
+    pub blackboards: Vec<BlackboardInformation>,
+    pub roots: TreeRoots,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TreeRoots {
+    pub roots: Vec<NodeId>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionEvent {
+    /// Result of a command, including error if failure.
     CommandResult(CommandResult),
+    /// Information about a blackboard, its connections and states.
     BlackboardInformation(BlackboardInformation),
     // ExecutionResult(ExecutionResult),
+    /// Information about a node, its children and config.
     NodeInformation(NodeInformation),
-    TreeRoots(Vec<NodeId>),
+
+    /// Current root nodes in the tree.
+    TreeRoots(TreeRoots),
+    /// The current tree config.
     TreeConfig(TreeConfig),
+    /// The entire current tree state.
+    TreeState(TreeState),
 }
 
 //------------------------------------------------------------------------

@@ -396,16 +396,21 @@ impl Tree for BasicTree {
         Ok(id)
     }
 
-    fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>> {
+    fn remove_blackboard(&mut self, id: BlackboardId) -> Result<Box<dyn Blackboard>, BetulaError> {
         // First, disconnect all connections.
-        let connections = self.blackboards.get(&id)?.connections.clone();
-        for connection in &connections {
-            let _ = self.disconnect_port(&connection).ok()?;
+        let blackboard = self
+            .blackboards
+            .get(&id)
+            .ok_or::<BetulaError>(format!("could not find blackboard {id:?}").into())?;
+        let connections = blackboard.connections.clone();
+        for connection in connections.iter() {
+            let _ = self.disconnect_port(&connection)?;
         }
         // Then remove the blackboard and return.
         self.blackboards
             .remove(&id)
             .map(|v| v.blackboard.into_inner())
+            .ok_or(format!("could not find blackboard {id:?}").into())
     }
 
     fn connect_port(&mut self, connection: &PortConnection) -> Result<(), BetulaError> {

@@ -1230,6 +1230,91 @@ impl BetulaViewer {
         Ok(())
     }
 
+    pub fn set_tree_roots(&mut self, roots: &[BetulaNodeId]) {
+        self.tree_roots_remote = roots.to_vec();
+        self.tree_roots_local = roots.to_vec();
+    }
+
+    pub fn set_node_information(
+        &mut self,
+        v: betula_common::control::NodeInformation,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        let viewer_node = self.get_node_mut(v.id, snarl)?;
+        if viewer_node.ui_node.is_none() {
+            viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
+        }
+
+        // Update the configuration if we have one.
+        let ui_node = viewer_node.ui_node.as_mut().unwrap();
+        // Oh, and set the config if we got one
+        if let Some(config) = v.config {
+            let config = self
+                .ui_support
+                .tree_support_ref()
+                .config_deserialize(config)?;
+            ui_node.set_config(&*config)?;
+            viewer_node.clear_config_needs_send();
+        }
+
+        viewer_node.update_children_remote(&v.children);
+        // Pins may have changed, so we must update the snarl state.
+        // Todo: just this node instead of all of them.
+        self.update_snarl_dirty_nodes(snarl)?;
+        Ok(())
+    }
+
+    pub fn set_blackboard_information(
+        &mut self,
+        v: betula_common::control::BlackboardInformation,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        if let Some(bb) = self.blackboards.get(&v.id) {
+            // do update things.
+            {
+                let mut bb = (*bb).borrow_mut();
+                let changed = bb.set_connections_remote(&v.connections);
+                if changed {
+                    self.mark_blackboards_dirty(&v.id, snarl)?;
+                }
+                let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
+                bb.set_values(ui_values);
+            }
+
+            // Handle any pending connections.
+            for snarl_id in self
+                .blackboard_map
+                .get(&v.id)
+                .ok_or("could not find blackboard id in map")?
+            {
+                if let BetulaViewerNode::Blackboard(ref mut bb) = &mut snarl[*snarl_id] {
+                    bb.update_changes();
+                }
+            }
+        } else {
+            // Convert the values.
+            let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
+            let rc = Rc::new(RefCell::new(BlackboardData {
+                ui_values,
+                connections_remote: v.connections.iter().cloned().collect(),
+                connections_local: v.connections.iter().cloned().collect(),
+            }));
+            let cloned_rc = Rc::clone(&rc);
+            self.blackboards.insert(v.id, cloned_rc);
+            // Add the reference to any nodes with this id.
+            let snarl_ids = self.get_blackboard_snarl_ids(&v.id)?;
+            for id in snarl_ids {
+                let cloned_rc = Rc::clone(&rc);
+                if let BetulaViewerNode::Blackboard(bb) = &mut snarl[id] {
+                    bb.data = Some(cloned_rc);
+                }
+            }
+            // The actual blackboard doesn't have the ports right now.
+        }
+        self.update_snarl_dirty_blackboards(snarl)?;
+        Ok(())
+    }
+
     /// Service routine to handle communication and update state.
     #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
@@ -1239,6 +1324,7 @@ impl BetulaViewer {
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
         use betula_common::control::InteractionEvent::TreeRoots;
+        use betula_common::control::InteractionEvent::TreeState;
 
         // First, send changes to the server if necessary.
         self.send_changes_to_server(snarl)?;
@@ -1258,75 +1344,10 @@ impl BetulaViewer {
                 println!("event {event:?}");
                 match event {
                     NodeInformation(v) => {
-                        let viewer_node = self.get_node_mut(v.id, snarl)?;
-                        if viewer_node.ui_node.is_none() {
-                            viewer_node.ui_node =
-                                Some(self.ui_support.create_ui_node(&v.node_type)?);
-                        }
-
-                        // Update the configuration if we have one.
-                        let ui_node = viewer_node.ui_node.as_mut().unwrap();
-                        // Oh, and set the config if we got one
-                        if let Some(config) = v.config {
-                            let config = self
-                                .ui_support
-                                .tree_support_ref()
-                                .config_deserialize(config)?;
-                            ui_node.set_config(&*config)?;
-                            viewer_node.clear_config_needs_send();
-                        }
-
-                        viewer_node.update_children_remote(&v.children);
-                        // Pins may have changed, so we must update the snarl state.
-                        // Todo: just this node instead of all of them.
-                        self.update_snarl_dirty_nodes(snarl)?;
+                        self.set_node_information(v, snarl)?;
                     }
                     BlackboardInformation(v) => {
-                        if let Some(bb) = self.blackboards.get(&v.id) {
-                            // do update things.
-                            {
-                                let mut bb = (*bb).borrow_mut();
-                                let changed = bb.set_connections_remote(&v.connections);
-                                if changed {
-                                    self.mark_blackboards_dirty(&v.id, snarl)?;
-                                }
-                                let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
-                                bb.set_values(ui_values);
-                            }
-
-                            // Handle any pending connections.
-                            for snarl_id in self
-                                .blackboard_map
-                                .get(&v.id)
-                                .ok_or("could not find blackboard id in map")?
-                            {
-                                if let BetulaViewerNode::Blackboard(ref mut bb) =
-                                    &mut snarl[*snarl_id]
-                                {
-                                    bb.update_changes();
-                                }
-                            }
-                        } else {
-                            // Convert the values.
-                            let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
-                            let rc = Rc::new(RefCell::new(BlackboardData {
-                                ui_values,
-                                connections_remote: v.connections.iter().cloned().collect(),
-                                connections_local: v.connections.iter().cloned().collect(),
-                            }));
-                            let cloned_rc = Rc::clone(&rc);
-                            self.blackboards.insert(v.id, cloned_rc);
-                            // Add the reference to any nodes with this id.
-                            let snarl_ids = self.get_blackboard_snarl_ids(&v.id)?;
-                            for id in snarl_ids {
-                                let cloned_rc = Rc::clone(&rc);
-                                if let BetulaViewerNode::Blackboard(bb) = &mut snarl[id] {
-                                    bb.data = Some(cloned_rc);
-                                }
-                            }
-                            // The actual blackboard doesn't have the ports right now.
-                        }
-                        self.update_snarl_dirty_blackboards(snarl)?;
+                        self.set_blackboard_information(v, snarl)?;
                     }
                     CommandResult(c) => {
                         match c.command {
@@ -1348,8 +1369,17 @@ impl BetulaViewer {
                             _ => {}
                         }
                     }
-                    TreeRoots(roots) => {
-                        self.tree_roots_remote = roots;
+                    TreeRoots(tree_roots) => {
+                        self.set_tree_roots(&tree_roots.roots);
+                    }
+                    TreeState(tree_state) => {
+                        for node_info in tree_state.nodes {
+                            self.set_node_information(node_info, snarl)?;
+                        }
+                        for blackboard_info in tree_state.blackboards {
+                            self.set_blackboard_information(blackboard_info, snarl)?;
+                        }
+                        self.set_tree_roots(&tree_state.roots.roots);
                     }
                     unhandled => panic!("unhandled event: {unhandled:?}"),
                 }

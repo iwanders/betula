@@ -327,7 +327,7 @@ pub trait Tree: std::fmt::Debug + AsAny {
     ) -> Result<BlackboardId, BetulaError>;
 
     /// Remove a blackboard by the specified id.
-    fn remove_blackboard(&mut self, id: BlackboardId) -> Option<Box<dyn Blackboard>>;
+    fn remove_blackboard(&mut self, id: BlackboardId) -> Result<Box<dyn Blackboard>, BetulaError>;
 
     /// Connect an input or an output port to a blackboard using the port's name.
     fn connect_port_to_blackboard(
@@ -379,4 +379,15 @@ pub trait Tree: std::fmt::Debug + AsAny {
 
     /// Set the roots of this tree.
     fn set_roots(&mut self, nodes: &[NodeId]) -> Result<(), BetulaError>;
+
+    /// Clear the entire tree.
+    fn clear(&mut self) -> Result<(), BetulaError> {
+        for n in self.nodes() {
+            self.remove_node(n)?;
+        }
+        for b in self.blackboards() {
+            self.remove_blackboard(b)?;
+        }
+        Ok(())
+    }
 }
