@@ -704,10 +704,7 @@ impl BetulaViewerNode {
         }
     }
 }
-const _: () = assert!(
-    false,
-    "Should we lift the client out of the viewer into the editor?"
-);
+// const _: () = assert!(false, "Should we lift the client out of the viewer into the editor?");
 pub struct BetulaViewer {
     /// Client to interact with the server.
     client: Box<dyn TreeClient>,

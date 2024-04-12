@@ -1,7 +1,10 @@
 use eframe::{App, CreationContext};
 
-use crate::{BetulaViewer, BetulaViewerNode};
-use betula_common::{control::TreeServer, TreeSupport};
+use crate::{BetulaViewer, BetulaViewerNode, UiSupport};
+use betula_common::{
+    control::{InProcessControl, TreeClient, TreeServer},
+    TreeSupport,
+};
 use betula_core::BetulaError;
 use egui_snarl::{ui::SnarlStyle, Snarl};
 
@@ -14,11 +17,20 @@ pub struct BetulaEditor {
     style: SnarlStyle,
     viewer: BetulaViewer,
     text_channel: (Sender<String>, Receiver<String>),
+
+    /// Client to interact with the server.
+    client: Box<dyn TreeClient>,
+
+    viewer_server: Box<dyn TreeServer>,
 }
 
 impl BetulaEditor {
-    pub fn new(viewer: BetulaViewer, _cx: &CreationContext) -> Self {
+    pub fn new(client: Box<dyn TreeClient>, ui_support: UiSupport, _cx: &CreationContext) -> Self {
         let snarl = Snarl::<BetulaViewerNode>::new();
+
+        let (viewer_server, viewer_client) = InProcessControl::new();
+
+        let viewer = BetulaViewer::new(Box::new(viewer_client), ui_support);
 
         let mut style = SnarlStyle::new();
         style.simple_wire = true;
@@ -28,13 +40,44 @@ impl BetulaEditor {
             snarl,
             style,
             text_channel: channel(),
+            client,
+            viewer_server: Box::new(viewer_server),
         }
+    }
+    pub fn client(&self) -> &dyn TreeClient {
+        &*self.client
+    }
+
+    fn service(&mut self) -> Result<(), BetulaError> {
+        loop {
+            let viewer_cmd_received = self.viewer_server.get_command()?;
+            let backend_event_received = self.client.get_event()?;
+
+            if viewer_cmd_received.is_none() && backend_event_received.is_none() {
+                break;
+            }
+
+            if let Some(viewer_cmd) = viewer_cmd_received {
+                // Just pass to the backedn.
+                self.client.send_command(viewer_cmd)?;
+            }
+            if let Some(backend_event) = backend_event_received {
+                // Just pass to the backedn.
+                self.viewer_server.send_event(backend_event)?;
+            }
+        }
+
+        let r = self.viewer.service(&mut self.snarl);
+        if r.is_err() {
+            println!("Error servicing: {:?}", r.err());
+        }
+        Ok(())
     }
 }
 
 impl App for BetulaEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let r = self.viewer.service(&mut self.snarl);
+        let r = self.service();
         if r.is_err() {
             println!("Error servicing: {:?}", r.err());
         }

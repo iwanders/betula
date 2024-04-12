@@ -35,7 +35,6 @@ fn main() -> eframe::Result<()> {
 
     // Create the viewer
     let ui_support = create_ui_support();
-    let viewer = BetulaViewer::new(Box::new(client), ui_support);
 
     // Run the viewer.
     let native_options = eframe::NativeOptions {
@@ -48,6 +47,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Betula Interface",
         native_options,
-        Box::new(|cx| Box::new(BetulaEditor::new(viewer, cx))),
+        Box::new(|cx| Box::new(BetulaEditor::new(Box::new(client), ui_support, cx))),
     )
 }
