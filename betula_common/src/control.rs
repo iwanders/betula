@@ -179,6 +179,9 @@ impl InteractionCommand {
             run_specific: nodes.to_vec(),
         })
     }
+    pub fn request_tree_config() -> Self {
+        InteractionCommand::RequestTreeConfig
+    }
 
     fn node_information(
         tree_support: &TreeSupport,

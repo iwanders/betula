@@ -14,7 +14,7 @@ uuid = {version = "1.8.0", features=["v4"]}
 eframe = { version = "0.26", features = ["serde", "persistence"] }
 rfd = "0.14.1"
 smol = "2.0.0"
+serde_json = { version = "1.0" }
 
 [dev-dependencies]
-serde_json = { version = "1.0" }
 serde = { version = "1.0", features = ["derive"] }

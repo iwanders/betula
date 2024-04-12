@@ -2,7 +2,8 @@ use eframe::{App, CreationContext};
 
 use crate::{BetulaViewer, BetulaViewerNode, UiSupport};
 use betula_common::{
-    control::{InProcessControl, TreeClient, TreeServer},
+    control::{InProcessControl, InteractionCommand, TreeClient, TreeServer},
+    tree_support::TreeConfig,
     TreeSupport,
 };
 use betula_core::BetulaError;
@@ -48,7 +49,32 @@ impl BetulaEditor {
         &*self.client
     }
 
-    fn service(&mut self) -> Result<(), BetulaError> {
+    fn request_tree_config(&mut self) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::request_tree_config();
+        self.client.send_command(cmd)
+    }
+
+    fn open_tree_config(&mut self, ctx: &egui::Context, v: TreeConfig) {
+        todo!();
+    }
+
+    fn save_tree_config(&mut self, ctx: &egui::Context, v: TreeConfig) {
+        let task = rfd::AsyncFileDialog::new().save_file();
+        let contents = serde_json::to_string_pretty(&v);
+        if let Err(e) = contents {
+            println!("Failed to serialize {e:?}");
+            return;
+        }
+        let contents = contents.unwrap();
+        execute(async move {
+            let file = task.await;
+            if let Some(file) = file {
+                _ = file.write(contents.as_bytes()).await;
+            }
+        });
+    }
+
+    fn service(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
         loop {
             let viewer_cmd_received = self.viewer_server.get_command()?;
             let backend_event_received = self.client.get_event()?;
@@ -62,8 +88,26 @@ impl BetulaEditor {
                 self.client.send_command(viewer_cmd)?;
             }
             if let Some(backend_event) = backend_event_received {
+                use betula_common::control::InteractionEvent::{CommandResult, TreeConfig};
+                let c = match backend_event {
+                    CommandResult(ref c) => match c.command {
+                        InteractionCommand::RequestTreeConfig => {
+                            println!("failed to get tree config");
+                            None
+                        }
+                        _ => Some(backend_event),
+                    },
+                    TreeConfig(v) => {
+                        println!("Got config: {v:?}");
+                        self.save_tree_config(ctx, v);
+                        None
+                    }
+                    _ => Some(backend_event),
+                };
                 // Just pass to the backedn.
-                self.viewer_server.send_event(backend_event)?;
+                if let Some(viewer_event) = c {
+                    self.viewer_server.send_event(viewer_event)?;
+                }
             }
         }
 
@@ -77,7 +121,7 @@ impl BetulaEditor {
 
 impl App for BetulaEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let r = self.service();
+        let r = self.service(ctx);
         if r.is_err() {
             println!("Error servicing: {:?}", r.err());
         }
@@ -95,7 +139,7 @@ impl App for BetulaEditor {
                             let task = rfd::AsyncFileDialog::new()
                                 .set_title("Open a tree")
                                 .pick_file();
-                            let ctx = ui.ctx().clone();
+                            let ctx = ctx.clone();
                             execute(async move {
                                 let file = task.await;
                                 if let Some(file) = file {
@@ -104,18 +148,14 @@ impl App for BetulaEditor {
                                     ctx.request_repaint();
                                 }
                             });
+                            // if let Err(e) = r {
+                            // println!("Failed to request config: {e:?}");
+                            // }
                             ui.close_menu();
                         }
 
                         if ui.button("💾 Save").clicked() {
-                            let task = rfd::AsyncFileDialog::new().save_file();
-                            let contents = "kldsjflkdsjfldsf";
-                            execute(async move {
-                                let file = task.await;
-                                if let Some(file) = file {
-                                    _ = file.write(contents.as_bytes()).await;
-                                }
-                            });
+                            let r = self.request_tree_config();
                             ui.close_menu();
                         }
                         if ui.button("Quit").clicked() {

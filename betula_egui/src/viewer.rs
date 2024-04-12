@@ -1352,7 +1352,7 @@ impl BetulaViewer {
                     TreeRoots(roots) => {
                         self.tree_roots_remote = roots;
                     }
-                    TreeConfig(_) => {}
+                    unhandled => panic!("unhandled event: {unhandled:?}"),
                 }
             } else {
                 break;
