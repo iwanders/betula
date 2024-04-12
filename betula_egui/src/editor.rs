@@ -54,12 +54,11 @@ impl BetulaEditor {
         self.client.send_command(cmd)
     }
 
-    fn open_tree_config(&mut self, ctx: &egui::Context, v: TreeConfig) {
-        todo!();
-    }
-
-    fn save_tree_config(&mut self, ctx: &egui::Context, v: TreeConfig) {
-        let task = rfd::AsyncFileDialog::new().save_file();
+    fn save_tree_config(&mut self, v: TreeConfig) {
+        let task = rfd::AsyncFileDialog::new()
+            .set_file_name("tree.json")
+            .add_filter("json", &["json"])
+            .save_file();
         let contents = serde_json::to_string_pretty(&v);
         if let Err(e) = contents {
             println!("Failed to serialize {e:?}");
@@ -69,12 +68,16 @@ impl BetulaEditor {
         execute(async move {
             let file = task.await;
             if let Some(file) = file {
-                _ = file.write(contents.as_bytes()).await;
+                let r = file.write(contents.as_bytes()).await;
+                if let Err(e) = r {
+                    println!("Failed to save {e:?}");
+                }
             }
         });
     }
 
     fn service(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
+        let _ = ctx;
         loop {
             let viewer_cmd_received = self.viewer_server.get_command()?;
             let backend_event_received = self.client.get_event()?;
@@ -99,7 +102,7 @@ impl BetulaEditor {
                     },
                     TreeConfig(v) => {
                         println!("Got config: {v:?}");
-                        self.save_tree_config(ctx, v);
+                        self.save_tree_config(v);
                         None
                     }
                     _ => Some(backend_event),
@@ -156,6 +159,9 @@ impl App for BetulaEditor {
 
                         if ui.button("💾 Save").clicked() {
                             let r = self.request_tree_config();
+                            if let Err(e) = r {
+                                println!("Failed to request config: {e:?}");
+                            }
                             ui.close_menu();
                         }
                         if ui.button("Quit").clicked() {
@@ -199,7 +205,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 ) -> std::thread::JoinHandle<Result<(), BetulaError>> {
     std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
         use betula_common::control::CommandResult;
-        use betula_common::control::{InteractionCommand, InteractionEvent};
+        use betula_common::control::InteractionEvent;
 
         let mut tree = T::new();
         let tree_support = tree_support();

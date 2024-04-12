@@ -1238,7 +1238,6 @@ impl BetulaViewer {
         use betula_common::control::InteractionEvent::BlackboardInformation;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
-        use betula_common::control::InteractionEvent::TreeConfig;
         use betula_common::control::InteractionEvent::TreeRoots;
 
         // First, send changes to the server if necessary.

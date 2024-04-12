@@ -2,7 +2,7 @@ use betula_common::control::InProcessControl;
 use betula_core::basic::{BasicBlackboard, BasicTree};
 use betula_egui::{
     editor::{create_server_thread, BetulaEditor},
-    BetulaViewer, UiSupport,
+    UiSupport,
 };
 
 // Factory function for the ui support.
