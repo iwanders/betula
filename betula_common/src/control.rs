@@ -184,6 +184,9 @@ impl InteractionCommand {
     pub fn request_tree_config() -> Self {
         InteractionCommand::RequestTreeConfig
     }
+    pub fn load_tree_config(config: TreeConfig) -> Self {
+        InteractionCommand::LoadTreeConfig(config)
+    }
 
     fn node_information(
         tree_support: &TreeSupport,

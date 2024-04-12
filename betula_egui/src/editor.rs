@@ -54,6 +54,11 @@ impl BetulaEditor {
         self.client.send_command(cmd)
     }
 
+    fn send_tree_config(&mut self, config: TreeConfig) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::load_tree_config(config);
+        self.client.send_command(cmd)
+    }
+
     fn save_tree_config(&mut self, v: TreeConfig) {
         let task = rfd::AsyncFileDialog::new()
             .set_file_name("tree.json")
@@ -104,7 +109,8 @@ impl BetulaEditor {
         let _ = ctx;
 
         if let Ok(config) = self.tree_config_channel.1.try_recv() {
-            println!("config: {config:?}");
+            todo!(); // load snarl config?
+            self.send_tree_config(config)?;
         }
 
         loop {
