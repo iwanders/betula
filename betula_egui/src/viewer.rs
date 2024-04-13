@@ -751,6 +751,16 @@ impl BetulaViewer {
         }
     }
 
+    fn clear(&mut self) {
+        self.tree_roots_local = Default::default();
+        self.tree_roots_remote = Default::default();
+        self.node_map = Default::default();
+        self.snarl_map = Default::default();
+        self.blackboards = Default::default();
+        self.blackboard_map = Default::default();
+        self.blackboard_snarl_map = Default::default();
+    }
+
     pub fn root_remove(&mut self, node_id: BetulaNodeId) {
         let mut z: HashSet<BetulaNodeId> = self.tree_roots_local.iter().cloned().collect();
         z.remove(&node_id);
@@ -774,6 +784,37 @@ impl BetulaViewer {
             .or_default()
             .insert(snarl_id);
         self.blackboard_snarl_map.insert(snarl_id, blackboard_id);
+    }
+
+    pub fn set_tree_state(
+        &mut self,
+        tree_state: betula_common::control::TreeState,
+        snarl: &mut Snarl<BetulaViewerNode>,
+        pending_snarl: Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        self.clear();
+        *snarl = pending_snarl;
+        // update the maps.
+        for (id, node) in snarl.node_ids() {
+            match node {
+                BetulaViewerNode::Blackboard(bb) => {
+                    self.add_blackboard_mapping(bb.id, id);
+                }
+                BetulaViewerNode::Node(node) => {
+                    self.add_id_mapping(node.id, id);
+                }
+            }
+        }
+        // With the maps ready, we can feed the state.
+
+        for node_info in tree_state.nodes {
+            self.set_node_information(node_info, snarl)?;
+        }
+        for blackboard_info in tree_state.blackboards {
+            self.set_blackboard_information(blackboard_info, snarl)?;
+        }
+        self.set_tree_roots(&tree_state.roots.roots);
+        Ok(())
     }
 
     fn get_node_snarl_id(&self, node_id: BetulaNodeId) -> Result<SnarlNodeId, BetulaError> {
@@ -1373,15 +1414,8 @@ impl BetulaViewer {
                     TreeRoots(tree_roots) => {
                         self.set_tree_roots(&tree_roots.roots);
                     }
-                    TreeState(tree_state) => {
-                        for node_info in tree_state.nodes {
-                            self.set_node_information(node_info, snarl)?;
-                        }
-                        for blackboard_info in tree_state.blackboards {
-                            self.set_blackboard_information(blackboard_info, snarl)?;
-                        }
-                        self.set_tree_roots(&tree_state.roots.roots);
-                        return Ok(());
+                    TreeState(_) => {
+                        panic!("state must be handled by set_tree_state to ensure consistency");
                     }
                     unhandled => panic!("unhandled event: {unhandled:?}"),
                 }

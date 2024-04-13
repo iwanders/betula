@@ -170,11 +170,12 @@ impl BetulaEditor {
                         self.save_tree_config(v)?;
                         None
                     }
-                    InteractionEvent::TreeState(_) => {
+                    InteractionEvent::TreeState(state) => {
                         if let Some(pending_snarl) = self.pending_snarl.take() {
-                            self.snarl = pending_snarl;
+                            self.viewer
+                                .set_tree_state(state, &mut self.snarl, pending_snarl)?;
                         }
-                        Some(backend_event)
+                        None
                     }
                     _ => Some(backend_event),
                 };
@@ -185,7 +186,6 @@ impl BetulaEditor {
             }
         }
 
-        println!("snarrrl: {:?}", self.snarl);
         let r = self.viewer.service(&mut self.snarl);
         if r.is_err() {
             println!("Error servicing viewer: {:?}", r.err());
