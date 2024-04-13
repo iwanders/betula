@@ -329,6 +329,16 @@ pub trait Tree: std::fmt::Debug + AsAny {
     /// Remove a blackboard by the specified id.
     fn remove_blackboard(&mut self, id: BlackboardId) -> Result<Box<dyn Blackboard>, BetulaError>;
 
+    /// Set the name of a blackboard.
+    fn set_blackboard_name(
+        &mut self,
+        blackboard_id: BlackboardId,
+        name: &str,
+    ) -> Result<(), BetulaError>;
+
+    /// Get the name of a blackboard.
+    fn blackboard_name(&self, blackboard_id: BlackboardId) -> Result<Option<String>, BetulaError>;
+
     /// Connect an input or an output port to a blackboard using the port's name.
     fn connect_port_to_blackboard(
         &mut self,

@@ -67,6 +67,7 @@ mod v1 {
         pub id: BlackboardId,
         pub values: BTreeMap<PortName, SerializedValue>,
         pub connections: Vec<PortConnection>,
+        pub name: Option<String>,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -253,6 +254,7 @@ impl TreeSupport {
         let mut blackboards = vec![];
         for id in tree.blackboards() {
             let connections = tree.blackboard_connections(id);
+            let name = tree.blackboard_name(id)?;
             let blackboard = tree
                 .blackboard_ref(id)
                 .ok_or(format!("could not get {id:?}"))?;
@@ -265,6 +267,7 @@ impl TreeSupport {
                 id,
                 values,
                 connections,
+                name,
             };
             blackboards.push(b);
         }
@@ -331,6 +334,7 @@ impl TreeSupport {
                     pub id: BlackboardId,
                     pub values: HashMap<PortName, Box<dyn Chalkable>>,
                     pub connections: Vec<PortConnection>,
+                    pub name: Option<String>,
                 }
                 let mut blackboards: Vec<BlackboardDeserialized> = vec![];
                 for blackboard in &root.blackboards {
@@ -338,6 +342,7 @@ impl TreeSupport {
                         id: blackboard.id,
                         connections: blackboard.connections.clone(),
                         values: Default::default(),
+                        name: blackboard.name.clone(),
                     };
                     for (k, v) in &blackboard.values {
                         let boxed_value = self.value_deserialize(v.clone())?;
@@ -366,6 +371,9 @@ impl TreeSupport {
                         bb.set(&k, v.clone())?;
                     }
                     tree.add_blackboard_boxed(id, bb)?;
+                    if let Some(name) = blackboard.name {
+                        tree.set_blackboard_name(id, &name)?;
+                    }
                     for connection in blackboard.connections {
                         tree.connect_port(&connection)?;
                     }
@@ -604,6 +612,8 @@ mod test {
         tree.connect_port_to_blackboard(&output_ports[0], bb)?;
         let input_ports = tree.node_ports(delay_node)?;
         tree.connect_port_to_blackboard(&input_ports[0], bb)?;
+
+        tree.set_blackboard_name(bb, "ThisOneIsGreenWithLines")?;
 
         let obj = TreeSerializer::new(&tree_support, &*tree);
         let config_json = serde_json::to_string(&obj)?;

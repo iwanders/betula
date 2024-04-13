@@ -35,6 +35,7 @@ struct BasicTreeNode {
 struct BasicBlackboardEntry {
     blackboard: RefCell<Box<dyn Blackboard>>,
     connections: HashSet<PortConnection>,
+    name: Option<String>,
 }
 #[derive(Debug, Default)]
 pub struct BasicTree {
@@ -391,6 +392,7 @@ impl Tree for BasicTree {
             BasicBlackboardEntry {
                 blackboard: blackboard.into(),
                 connections: Default::default(),
+                name: None,
             },
         );
         Ok(id)
@@ -497,6 +499,28 @@ impl Tree for BasicTree {
         }
         self.tree_roots = new_roots.to_vec();
         Ok(())
+    }
+
+    fn set_blackboard_name(
+        &mut self,
+        blackboard_id: BlackboardId,
+        name: &str,
+    ) -> Result<(), BetulaError> {
+        let blackboard = self
+            .blackboards
+            .get_mut(&blackboard_id)
+            .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
+        blackboard.name = Some(name.to_owned());
+        Ok(())
+    }
+
+    /// Get the name of a blackboard.
+    fn blackboard_name(&self, blackboard_id: BlackboardId) -> Result<Option<String>, BetulaError> {
+        let blackboard = self
+            .blackboards
+            .get(&blackboard_id)
+            .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
+        Ok(blackboard.name.clone())
     }
 }
 
