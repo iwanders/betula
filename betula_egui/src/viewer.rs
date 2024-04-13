@@ -341,6 +341,9 @@ pub struct BlackboardData {
     ui_values: BTreeMap<PortName, Box<dyn UiValue>>,
     connections_local: BTreeSet<PortConnection>,
     connections_remote: BTreeSet<PortConnection>,
+
+    name_remote: Option<String>,
+    name_editor: Option<String>,
 }
 impl BlackboardData {
     /// Return whether local and remote are identical.
@@ -460,8 +463,6 @@ pub struct ViewerBlackboard {
     is_dirty: bool,
 
     /// The ports that are shown for this blackboard.
-    ///
-    /// If None, all ports on the blackboard are depicted.
     ports: BTreeMap<PortName, ViewerBlackboardPort>,
 
     #[serde(skip)]
@@ -1321,6 +1322,7 @@ impl BetulaViewer {
                 }
                 let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
                 bb.set_values(ui_values);
+                (*bb).name_remote = v.name;
             }
 
             // Handle any pending connections.
@@ -1334,12 +1336,15 @@ impl BetulaViewer {
                 }
             }
         } else {
+            // New blackboard.
             // Convert the values.
             let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
             let rc = Rc::new(RefCell::new(BlackboardData {
                 ui_values,
                 connections_remote: v.connections.iter().cloned().collect(),
                 connections_local: v.connections.iter().cloned().collect(),
+                name_remote: v.name,
+                name_editor: None,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.blackboards.insert(v.id, cloned_rc);
@@ -1536,8 +1541,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
             BetulaViewerNode::Blackboard(bb) => {
                 // Grab the type support for this node.
-                if bb.data().is_some() {
-                    "Blackboard".to_owned()
+                let data = bb.data();
+                if let Some(data) = data {
+                    data.name_remote
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| "Blackboard".to_owned())
                 } else {
                     "Pending...".to_owned()
                 }

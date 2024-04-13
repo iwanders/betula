@@ -237,10 +237,12 @@ impl InteractionCommand {
         let bb = bb.borrow_mut();
         let port_values = tree_support.blackboard_value_serialize(&**bb)?;
         let connections = tree.blackboard_connections(blackboard_id);
+        let name = tree.blackboard_name(blackboard_id)?;
         Ok(BlackboardInformation {
             id: blackboard_id,
             port_values,
             connections,
+            name,
         })
     }
 
@@ -457,6 +459,7 @@ pub struct BlackboardInformation {
     pub id: BlackboardId,
     pub connections: Vec<PortConnection>,
     pub port_values: SerializedBlackboardValues,
+    pub name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
