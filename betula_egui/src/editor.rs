@@ -8,16 +8,30 @@ use betula_common::{
 };
 use betula_core::BetulaError;
 use egui_snarl::{ui::SnarlStyle, Snarl};
+use serde::{Deserialize, Serialize};
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 // Save / load through https://github.com/woelper/egui_pick_file and https://github.com/emilk/egui/issues/270
 
+type SerializableHolder = serde_json::Value;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct EditorState {
+    snarl_state: SerializableHolder,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct EditorConfig {
+    editor: EditorState,
+    tree: TreeConfig,
+}
+
 pub struct BetulaEditor {
     snarl: Snarl<BetulaViewerNode>,
     style: SnarlStyle,
     viewer: BetulaViewer,
-    tree_config_channel: (Sender<TreeConfig>, Receiver<TreeConfig>),
+    tree_config_channel: (Sender<EditorConfig>, Receiver<EditorConfig>),
 
     /// Client to interact with the server.
     client: Box<dyn TreeClient>,
@@ -59,17 +73,19 @@ impl BetulaEditor {
         self.client.send_command(cmd)
     }
 
-    fn save_tree_config(&mut self, v: TreeConfig) {
+    fn save_tree_config(&mut self, tree: TreeConfig) -> Result<(), BetulaError> {
         let task = rfd::AsyncFileDialog::new()
             .set_file_name("tree.json")
             .add_filter("json", &["json"])
             .save_file();
-        let contents = serde_json::to_string_pretty(&v);
-        if let Err(e) = contents {
-            println!("Failed to serialize {e:?}");
-            return;
-        }
-        let contents = contents.unwrap();
+
+        let editor = EditorState {
+            snarl_state: serde_json::to_value(&self.snarl)?,
+        };
+        let editor_config = EditorConfig { tree, editor };
+        let editor_config = serde_json::to_string_pretty(&editor_config)?;
+
+        let contents = editor_config;
         execute(async move {
             let file = task.await;
             if let Some(file) = file {
@@ -79,13 +95,14 @@ impl BetulaEditor {
                 }
             }
         });
+        Ok(())
     }
 
-    fn load_tree_config(content: &[u8]) -> Result<TreeConfig, BetulaError> {
-        let config: TreeConfig = serde_json::de::from_slice(content)?;
+    fn load_editor_config(content: &[u8]) -> Result<EditorConfig, BetulaError> {
+        let config: EditorConfig = serde_json::de::from_slice(content)?;
         Ok(config)
     }
-    fn load_tree_config_dialog(&self) {
+    fn load_editor_config_dialog(&self) {
         let sender = self.tree_config_channel.0.clone();
         let task = rfd::AsyncFileDialog::new()
             .set_title("Open a tree")
@@ -94,7 +111,7 @@ impl BetulaEditor {
             let file = task.await;
             if let Some(file) = file {
                 let text = file.read().await;
-                let config = Self::load_tree_config(&text);
+                let config = Self::load_editor_config(&text);
                 if let Ok(config) = config {
                     let _ = sender.send(config);
                 } else {
@@ -104,13 +121,19 @@ impl BetulaEditor {
             }
         });
     }
+    fn load_editor_state(&mut self, editor_state: EditorState) -> Result<(), BetulaError> {
+        let snarl: Snarl<BetulaViewerNode> = serde_json::from_value(editor_state.snarl_state)?;
+        self.snarl = snarl;
+        println!("SnaRL: {:?}", self.snarl);
+        Ok(())
+    }
 
     fn service(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
         let _ = ctx;
 
         if let Ok(config) = self.tree_config_channel.1.try_recv() {
-            todo!(); // load snarl config?
-            self.send_tree_config(config)?;
+            self.load_editor_state(config.editor)?;
+            self.send_tree_config(config.tree)?;
         }
 
         loop {
@@ -122,7 +145,7 @@ impl BetulaEditor {
             }
 
             if let Some(viewer_cmd) = viewer_cmd_received {
-                // Just pass to the backedn.
+                // Just pass to the backend.
                 self.client.send_command(viewer_cmd)?;
             }
             if let Some(backend_event) = backend_event_received {
@@ -137,7 +160,7 @@ impl BetulaEditor {
                     },
                     TreeConfig(v) => {
                         println!("Got config: {v:?}");
-                        self.save_tree_config(v);
+                        self.save_tree_config(v)?;
                         None
                     }
                     _ => Some(backend_event),
@@ -169,7 +192,7 @@ impl App for BetulaEditor {
                 {
                     ui.menu_button("File", |ui| {
                         if ui.button("📂 Open").clicked() {
-                            self.load_tree_config_dialog();
+                            self.load_editor_config_dialog();
                             ui.close_menu();
                         }
 

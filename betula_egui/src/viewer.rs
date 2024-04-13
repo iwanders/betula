@@ -464,6 +464,7 @@ pub struct ViewerBlackboard {
     /// If None, all ports on the blackboard are depicted.
     ports: BTreeMap<PortName, ViewerBlackboardPort>,
 
+    #[serde(skip)]
     pending_connections: HashSet<PortConnection>,
 }
 

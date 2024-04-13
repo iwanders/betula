@@ -1082,6 +1082,7 @@ version = "0.2.1"
 source = "git+https://github.com/iwanders/egui-snarl.git?rev=f0995696fb19305ee133e3fd669b7079bf6ccf0f#f0995696fb19305ee133e3fd669b7079bf6ccf0f"
 dependencies = [
  "egui",
+ "serde",
  "slab",
  "tiny-fn",
 ]
@@ -2657,6 +2658,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+ "serde",
 ]
 
 [[package]]
