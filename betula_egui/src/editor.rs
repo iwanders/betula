@@ -37,6 +37,8 @@ pub struct BetulaEditor {
     client: Box<dyn TreeClient>,
 
     viewer_server: Box<dyn TreeServer>,
+
+    pending_snarl: Option<Snarl<BetulaViewerNode>>,
 }
 
 impl BetulaEditor {
@@ -53,6 +55,7 @@ impl BetulaEditor {
         BetulaEditor {
             viewer,
             snarl,
+            pending_snarl: None,
             style,
             tree_config_channel: channel(),
             client,
@@ -121,18 +124,21 @@ impl BetulaEditor {
             }
         });
     }
-    fn load_editor_state(&mut self, editor_state: EditorState) -> Result<(), BetulaError> {
+    fn load_editor_state(
+        &mut self,
+        editor_state: EditorState,
+    ) -> Result<Snarl<BetulaViewerNode>, BetulaError> {
         let snarl: Snarl<BetulaViewerNode> = serde_json::from_value(editor_state.snarl_state)?;
-        self.snarl = snarl;
-        println!("SnaRL: {:?}", self.snarl);
-        Ok(())
+        // self.snarl = snarl;
+        // println!("SnaRL: {:?}", self.snarl);
+        Ok(snarl)
     }
 
     fn service(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
         let _ = ctx;
 
         if let Ok(config) = self.tree_config_channel.1.try_recv() {
-            self.load_editor_state(config.editor)?;
+            self.pending_snarl = Some(self.load_editor_state(config.editor)?);
             self.send_tree_config(config.tree)?;
         }
 
@@ -149,6 +155,7 @@ impl BetulaEditor {
                 self.client.send_command(viewer_cmd)?;
             }
             if let Some(backend_event) = backend_event_received {
+                use betula_common::control::InteractionEvent;
                 use betula_common::control::InteractionEvent::{CommandResult, TreeConfig};
                 let c = match backend_event {
                     CommandResult(ref c) => match c.command {
@@ -163,6 +170,12 @@ impl BetulaEditor {
                         self.save_tree_config(v)?;
                         None
                     }
+                    InteractionEvent::TreeState(_) => {
+                        if let Some(pending_snarl) = self.pending_snarl.take() {
+                            self.snarl = pending_snarl;
+                        }
+                        Some(backend_event)
+                    }
                     _ => Some(backend_event),
                 };
                 // Just pass to the backend.
@@ -172,9 +185,10 @@ impl BetulaEditor {
             }
         }
 
+        println!("snarrrl: {:?}", self.snarl);
         let r = self.viewer.service(&mut self.snarl);
         if r.is_err() {
-            println!("Error servicing: {:?}", r.err());
+            println!("Error servicing viewer: {:?}", r.err());
         }
         Ok(())
     }

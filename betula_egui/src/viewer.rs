@@ -1381,6 +1381,7 @@ impl BetulaViewer {
                             self.set_blackboard_information(blackboard_info, snarl)?;
                         }
                         self.set_tree_roots(&tree_state.roots.roots);
+                        return Ok(());
                     }
                     unhandled => panic!("unhandled event: {unhandled:?}"),
                 }
@@ -1388,6 +1389,7 @@ impl BetulaViewer {
                 break;
             }
         }
+
         Ok(())
     }
 
