@@ -117,6 +117,7 @@ pub enum InteractionCommand {
     SetChildren(SetChildren),
 
     AddBlackboard(BlackboardId),
+    SetBlackboardName(BlackboardId, String),
 
     SetConfig(SetConfigCommand),
 
@@ -185,6 +186,10 @@ impl InteractionCommand {
 
     pub fn set_config(id: NodeId, config: SerializedConfig) -> Self {
         InteractionCommand::SetConfig(SetConfigCommand { id, config })
+    }
+
+    pub fn set_blackboard_name(id: BlackboardId, name: String) -> Self {
+        InteractionCommand::SetBlackboardName(id, name)
     }
 
     pub fn run_specific(nodes: &[NodeId]) -> Self {
@@ -418,6 +423,20 @@ impl InteractionCommand {
                     command: self.clone(),
                     error: None,
                 })])
+            }
+            InteractionCommand::SetBlackboardName(blackboard_id, name) => {
+                tree.set_blackboard_name(*blackboard_id, &name)?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
+                        tree_support,
+                        *blackboard_id,
+                        tree,
+                    )?),
+                ])
             }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;

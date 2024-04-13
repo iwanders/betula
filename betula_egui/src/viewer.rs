@@ -338,16 +338,18 @@ use std::collections::{BTreeMap, BTreeSet};
 /// connections that exist in the backend that relate to this blackboard.
 #[derive(Debug)]
 pub struct BlackboardData {
+    id: BlackboardId,
+
     ui_values: BTreeMap<PortName, Box<dyn UiValue>>,
     connections_local: BTreeSet<PortConnection>,
     connections_remote: BTreeSet<PortConnection>,
 
     name_remote: Option<String>,
-    name_editor: Option<String>,
+    name_local: Option<String>,
 }
 impl BlackboardData {
     /// Return whether local and remote are identical.
-    pub fn is_up_to_date(&self) -> bool {
+    pub fn is_connections_up_to_date(&self) -> bool {
         self.connections_local == self.connections_remote
     }
     /// Get all local connections.
@@ -467,6 +469,9 @@ pub struct ViewerBlackboard {
 
     #[serde(skip)]
     pending_connections: HashSet<PortConnection>,
+
+    #[serde(skip)]
+    name_editor: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -484,6 +489,7 @@ impl ViewerBlackboard {
             is_dirty: false,
             ports: Default::default(),
             pending_connections: Default::default(),
+            name_editor: None,
         }
     }
     pub fn data(&self) -> Option<Ref<'_, BlackboardData>> {
@@ -684,6 +690,41 @@ impl ViewerBlackboard {
             .flatten()
             .cloned()
             .collect()
+    }
+
+    pub fn ui_node_menu(&mut self, ui: &mut Ui) {
+        ui.label("Node menu");
+        if self.data.is_none() {
+            return;
+        }
+        let mut data = self.data.as_ref().unwrap().borrow_mut();
+        let name: String = data
+            .name_remote
+            .as_ref()
+            .cloned()
+            .unwrap_or("Blackboard".to_owned());
+
+        ui.horizontal(|ui| {
+            ui.label("Name:");
+            if let Some(ref mut editor_string) = &mut self.name_editor {
+                let edit_box = egui::TextEdit::singleline(editor_string)
+                    .desired_width(0.0)
+                    .clip_text(false);
+                let r = ui.add(edit_box);
+                if r.lost_focus() {
+                    if name != *editor_string {
+                        data.name_local = Some(editor_string.clone());
+                    }
+                    self.name_editor = None;
+                    ui.close_menu();
+                }
+            } else {
+                let r = ui.label(format!("{}", &name));
+                if r.clicked() {
+                    self.name_editor = Some(name.clone().into());
+                }
+            }
+        });
     }
 }
 
@@ -1156,12 +1197,16 @@ impl BetulaViewer {
         }
 
         for blackboard in self.blackboards.values() {
-            let blackboard = blackboard.borrow();
-            if !blackboard.is_up_to_date() {
+            let mut blackboard = blackboard.borrow_mut();
+            if !blackboard.is_connections_up_to_date() {
                 let connect_ports = blackboard.local_connected_ports();
                 let disconnect_ports = blackboard.local_disconnected_ports();
                 let cmd =
                     InteractionCommand::port_disconnect_connect(&disconnect_ports, &connect_ports);
+                self.client.send_command(cmd)?;
+            }
+            if let Some(new_name) = blackboard.name_local.take() {
+                let cmd = InteractionCommand::set_blackboard_name(blackboard.id, new_name);
                 self.client.send_command(cmd)?;
             }
         }
@@ -1340,11 +1385,12 @@ impl BetulaViewer {
             // Convert the values.
             let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
             let rc = Rc::new(RefCell::new(BlackboardData {
+                id: v.id,
                 ui_values,
                 connections_remote: v.connections.iter().cloned().collect(),
                 connections_local: v.connections.iter().cloned().collect(),
                 name_remote: v.name,
-                name_editor: None,
+                name_local: None,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.blackboards.insert(v.id, cloned_rc);
@@ -1917,7 +1963,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         _scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
-        ui.label("Node menu");
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_id = node.id;
@@ -1938,7 +1983,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     ui.close_menu();
                 }
             }
-            _ => todo!(),
+            BetulaViewerNode::Blackboard(ref mut bb) => {
+                bb.ui_node_menu(ui);
+            }
         }
     }
 
@@ -2191,7 +2238,7 @@ mod test {
             // we should've definitely converged now.
             for blackboard in viewer.blackboards.values() {
                 let blackboard = blackboard.borrow();
-                if !blackboard.is_up_to_date() {
+                if !blackboard.is_connections_up_to_date() {
                     assert!(false, "did not converge");
                 }
             }
