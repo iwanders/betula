@@ -747,7 +747,7 @@ impl BetulaViewerNode {
         }
     }
 }
-// const _: () = assert!(false, "Should we lift the client out of the viewer into the editor?");
+
 pub struct BetulaViewer {
     /// Client to interact with the server.
     client: Box<dyn TreeClient>,
@@ -1502,10 +1502,21 @@ impl BetulaViewer {
     ) {
         let cmd = InteractionCommand::add_blackboard(id);
         if let Ok(_) = self.client.send_command(cmd) {
-            let snarl_id =
-                snarl.insert_node(pos, BetulaViewerNode::Blackboard(ViewerBlackboard::new(id)));
-            self.add_blackboard_mapping(id, snarl_id);
+            self.ui_create_blackboard_node(id, pos, snarl, None);
         }
+    }
+
+    pub fn ui_create_blackboard_node(
+        &mut self,
+        id: BlackboardId,
+        pos: egui::Pos2,
+        snarl: &mut Snarl<BetulaViewerNode>,
+        data: Option<BlackboardDataRc>,
+    ) {
+        let mut viewer_node = ViewerBlackboard::new(id);
+        viewer_node.data = data;
+        let snarl_id = snarl.insert_node(pos, BetulaViewerNode::Blackboard(viewer_node));
+        self.add_blackboard_mapping(id, snarl_id);
     }
 
     #[cfg(test)]
@@ -1939,7 +1950,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         _scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
-        ui.label("Add node:");
+        ui.label("Node");
         for node_type in self.ui_support.node_types() {
             let name = self.ui_support.display_name(&node_type);
             if ui.button(name).clicked() {
@@ -1947,10 +1958,32 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 ui.close_menu();
             }
         }
-        ui.label("Blackboard:");
-        if ui.button("New blackboard").clicked() {
+        ui.label("Blackboard");
+        if ui.button("New").clicked() {
             self.ui_create_blackboard(BlackboardId(Uuid::new_v4()), pos, snarl);
             ui.close_menu();
+        }
+
+        let mut id_names = vec![];
+        {
+            for blackboard in self.blackboards.values() {
+                let data_rc = Rc::clone(blackboard);
+                let data = blackboard.borrow();
+                let id = data.id;
+                let name = data
+                    .name_remote
+                    .as_ref()
+                    .map(|z| z.clone())
+                    .unwrap_or("Blackboard".to_owned());
+                id_names.push((id, name, data_rc));
+            }
+        }
+
+        for (id, name, data_rc) in id_names {
+            if ui.button(name).clicked() {
+                self.ui_create_blackboard_node(id, pos, snarl, Some(data_rc));
+                ui.close_menu();
+            }
         }
     }
 
