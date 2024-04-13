@@ -19,12 +19,53 @@ type SerializableHolder = serde_json::Value;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct EditorState {
     snarl_state: SerializableHolder,
+    run_state: RunState,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct EditorConfig {
     editor: EditorState,
     tree: TreeConfig,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct Milliseconds(pub u64);
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+struct RunState {
+    roots: bool,
+    interval: Milliseconds,
+}
+impl RunState {
+    pub fn save(&self) -> Self {
+        let mut new = *self;
+        new.roots = false;
+        new
+    }
+    pub fn command(&self) -> InteractionCommand {
+        InteractionCommand::RunSettings(betula_common::control::RunSettings {
+            roots: Some(self.roots),
+            interval: Some(std::time::Duration::from_millis(self.interval.0)),
+            ..Default::default()
+        })
+    }
+}
+
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct RunSettings {
+// pub roots: Option<bool>,
+// pub specific: Vec<NodeId>,
+// #[serde(with = "option_duration_serde")]
+// pub interval: Option<std::time::Duration>,
+// }
+
+impl Default for RunState {
+    fn default() -> Self {
+        Self {
+            roots: false,
+            interval: Milliseconds(50),
+        }
+    }
 }
 
 pub struct BetulaEditor {
@@ -39,6 +80,8 @@ pub struct BetulaEditor {
     viewer_server: Box<dyn TreeServer>,
 
     pending_snarl: Option<Snarl<BetulaViewerNode>>,
+
+    run_state: RunState,
 }
 
 impl BetulaEditor {
@@ -60,6 +103,7 @@ impl BetulaEditor {
             tree_config_channel: channel(),
             client,
             viewer_server: Box::new(viewer_server),
+            run_state: Default::default(),
         }
     }
     pub fn client(&self) -> &dyn TreeClient {
@@ -76,6 +120,11 @@ impl BetulaEditor {
         self.client.send_command(cmd)
     }
 
+    fn send_run_settings(&self) -> Result<(), BetulaError> {
+        let cmd = self.run_state.command();
+        self.client.send_command(cmd)
+    }
+
     fn save_tree_config(&mut self, tree: TreeConfig) -> Result<(), BetulaError> {
         let task = rfd::AsyncFileDialog::new()
             .set_file_name("tree.json")
@@ -84,6 +133,7 @@ impl BetulaEditor {
 
         let editor = EditorState {
             snarl_state: serde_json::to_value(&self.snarl)?,
+            run_state: self.run_state.save(),
         };
         let editor_config = EditorConfig { tree, editor };
         let editor_config = serde_json::to_string_pretty(&editor_config)?;
@@ -129,8 +179,6 @@ impl BetulaEditor {
         editor_state: EditorState,
     ) -> Result<Snarl<BetulaViewerNode>, BetulaError> {
         let snarl: Snarl<BetulaViewerNode> = serde_json::from_value(editor_state.snarl_state)?;
-        // self.snarl = snarl;
-        // println!("SnaRL: {:?}", self.snarl);
         Ok(snarl)
     }
 
@@ -138,6 +186,10 @@ impl BetulaEditor {
         let _ = ctx;
 
         if let Ok(config) = self.tree_config_channel.1.try_recv() {
+            // Pause the execution!
+            self.run_state = config.editor.run_state;
+            self.run_state.roots = false;
+            self.send_run_settings()?;
             self.pending_snarl = Some(self.load_editor_state(config.editor)?);
             self.send_tree_config(config.tree)?;
         }
@@ -161,6 +213,15 @@ impl BetulaEditor {
                     CommandResult(ref c) => match c.command {
                         InteractionCommand::RequestTreeConfig => {
                             println!("failed to get tree config");
+                            None
+                        }
+                        InteractionCommand::RunSettings(ref e) => {
+                            if let Some(new_value) = &e.roots {
+                                self.run_state.roots = *new_value;
+                            }
+                            if let Some(interval) = &e.interval {
+                                self.run_state.interval = Milliseconds(interval.as_millis() as u64);
+                            }
                             None
                         }
                         _ => Some(backend_event),
@@ -192,15 +253,8 @@ impl BetulaEditor {
         }
         Ok(())
     }
-}
 
-impl App for BetulaEditor {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let r = self.service(ctx);
-        if r.is_err() {
-            println!("Error servicing: {:?}", r.err());
-        }
-
+    pub fn ui_top_panel(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 {
@@ -223,10 +277,52 @@ impl App for BetulaEditor {
                     });
                     ui.add_space(16.0);
                 }
+                ui.separator();
+                let symbol = if self.run_state.roots { "⏸" } else { "▶" };
+                let mut state_changed = false;
+                if ui.button(symbol).clicked() {
+                    // ⏸
+                    self.run_state.roots = !self.run_state.roots;
+                    state_changed = true;
+                }
+                let r = ui.add(
+                    egui::DragValue::new(&mut self.run_state.interval.0)
+                        .clamp_range(20..=10000)
+                        .suffix("ms")
+                        .update_while_editing(false),
+                );
+                if r.changed() {
+                    state_changed = true;
+                }
+                if state_changed {
+                    if let Err(e) = self.send_run_settings() {
+                        println!("Error servicing: {e:?}");
+                    }
+                }
 
-                egui::widgets::global_dark_light_mode_switch(ui);
+                if ui.button("⏭").clicked() {}
+                // 📥
+                ui.separator();
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    egui::widgets::global_dark_light_mode_switch(ui);
+                });
             });
         });
+        Ok(())
+    }
+}
+
+impl App for BetulaEditor {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let r = self.service(ctx);
+        if r.is_err() {
+            println!("Error servicing: {:?}", r.err());
+        }
+
+        let r = self.ui_top_panel(ctx);
+        if r.is_err() {
+            println!("Error top pannel: {:?}", r.err());
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             self.snarl
@@ -263,32 +359,40 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
         let mut tree = T::new();
         let tree_support = tree_support();
 
-        let mut run_roots: bool = true;
+        let mut run_roots: bool = false;
+        let mut sleep_interval = std::time::Duration::from_millis(10);
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            let received = server.get_command()?;
+            std::thread::sleep(sleep_interval);
 
-            if let Some(command) = received {
-                println!("    Executing {command:?}");
-                if let InteractionCommand::RunSettings(run_settings) = &command {
-                    if let Some(new_value) = run_settings.run_roots {
-                        println!("Setting run roots to: {new_value}");
-                        run_roots = new_value;
-                    }
-                }
-                let r = command.execute(&tree_support, &mut tree);
-                match r {
-                    Ok(v) => {
-                        for event in v {
-                            server.send_event(event)?;
+            loop {
+                let received = server.get_command()?;
+                if let Some(command) = received {
+                    println!("    Executing {command:?}");
+                    if let InteractionCommand::RunSettings(run_settings) = &command {
+                        if let Some(new_value) = run_settings.roots {
+                            println!("Setting run roots to: {new_value}");
+                            run_roots = new_value;
+                        }
+                        if let Some(new_duration) = run_settings.interval {
+                            sleep_interval = new_duration;
                         }
                     }
-                    Err(e) => {
-                        server.send_event(InteractionEvent::CommandResult(CommandResult {
-                            command: command,
-                            error: Some(format!("{e:?}")),
-                        }))?;
+                    let r = command.execute(&tree_support, &mut tree);
+                    match r {
+                        Ok(v) => {
+                            for event in v {
+                                server.send_event(event)?;
+                            }
+                        }
+                        Err(e) => {
+                            server.send_event(InteractionEvent::CommandResult(CommandResult {
+                                command: command,
+                                error: Some(format!("{e:?}")),
+                            }))?;
+                        }
                     }
+                } else {
+                    break;
                 }
             }
 

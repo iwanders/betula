@@ -79,10 +79,34 @@ pub struct PortChanges {
     pub connect: Vec<PortConnection>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+mod option_duration_serde {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+    pub fn serialize<S>(
+        value: &Option<std::time::Duration>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let v = value.as_ref().and_then(|v| Some(v.as_secs_f64()));
+        Option::<f64>::serialize(&v, serializer)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<std::time::Duration>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Option::<f64>::deserialize(deserializer)
+            .and_then(|v| Ok(v.and_then(|v| Some(std::time::Duration::from_secs_f64(v)))))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct RunSettings {
-    pub run_roots: Option<bool>,
-    pub run_specific: Vec<NodeId>,
+    pub roots: Option<bool>,
+    pub specific: Vec<NodeId>,
+    #[serde(with = "option_duration_serde")]
+    pub interval: Option<std::time::Duration>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -163,22 +187,11 @@ impl InteractionCommand {
         InteractionCommand::SetConfig(SetConfigCommand { id, config })
     }
 
-    pub fn run_pause() -> Self {
-        InteractionCommand::RunSettings(RunSettings {
-            run_roots: Some(false),
-            run_specific: vec![],
-        })
-    }
-    pub fn run_start() -> Self {
-        InteractionCommand::RunSettings(RunSettings {
-            run_roots: Some(true),
-            run_specific: vec![],
-        })
-    }
     pub fn run_specific(nodes: &[NodeId]) -> Self {
         InteractionCommand::RunSettings(RunSettings {
-            run_roots: None,
-            run_specific: nodes.to_vec(),
+            roots: None,
+            interval: None,
+            specific: nodes.to_vec(),
         })
     }
     pub fn request_tree_config() -> Self {
@@ -349,7 +362,7 @@ impl InteractionCommand {
                 ])
             }
             InteractionCommand::RunSettings(run_settings) => {
-                for z in &run_settings.run_specific {
+                for z in &run_settings.specific {
                     let _result = tree.execute(*z)?;
                 }
                 Ok(vec![InteractionEvent::CommandResult(CommandResult {
