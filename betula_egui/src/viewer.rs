@@ -474,7 +474,7 @@ pub struct ViewerBlackboard {
     name_editor: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct ViewerBlackboardPort {
     connections: BTreeSet<PortConnection>,
     value_editor: bool,
@@ -693,7 +693,6 @@ impl ViewerBlackboard {
     }
 
     pub fn ui_node_menu(&mut self, ui: &mut Ui) {
-        ui.label("Node menu");
         if self.data.is_none() {
             return;
         }
@@ -725,6 +724,61 @@ impl ViewerBlackboard {
                 }
             }
         });
+
+        ui.label("Ports");
+        for name in data.ui_values.keys() {
+            ui.menu_button(name.to_string(), |ui| {
+                let mut currently_shown = self.ports.contains_key(name);
+                let r = ui.checkbox(&mut currently_shown, "Show");
+                if r.changed() {
+                    if currently_shown {
+                        // Add this port
+                        self.ports
+                            .insert(name.clone(), ViewerBlackboardPort::default());
+                    } else {
+                        // Remove this port
+                        self.ports.remove(name);
+                    }
+                    self.is_dirty = true;
+                }
+                for (label, direction) in [
+                    ("Writers", PortDirection::Output),
+                    ("Readers", PortDirection::Input),
+                ] {
+                    let port_connections: Vec<_> = data
+                        .connections_remote
+                        .iter()
+                        .filter(|c| c.node.direction() == direction && c.blackboard.name() == *name)
+                        .collect();
+                    if port_connections.is_empty() {
+                        continue;
+                    }
+                    ui.menu_button(label, |ui| {
+                        for c in port_connections {
+                            let mut currently_shown = self
+                                .ports
+                                .get(name)
+                                .map(|z| z.connections.contains(c))
+                                .unwrap_or(false);
+                            let label = format!("{:?} ({:?})", c.node.name(), c.node.node());
+                            let r = ui.checkbox(&mut currently_shown, label.to_string());
+                            if r.changed() {
+                                if currently_shown {
+                                    // Add this port
+                                    let v = self.ports.entry(name.clone()).or_default();
+                                    v.connections.insert(c.clone());
+                                } else {
+                                    // Remove this port
+                                    let v = self.ports.entry(name.clone()).or_default();
+                                    v.connections.remove(c);
+                                }
+                                self.is_dirty = true;
+                            }
+                        }
+                    });
+                }
+            });
+        }
     }
 }
 
