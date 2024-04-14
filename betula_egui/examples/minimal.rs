@@ -37,12 +37,13 @@ fn main() -> eframe::Result<()> {
     let ui_support = create_ui_support();
 
     // Run the viewer.
-    let native_options = eframe::NativeOptions {
+    let mut native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])
             .with_min_inner_size([300.0, 220.0]),
         ..Default::default()
     };
+    native_options.viewport.icon = Some(std::sync::Arc::new(betula_egui::betula_icon()));
 
     eframe::run_native(
         "Betula Interface",
