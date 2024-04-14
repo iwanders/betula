@@ -401,3 +401,60 @@ pub trait Tree: std::fmt::Debug + AsAny {
         Ok(())
     }
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct ExecutionStatus {
+    pub node: NodeId,
+    pub status: NodeStatus,
+}
+use std::cell::RefCell;
+struct TrackedTreeContext<'a, 'b> {
+    this_node: NodeId,
+    tree: &'a dyn Tree,
+    status: &'b RefCell<Vec<ExecutionStatus>>,
+}
+impl RunContext for TrackedTreeContext<'_, '_> {
+    fn children(&self) -> usize {
+        self.tree
+            .children(self.this_node)
+            .expect("node must exist in tree")
+            .len()
+    }
+    fn run(&self, index: usize) -> Result<NodeStatus, NodeError> {
+        let ids = self.tree.children(self.this_node)?;
+        let (v, all) = execute_tracked(self.tree, ids[index])?;
+        let mut status = self.status.borrow_mut();
+        for s in all {
+            status.push(s);
+        }
+        Ok(v)
+    }
+}
+
+/// Execute a node on a tree and track all node execution status.
+fn execute_tracked(
+    tree: &dyn Tree,
+    id: NodeId,
+) -> Result<(NodeStatus, Vec<ExecutionStatus>), NodeError> {
+    let mut res: RefCell<Vec<ExecutionStatus>> = RefCell::new(vec![]);
+    let mut n = tree
+        .node_ref(id)
+        .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
+        .try_borrow_mut()?;
+
+    let mut context = TrackedTreeContext {
+        this_node: id,
+        tree: tree,
+        status: &mut res,
+    };
+
+    let v = n.tick(&mut context)?;
+    {
+        let mut modifyable = res.borrow_mut();
+        modifyable.push(ExecutionStatus {
+            node: id,
+            status: v,
+        });
+    }
+    Ok((v, res.into_inner()))
+}

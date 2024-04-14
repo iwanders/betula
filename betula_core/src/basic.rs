@@ -670,6 +670,30 @@ mod tests {
     }
 
     #[test]
+    fn fallback_tracked() -> Result<(), NodeError> {
+        // use crate::TrackedTreeExecution;
+        let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
+        let root_id = NodeId(crate::Uuid::new_v4());
+        let root = tree.add_node_boxed(root_id, Box::new(SelectorNode {}))?;
+        let f1_id = NodeId(crate::Uuid::new_v4());
+        let f1 = tree.add_node_boxed(f1_id, Box::new(FailureNode {}))?;
+        let s1_id = NodeId(crate::Uuid::new_v4());
+        let s1 = tree.add_node_boxed(s1_id, Box::new(SuccessNode {}))?;
+        tree.set_children(root, &vec![f1, s1])?;
+        let (this_node, all_nodes) = crate::execute_tracked(&*tree, root)?;
+        println!("All nodes: {all_nodes:#?}");
+        assert_eq!(this_node, NodeStatus::Success);
+        assert_eq!(all_nodes.len(), 3);
+        assert_eq!(all_nodes[0].node, f1_id);
+        assert_eq!(all_nodes[0].status, NodeStatus::Failure);
+        assert_eq!(all_nodes[1].node, s1_id);
+        assert_eq!(all_nodes[1].status, NodeStatus::Success);
+        assert_eq!(all_nodes[2].node, root_id);
+        assert_eq!(all_nodes[2].status, NodeStatus::Success);
+        Ok(())
+    }
+
+    #[test]
     fn blackboard_output() {
         let mut bb = BasicBlackboard::default();
 
