@@ -495,10 +495,10 @@ impl BlackboardValues {
     }
 }
 
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// pub struct ExecutionResult {
-// pub nodes: Vec<(NodeId, Result<NodeStatus, String>)>,
-// }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExecutionResult {
+    pub node_status: Vec<betula_core::ExecutionStatus>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInformation {
@@ -539,18 +539,25 @@ pub struct TreeRoots {
 pub enum InteractionEvent {
     /// Result of a command, including error if failure.
     CommandResult(CommandResult),
+
     /// Information about a blackboard, its connections and states.
     BlackboardInformation(BlackboardInformation),
+
     /// Information about changed blackboard values.
     BlackboardValues(BlackboardValues),
-    // ExecutionResult(ExecutionResult),
+
+    /// Execution results for nodes.
+    ExecutionResult(ExecutionResult),
+
     /// Information about a node, its children and config.
     NodeInformation(NodeInformation),
 
     /// Current root nodes in the tree.
     TreeRoots(TreeRoots),
+
     /// The current tree config.
     TreeConfig(TreeConfig),
+
     /// The entire current tree state.
     TreeState(TreeState),
 }

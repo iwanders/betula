@@ -36,7 +36,7 @@ fn main() -> eframe::Result<()> {
     // Create the viewer
     let ui_support = create_ui_support();
 
-    // Run the viewer.
+    // Run the editor.
     let mut native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])

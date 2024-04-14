@@ -354,7 +354,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 ) -> std::thread::JoinHandle<Result<(), BetulaError>> {
     std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
         use betula_common::control::CommandResult;
-        use betula_common::control::{BlackboardValues, InteractionEvent};
+        use betula_common::control::{BlackboardValues, ExecutionResult, InteractionEvent};
 
         let mut tree = T::new();
         let tree_support = tree_support();
@@ -398,15 +398,22 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 
             if run_roots {
                 let roots = tree.roots();
+                let mut status: Vec<betula_core::ExecutionStatus> = vec![];
                 for r in &roots {
-                    match tree.execute(*r) {
-                        Ok(_v) => {
-                            // println!("Success running {r:?}: {v:?}");
+                    match betula_core::execute_tracked(&tree, *r) {
+                        Ok((_this_node, mut all_nodes)) => {
+                            status.extend(&mut all_nodes.drain(..));
                         }
                         Err(_e) => {
                             // println!("Failed running {r:?}: {e:?}");
                         }
                     }
+                }
+
+                if !status.is_empty() {
+                    server.send_event(InteractionEvent::ExecutionResult(ExecutionResult {
+                        node_status: status,
+                    }))?;
                 }
 
                 // Dump all blackboard values to the frontend for now.

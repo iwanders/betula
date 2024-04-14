@@ -402,6 +402,7 @@ pub trait Tree: std::fmt::Debug + AsAny {
     }
 }
 
+// Should this be called NodeStatus instead of ExecutionStatus??
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ExecutionStatus {
     pub node: NodeId,
@@ -432,7 +433,7 @@ impl RunContext for TrackedTreeContext<'_, '_> {
 }
 
 /// Execute a node on a tree and track all node execution status.
-fn execute_tracked(
+pub fn execute_tracked(
     tree: &dyn Tree,
     id: NodeId,
 ) -> Result<(NodeStatus, Vec<ExecutionStatus>), NodeError> {

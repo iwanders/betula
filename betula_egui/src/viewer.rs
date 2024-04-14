@@ -57,7 +57,7 @@ use egui::{Color32, Ui};
 
 use betula_core::{
     blackboard::{BlackboardPort, NodePort, PortConnection, PortDirection, PortName},
-    BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeType,
+    BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeStatus, NodeType,
 };
 
 use betula_common::control::{InteractionCommand, SerializedBlackboardValues, TreeClient};
@@ -116,6 +116,9 @@ pub struct ViewerNode {
     /// that is set to the node, it is set to false again.
     #[serde(skip)]
     config_needs_send: bool,
+
+    #[serde(skip)]
+    node_status: Option<NodeStatus>,
 }
 
 impl ViewerNode {
@@ -127,6 +130,7 @@ impl ViewerNode {
             children_remote: vec![],
             children_dirty: false,
             config_needs_send: false,
+            node_status: None,
         }
     }
 
@@ -1491,6 +1495,27 @@ impl BetulaViewer {
         Ok(())
     }
 
+    pub fn clear_execution_results(&mut self, snarl: &mut Snarl<BetulaViewerNode>) {
+        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
+        for node in node_ids {
+            if let BetulaViewerNode::Node(node) = &mut snarl[node] {
+                node.node_status = None;
+            }
+        }
+    }
+
+    pub fn set_execution_results(
+        &mut self,
+        results: &[betula_core::ExecutionStatus],
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        for e in results {
+            if let Ok(v) = self.get_node_mut(e.node, snarl) {
+                v.node_status = Some(e.status);
+            }
+        }
+    }
+
     pub fn set_tree_roots(&mut self, roots: &[BetulaNodeId]) {
         self.tree_roots_remote = roots.to_vec();
         self.tree_roots_local = roots.to_vec();
@@ -1599,11 +1624,7 @@ impl BetulaViewer {
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionCommand::{AddBlackboard, RemoveBlackboard};
-        use betula_common::control::InteractionEvent::CommandResult;
-        use betula_common::control::InteractionEvent::NodeInformation;
-        use betula_common::control::InteractionEvent::TreeRoots;
-        use betula_common::control::InteractionEvent::TreeState;
-        use betula_common::control::InteractionEvent::{BlackboardInformation, BlackboardValues};
+        use betula_common::control::InteractionEvent;
 
         // First, send changes to the server if necessary.
         self.send_changes_to_server(snarl)?;
@@ -1622,16 +1643,16 @@ impl BetulaViewer {
             if let Some(event) = self.client.get_event()? {
                 // println!("event {event:?}");
                 match event {
-                    NodeInformation(v) => {
+                    InteractionEvent::NodeInformation(v) => {
                         self.set_node_information(v, snarl)?;
                     }
-                    BlackboardInformation(v) => {
+                    InteractionEvent::BlackboardInformation(v) => {
                         self.set_blackboard_information(v, snarl)?;
                     }
-                    BlackboardValues(v) => {
+                    InteractionEvent::BlackboardValues(v) => {
                         self.set_blackboard_values(v)?;
                     }
-                    CommandResult(c) => {
+                    InteractionEvent::CommandResult(c) => {
                         match c.command {
                             RemoveNode(node_id) => {
                                 println!("Node removal command");
@@ -1657,13 +1678,19 @@ impl BetulaViewer {
                             _ => {}
                         }
                     }
-                    TreeRoots(tree_roots) => {
+                    InteractionEvent::TreeRoots(tree_roots) => {
                         self.set_tree_roots(&tree_roots.roots);
                     }
-                    TreeState(_) => {
+                    InteractionEvent::TreeState(_) => {
                         panic!("state must be handled by set_tree_state to ensure consistency");
                     }
-                    unhandled => panic!("unhandled event: {unhandled:?}"),
+                    InteractionEvent::TreeConfig(_) => {
+                        panic!("must be handled by the editor");
+                    }
+                    InteractionEvent::ExecutionResult(results) => {
+                        self.clear_execution_results(snarl);
+                        self.set_execution_results(&results.node_status, snarl);
+                    } // unhandled => panic!("unhandled event: {unhandled:?}"),
                 }
             } else {
                 break;
@@ -2240,6 +2267,44 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
             BetulaViewerNode::Blackboard(_) => {}
         };
+    }
+
+    fn node_stroke(
+        &mut self,
+        id: SnarlNodeId,
+        current: &egui::Stroke,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Option<egui::Stroke> {
+        match &snarl[id] {
+            BetulaViewerNode::Node(ref node) => {
+                let mut current_hsva =
+                    egui::ecolor::Hsva::from_srgba_premultiplied(current.color.to_array());
+                let hue_success = 100.0 / 360.0;
+                let hue_failure = 1.0;
+                let hue_running = 41.0 / 360.0;
+                let satutarion_bump = 0.75;
+                let value_bump = 0.5;
+
+                if let Some(node_status) = node.node_status.as_ref() {
+                    let hue = match node_status {
+                        NodeStatus::Success => hue_success,
+                        NodeStatus::Failure => hue_failure,
+                        NodeStatus::Running => hue_running,
+                    };
+                    current_hsva.s = (current_hsva.s + satutarion_bump).min(1.0);
+                    if current_hsva.v < 0.5 {
+                        current_hsva.v = (current_hsva.v + value_bump).min(1.0);
+                    }
+                    current_hsva.h = hue;
+                    let [r, g, b, a] = current_hsva.to_srgba_premultiplied();
+                    let new_color = Color32::from_rgba_premultiplied(r, g, b, a);
+                    Some(egui::Stroke::from((current.width, new_color)))
+                } else {
+                    None
+                }
+            }
+            BetulaViewerNode::Blackboard(_) => None,
+        }
     }
 }
 
