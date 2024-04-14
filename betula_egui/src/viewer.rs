@@ -1350,6 +1350,10 @@ impl BetulaViewer {
         let cmd = InteractionCommand::remove_node(node_id);
         self.client.send_command(cmd)
     }
+    fn send_run_node(&self, node_id: BetulaNodeId) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::run_specific(&[node_id]);
+        self.client.send_command(cmd)
+    }
 
     /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
     fn send_changes_to_server(
@@ -2241,6 +2245,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_id = node.id;
+                if ui.button("Execute").clicked() {
+                    if let Err(v) = self.send_run_node(node_id) {
+                        println!("Failed to send run node {v:?}");
+                    }
+                    ui.close_menu();
+                }
                 if ui.button("Remove").clicked() {
                     if let Err(v) = self.send_remove_node(node_id) {
                         println!("Failed to send node removal {v:?}");
