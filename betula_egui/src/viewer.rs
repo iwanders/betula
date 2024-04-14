@@ -1518,7 +1518,7 @@ impl BetulaViewer {
 
     pub fn set_execution_results(
         &mut self,
-        results: &[betula_core::ExecutionStatus],
+        results: &[betula_common::ExecutionStatus],
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         for e in results {

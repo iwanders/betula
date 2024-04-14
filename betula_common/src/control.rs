@@ -497,7 +497,7 @@ impl BlackboardValues {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecutionResult {
-    pub node_status: Vec<betula_core::ExecutionStatus>,
+    pub node_status: Vec<crate::server_thread::ExecutionStatus>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
