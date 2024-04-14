@@ -1,9 +1,6 @@
-use betula_common::control::InProcessControl;
+use betula_common::{control::InProcessControl, create_server_thread};
 use betula_core::basic::{BasicBlackboard, BasicTree};
-use betula_egui::{
-    editor::{create_server_thread, BetulaEditor},
-    UiSupport,
-};
+use betula_egui::{editor::BetulaEditor, UiSupport};
 
 // Factory function for the ui support.
 fn create_ui_support() -> UiSupport {
