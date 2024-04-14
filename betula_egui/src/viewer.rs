@@ -593,7 +593,23 @@ impl ViewerBlackboard {
         if let Some(port_name) = self.port_name(inpin.input) {
             BlackboardPort::new(self.id, &port_name)
         } else {
-            BlackboardPort::new(self.id, &node_port.name())
+            // Check if this name is already present, if so add a 2, else use the port name as is.
+            let names = self
+                .data()
+                .expect("can only connect if we have data")
+                .ports();
+            if names.contains(&node_port.name()) {
+                let mut counter = 1;
+                let base_name = node_port.name();
+                let mut new_name = PortName::from(format!("{} {}", base_name.as_ref(), counter));
+                while names.contains(&new_name) {
+                    counter += 1;
+                    new_name = PortName::from(format!("{} {}", base_name.as_ref(), counter));
+                }
+                BlackboardPort::new(self.id, &new_name)
+            } else {
+                BlackboardPort::new(self.id, &node_port.name())
+            }
         }
     }
 
