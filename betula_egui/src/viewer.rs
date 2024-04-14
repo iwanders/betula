@@ -1529,6 +1529,10 @@ impl BetulaViewer {
         self.tree_roots_local = roots.to_vec();
     }
 
+    pub fn tree_roots(&self) -> Vec<BetulaNodeId> {
+        self.tree_roots_remote.clone()
+    }
+
     pub fn set_node_information(
         &mut self,
         v: betula_common::control::NodeInformation,

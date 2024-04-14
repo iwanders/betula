@@ -52,14 +52,6 @@ impl RunState {
     }
 }
 
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// pub struct RunSettings {
-// pub roots: Option<bool>,
-// pub specific: Vec<NodeId>,
-// #[serde(with = "option_duration_serde")]
-// pub interval: Option<std::time::Duration>,
-// }
-
 impl Default for RunState {
     fn default() -> Self {
         Self {
@@ -123,6 +115,10 @@ impl BetulaEditor {
 
     fn send_run_settings(&self) -> Result<(), BetulaError> {
         let cmd = self.run_state.command();
+        self.client.send_command(cmd)
+    }
+    fn send_run_roots(&self) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::run_specific(&self.viewer.tree_roots());
         self.client.send_command(cmd)
     }
 
@@ -304,7 +300,11 @@ impl BetulaEditor {
                     }
                 }
 
-                if ui.button("⏭").clicked() {}
+                if ui.button("⏭").clicked() {
+                    if let Err(e) = self.send_run_roots() {
+                        println!("Error servicing: {e:?}");
+                    }
+                }
                 // 📥
                 ui.separator();
 
@@ -361,6 +361,41 @@ fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
 /// Function to create the tree support in the background server thread.
 pub type TreeSupportCreator = Box<dyn Fn() -> TreeSupport + Send>;
 
+fn run_nodes(
+    tree_support: &TreeSupport,
+    tree: &dyn betula_core::Tree,
+    roots: &[betula_core::NodeId],
+) -> Result<Vec<betula_common::control::InteractionEvent>, BetulaError> {
+    use betula_common::control::CommandResult;
+    use betula_common::control::{BlackboardValues, ExecutionResult, InteractionEvent};
+    let mut events = vec![];
+    let mut status: Vec<betula_core::ExecutionStatus> = vec![];
+    for r in roots.iter() {
+        match betula_core::execute_tracked(tree, *r) {
+            Ok((_this_node, mut all_nodes)) => {
+                status.extend(&mut all_nodes.drain(..));
+            }
+            Err(_e) => {
+                // println!("Failed running {r:?}: {e:?}");
+            }
+        }
+    }
+
+    if !status.is_empty() {
+        events.push(InteractionEvent::ExecutionResult(ExecutionResult {
+            node_status: status,
+        }));
+    }
+
+    // Dump all blackboard values to the frontend for now.
+    if !roots.is_empty() {
+        events.push(InteractionEvent::BlackboardValues(
+            BlackboardValues::from_tree(&tree_support, tree)?,
+        ));
+    }
+    Ok(events)
+}
+
 /// Function to run a Tree and TreeServer in the background.
 pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + 'static>(
     tree_support: TreeSupportCreator,
@@ -390,6 +425,13 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                         if let Some(new_duration) = run_settings.interval {
                             sleep_interval = new_duration;
                         }
+                        if !run_settings.specific.is_empty() {
+                            let events =
+                                run_nodes(&tree_support, &mut tree, &run_settings.specific)?;
+                            for e in events {
+                                server.send_event(e)?;
+                            }
+                        }
                     }
                     let r = command.execute(&tree_support, &mut tree);
                     match r {
@@ -412,29 +454,9 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 
             if run_roots {
                 let roots = tree.roots();
-                let mut status: Vec<betula_core::ExecutionStatus> = vec![];
-                for r in &roots {
-                    match betula_core::execute_tracked(&tree, *r) {
-                        Ok((_this_node, mut all_nodes)) => {
-                            status.extend(&mut all_nodes.drain(..));
-                        }
-                        Err(_e) => {
-                            // println!("Failed running {r:?}: {e:?}");
-                        }
-                    }
-                }
-
-                if !status.is_empty() {
-                    server.send_event(InteractionEvent::ExecutionResult(ExecutionResult {
-                        node_status: status,
-                    }))?;
-                }
-
-                // Dump all blackboard values to the frontend for now.
-                if !roots.is_empty() {
-                    server.send_event(InteractionEvent::BlackboardValues(
-                        BlackboardValues::from_tree(&tree_support, &tree)?,
-                    ))?;
+                let events = run_nodes(&tree_support, &mut tree, &roots)?;
+                for e in events {
+                    server.send_event(e)?;
                 }
             }
         }
