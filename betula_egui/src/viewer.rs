@@ -117,6 +117,9 @@ pub struct ViewerNode {
     #[serde(skip)]
     config_needs_send: bool,
 
+    /// The previous node execution status.
+    ///
+    /// Used for coloring the node border if enabled.
     #[serde(skip)]
     node_status: Option<NodeStatus>,
 }
@@ -916,8 +919,12 @@ pub struct BetulaViewer {
 
     /// Roots
     tree_roots_local: Vec<BetulaNodeId>,
+
     /// Roots
     tree_roots_remote: Vec<BetulaNodeId>,
+
+    /// Color nodes by the execution status.
+    color_node_status: bool,
 }
 
 impl BetulaViewer {
@@ -936,6 +943,7 @@ impl BetulaViewer {
             blackboards: Default::default(),
             blackboard_map: Default::default(),
             blackboard_snarl_map: Default::default(),
+            color_node_status: true,
         }
     }
 
@@ -1741,6 +1749,14 @@ impl BetulaViewer {
         self.add_blackboard_mapping(id, snarl_id);
     }
 
+    pub fn color_node_status(&self) -> bool {
+        self.color_node_status
+    }
+
+    pub fn set_color_node_status(&mut self, value: bool) {
+        self.color_node_status = value;
+    }
+
     #[cfg(test)]
     fn connect_relation(
         &mut self,
@@ -2275,6 +2291,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         current: &egui::Stroke,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Option<egui::Stroke> {
+        if !self.color_node_status {
+            return None;
+        }
         match &snarl[id] {
             BetulaViewerNode::Node(ref node) => {
                 let mut current_hsva =
@@ -2298,7 +2317,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     current_hsva.h = hue;
                     let [r, g, b, a] = current_hsva.to_srgba_premultiplied();
                     let new_color = Color32::from_rgba_premultiplied(r, g, b, a);
-                    Some(egui::Stroke::from((current.width, new_color)))
+                    Some(egui::Stroke::from((current.width + 0.5, new_color)))
                 } else {
                     None
                 }

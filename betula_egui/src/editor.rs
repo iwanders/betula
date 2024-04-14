@@ -20,6 +20,7 @@ type SerializableHolder = serde_json::Value;
 struct EditorState {
     snarl_state: SerializableHolder,
     run_state: RunState,
+    color_node_status: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -134,6 +135,7 @@ impl BetulaEditor {
         let editor = EditorState {
             snarl_state: serde_json::to_value(&self.snarl)?,
             run_state: self.run_state.save(),
+            color_node_status: self.viewer.color_node_status(),
         };
         let editor_config = EditorConfig { tree, editor };
         let editor_config = serde_json::to_string_pretty(&editor_config)?;
@@ -189,6 +191,8 @@ impl BetulaEditor {
             // Pause the execution!
             self.run_state = config.editor.run_state;
             self.run_state.roots = false;
+            self.viewer
+                .set_color_node_status(config.editor.color_node_status);
             self.send_run_settings()?;
             self.pending_snarl = Some(self.load_editor_state(config.editor)?);
             self.send_tree_config(config.tree)?;
@@ -302,6 +306,16 @@ impl BetulaEditor {
 
                 if ui.button("⏭").clicked() {}
                 // 📥
+                ui.separator();
+
+                let mut node_color_status = self.viewer.color_node_status();
+                if ui.checkbox(&mut node_color_status, "Color").changed() {
+                    self.viewer.set_color_node_status(node_color_status);
+                    if !node_color_status {
+                        self.viewer.clear_execution_results(&mut self.snarl);
+                    }
+                }
+
                 ui.separator();
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_dark_light_mode_switch(ui);
