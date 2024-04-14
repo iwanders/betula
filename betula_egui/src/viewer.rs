@@ -599,7 +599,7 @@ impl ViewerBlackboard {
                 .expect("can only connect if we have data")
                 .ports();
             if names.contains(&node_port.name()) {
-                let mut counter = 1;
+                let mut counter = 2;
                 let base_name = node_port.name();
                 let mut new_name = PortName::from(format!("{} {}", base_name.as_ref(), counter));
                 while names.contains(&new_name) {
