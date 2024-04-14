@@ -117,6 +117,7 @@ pub enum InteractionCommand {
     SetChildren(SetChildren),
 
     AddBlackboard(BlackboardId),
+    RemoveBlackboard(BlackboardId),
     SetBlackboardName(BlackboardId, String),
 
     SetConfig(SetConfigCommand),
@@ -147,6 +148,10 @@ impl InteractionCommand {
 
     pub fn add_blackboard(id: BlackboardId) -> Self {
         InteractionCommand::AddBlackboard(id)
+    }
+
+    pub fn remove_blackboard(id: BlackboardId) -> Self {
+        InteractionCommand::RemoveBlackboard(id)
     }
 
     pub fn remove_node(id: NodeId) -> Self {
@@ -309,6 +314,13 @@ impl InteractionCommand {
                         tree,
                     )?),
                 ])
+            }
+            InteractionCommand::RemoveBlackboard(v) => {
+                tree.remove_blackboard(*v)?;
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
             }
             InteractionCommand::PortDisconnectConnect(port_changes) => {
                 let mut involved_blackboards: std::collections::HashSet<BlackboardId> =

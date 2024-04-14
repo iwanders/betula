@@ -346,6 +346,8 @@ pub struct BlackboardData {
 
     name_remote: Option<String>,
     name_local: Option<String>,
+
+    should_remove: bool,
 }
 impl BlackboardData {
     /// Return whether local and remote are identical.
@@ -443,6 +445,10 @@ impl BlackboardData {
             .cloned()
             .collect();
     }
+
+    pub fn is_disconnected(&self) -> bool {
+        self.connections_local.is_empty() && self.connections_remote.is_empty()
+    }
 }
 
 /// A representation of a blackboard in the viewer.
@@ -472,6 +478,9 @@ pub struct ViewerBlackboard {
 
     #[serde(skip)]
     name_editor: Option<String>,
+
+    #[serde(skip)]
+    should_remove_node: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -490,6 +499,7 @@ impl ViewerBlackboard {
             ports: Default::default(),
             pending_connections: Default::default(),
             name_editor: None,
+            should_remove_node: false,
         }
     }
     pub fn data(&self) -> Option<Ref<'_, BlackboardData>> {
@@ -735,6 +745,34 @@ impl ViewerBlackboard {
         });
 
         ui.horizontal(|ui| {
+            // Button to hide this node.
+            if ui.button("Hide").clicked() {
+                self.should_remove_node = true;
+                self.is_dirty = true;
+                ui.close_menu();
+            }
+
+            // Add a button for the delete option, ONLY allow this if no
+            // connections are left to it, it both prevents accidental
+            // deletion of the blackboard if connections are still present
+            // which was likely not intentional, as well as making the
+            // bookkeeping trivial for removing a blackboard node.
+            let is_disconnected = data.is_disconnected();
+            let delete_button = egui::Button::new("Delete");
+            let tooltip_ui = |ui: &mut egui::Ui| {
+                ui.label("Can only delete blackboard if there are no connections left to it.");
+            };
+            if ui
+                .add_enabled(is_disconnected, delete_button)
+                .on_disabled_hover_ui(tooltip_ui)
+                .clicked()
+            {
+                data.should_remove = true;
+                ui.close_menu();
+            }
+        });
+
+        ui.horizontal(|ui| {
             ui.label("Ports");
             if ui.button("none").clicked() {
                 self.ports.clear();
@@ -906,6 +944,17 @@ impl BetulaViewer {
             .insert(snarl_id);
         self.blackboard_snarl_map.insert(snarl_id, blackboard_id);
     }
+    pub fn remove_blackboard_mapping(
+        &mut self,
+        blackboard_id: BlackboardId,
+        snarl_id: SnarlNodeId,
+    ) {
+        self.blackboard_map
+            .entry(blackboard_id)
+            .or_default()
+            .remove(&snarl_id);
+        self.blackboard_snarl_map.remove(&snarl_id);
+    }
 
     pub fn set_tree_state(
         &mut self,
@@ -1035,7 +1084,6 @@ impl BetulaViewer {
             let mut blackboard = blackboard.borrow_mut();
             blackboard.remove_node_connections(&node_id);
         }
-
         let snarl_id = self
             .node_map
             .remove(&node_id)
@@ -1045,12 +1093,18 @@ impl BetulaViewer {
         Ok(snarl_id)
     }
 
-    fn remove_blackboard_id(
+    fn remove_blackboard(
         &mut self,
         blackboard_id: BlackboardId,
     ) -> Result<Vec<SnarlNodeId>, BetulaError> {
+        // Obtain the snarl ids to remove.
         let mut snarl_id = self
             .blackboard_map
+            .remove(&blackboard_id)
+            .ok_or::<BetulaError>(format!("could not find {blackboard_id:?}").into())?;
+        // Drop the data.
+        let _data = self
+            .blackboards
             .remove(&blackboard_id)
             .ok_or::<BetulaError>(format!("could not find {blackboard_id:?}").into())?;
         for id in &snarl_id {
@@ -1288,6 +1342,11 @@ impl BetulaViewer {
                 let cmd = InteractionCommand::set_blackboard_name(blackboard.id, new_name);
                 self.client.send_command(cmd)?;
             }
+            if blackboard.should_remove {
+                let cmd = InteractionCommand::remove_blackboard(blackboard.id);
+                self.client.send_command(cmd)?;
+                blackboard.should_remove = false;
+            }
         }
 
         if self.tree_roots_remote != self.tree_roots_local {
@@ -1342,6 +1401,7 @@ impl BetulaViewer {
         // Draw lines between appropriate ports.
         // Check for dirty nodes, and update the snarl state.
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
+        let mut nodes_to_remove = vec![];
         for snarl_id in node_ids {
             let mut disconnections = vec![];
             let mut connections = vec![];
@@ -1351,8 +1411,13 @@ impl BetulaViewer {
                 if bb.is_dirty() {
                     let mut to_disconnect = self.port_connections(snarl_id, snarl)?;
                     disconnections.append(&mut to_disconnect);
-                    let mut to_connect = self.port_connections_desired(snarl_id, snarl)?;
-                    connections.append(&mut to_connect);
+
+                    if bb.should_remove_node {
+                        nodes_to_remove.push((bb.id, snarl_id));
+                    } else {
+                        let mut to_connect = self.port_connections_desired(snarl_id, snarl)?;
+                        connections.append(&mut to_connect);
+                    }
                 }
             }
 
@@ -1365,6 +1430,10 @@ impl BetulaViewer {
             if let BetulaViewerNode::Blackboard(bb) = &mut snarl[snarl_id] {
                 bb.set_clean();
             }
+        }
+        for (blackboard_id, snarl_id) in &nodes_to_remove {
+            self.remove_blackboard_mapping(*blackboard_id, *snarl_id);
+            snarl.remove_node(*snarl_id);
         }
         Ok(())
     }
@@ -1470,6 +1539,7 @@ impl BetulaViewer {
                 connections_local: v.connections.iter().cloned().collect(),
                 name_remote: v.name,
                 name_local: None,
+                should_remove: false,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.blackboards.insert(v.id, cloned_rc);
@@ -1490,8 +1560,8 @@ impl BetulaViewer {
     /// Service routine to handle communication and update state.
     #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
-        use betula_common::control::InteractionCommand::AddBlackboard;
         use betula_common::control::InteractionCommand::RemoveNode;
+        use betula_common::control::InteractionCommand::{AddBlackboard, RemoveBlackboard};
         use betula_common::control::InteractionEvent::BlackboardInformation;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
@@ -1532,10 +1602,16 @@ impl BetulaViewer {
                                 if let Some(failure_reason) = c.error {
                                     // Yikes, it failed, lets clean up the mess and remove the node.
                                     println!("Failed to create blackboard: {failure_reason}, cleaning up.");
-                                    let ids = self.remove_blackboard_id(blackboard_id)?;
+                                    let ids = self.remove_blackboard(blackboard_id)?;
                                     for snarl_id in ids {
                                         snarl.remove_node(snarl_id);
                                     }
+                                }
+                            }
+                            RemoveBlackboard(blackboard_id) => {
+                                let ids = self.remove_blackboard(blackboard_id)?;
+                                for snarl_id in ids {
+                                    snarl.remove_node(snarl_id);
                                 }
                             }
                             _ => {}
