@@ -115,6 +115,7 @@ pub trait UiValue: std::fmt::Debug {
     }
 
     fn value(&self) -> Box<dyn Chalkable>;
+    fn set_value(&mut self, value: Box<dyn Chalkable>) -> Result<(), BetulaError>;
 
     fn value_type(&self) -> String;
 
@@ -134,6 +135,21 @@ impl<T: Chalkable + std::fmt::Debug + Clone + 'static> UiValue for DefaultUiValu
     }
     fn value(&self) -> Box<dyn Chalkable> {
         Box::new(self.data.clone())
+    }
+    fn set_value(&mut self, boxed_value: Box<dyn Chalkable>) -> Result<(), BetulaError> {
+        use betula_core::as_any::AsAnyHelper;
+        let new_value = (*boxed_value).downcast_ref::<T>();
+        if let Some(v) = new_value {
+            self.data = v.clone();
+            Ok(())
+        } else {
+            Err(format!(
+                "could not downcast {:?} to {:?}",
+                (*boxed_value).as_any_type_name(),
+                std::any::type_name::<T>()
+            )
+            .into())
+        }
     }
     fn value_type(&self) -> String {
         Self::static_type()

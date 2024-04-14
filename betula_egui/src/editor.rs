@@ -354,7 +354,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 ) -> std::thread::JoinHandle<Result<(), BetulaError>> {
     std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
         use betula_common::control::CommandResult;
-        use betula_common::control::InteractionEvent;
+        use betula_common::control::{BlackboardValues, InteractionEvent};
 
         let mut tree = T::new();
         let tree_support = tree_support();
@@ -409,17 +409,11 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                     }
                 }
 
-                // Lets just dump all the blackboard state every cycle.
+                // Dump all blackboard values to the frontend for now.
                 if !roots.is_empty() {
-                    for blackboard_id in tree.blackboards() {
-                        server.send_event(InteractionEvent::BlackboardInformation(
-                            InteractionCommand::blackboard_information(
-                                &tree_support,
-                                blackboard_id,
-                                &tree,
-                            )?,
-                        ))?;
-                    }
+                    server.send_event(InteractionEvent::BlackboardValues(
+                        BlackboardValues::from_tree(&tree_support, &tree)?,
+                    ))?;
                 }
             }
         }

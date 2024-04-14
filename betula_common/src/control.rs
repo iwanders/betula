@@ -1,17 +1,15 @@
 use betula_core::{
-    blackboard::{BlackboardId, PortConnection, PortName},
-    BetulaError, NodeId, NodeStatus, NodeType,
+    blackboard::{BlackboardId, PortConnection},
+    BetulaError, NodeId, NodeType,
 };
 
-use crate::{
-    tree_support::SerializedBlackboardValues, tree_support::SerializedConfig,
-    tree_support::SerializedValue, tree_support::TreeConfig,
-};
+pub use crate::tree_support::SerializedBlackboardValues;
+use crate::{tree_support::SerializedConfig, tree_support::TreeConfig};
 
 use serde::{Deserialize, Serialize};
 // we want asynchronous control & interaction with the tree.
 
-// do we need all of this...? :/
+// do we need all of this...? :/... yes... we do lol.
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AddNodeCommand {
@@ -111,25 +109,45 @@ pub struct RunSettings {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum InteractionCommand {
+    /// Add a new node.
     AddNode(AddNodeCommand),
+    /// Remove a node by id.
     RemoveNode(NodeId),
 
+    /// Set a node's children.
     SetChildren(SetChildren),
 
+    /// Add a blackboard
     AddBlackboard(BlackboardId),
+
+    /// Remove a blackboard
     RemoveBlackboard(BlackboardId),
+
+    /// Name a blackboard.
     SetBlackboardName(BlackboardId, String),
 
+    /// Set a node's configuration.
     SetConfig(SetConfigCommand),
 
+    /// Change ports by disconnecting and connecting them.
     PortDisconnectConnect(PortChanges),
 
+    /// Set the tree roots.
     SetRoots(Vec<NodeId>),
 
+    /// Modify the run settings.
+    ///
+    /// This is not actually a tree property, but it is a common action so
+    /// we want to support it.
     RunSettings(RunSettings),
 
+    /// Clear the entire tree.
     Clear,
+
+    /// Request the tree configuration for serialization.
     RequestTreeConfig,
+
+    /// Load a tree configuration into the tree.
     LoadTreeConfig(TreeConfig),
 
     /// Call the function on the tree, this _obviously_ only works for the
@@ -240,7 +258,6 @@ impl InteractionCommand {
         blackboard_id: BlackboardId,
         tree: &dyn Tree,
     ) -> Result<BlackboardInformation, BetulaError> {
-        let _ = tree_support;
         let bb = tree
             .blackboard_ref(blackboard_id)
             .ok_or(format!("cannot find {blackboard_id:?}"))?;
@@ -458,23 +475,30 @@ impl InteractionCommand {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BlackboardValueEvent {
-    pub id: BlackboardId,
-    pub name: PortName,
-    pub value: SerializedValue,
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct BlackboardValues {
+    pub blackboards: std::collections::BTreeMap<BlackboardId, SerializedBlackboardValues>,
+}
+impl BlackboardValues {
+    pub fn from_tree(tree_support: &TreeSupport, tree: &dyn Tree) -> Result<Self, BetulaError> {
+        let mut res = BlackboardValues::default();
+        let blackboards = tree.blackboards();
+        for blackboard_id in blackboards {
+            let bb = tree
+                .blackboard_ref(blackboard_id)
+                .ok_or(format!("cannot find {blackboard_id:?}"))?;
+            let bb = bb.borrow_mut();
+            let port_values = tree_support.blackboard_value_serialize(&**bb)?;
+            res.blackboards.insert(blackboard_id, port_values);
+        }
+        Ok(res)
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum NodeExecutionResult {
-    Success(NodeStatus),
-    Error(String),
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ExecutionResult {
-    pub nodes: Vec<(NodeId, NodeExecutionResult)>,
-}
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct ExecutionResult {
+// pub nodes: Vec<(NodeId, Result<NodeStatus, String>)>,
+// }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInformation {
@@ -517,6 +541,8 @@ pub enum InteractionEvent {
     CommandResult(CommandResult),
     /// Information about a blackboard, its connections and states.
     BlackboardInformation(BlackboardInformation),
+    /// Information about changed blackboard values.
+    BlackboardValues(BlackboardValues),
     // ExecutionResult(ExecutionResult),
     /// Information about a node, its children and config.
     NodeInformation(NodeInformation),

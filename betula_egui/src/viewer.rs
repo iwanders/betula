@@ -60,7 +60,7 @@ use betula_core::{
     BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeType,
 };
 
-use betula_common::control::{InteractionCommand, TreeClient};
+use betula_common::control::{InteractionCommand, SerializedBlackboardValues, TreeClient};
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -381,6 +381,31 @@ impl BlackboardData {
     /// Set the values.
     pub fn set_values(&mut self, values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>) {
         self.ui_values = values;
+    }
+    /// Update the values
+    pub fn update_values(
+        &mut self,
+        ui_support: &UiSupport,
+        port_values: SerializedBlackboardValues,
+    ) -> Result<(), BetulaError> {
+        // self.ui_values = values;
+        for (port, value) in port_values {
+            if let Some(existing) = self.ui_values.get_mut(&port) {
+                // Deserialize the value.
+                let deserialized = ui_support
+                    .tree_support_ref()
+                    .value_deserialize(value.clone())?;
+                if let Err(_) = existing.set_value(deserialized) {
+                    // Well, update failed, probably a type change, blow away the old value.
+                    *existing = ui_support.create_ui_value(value)?;
+                }
+            } else {
+                self.ui_values
+                    .insert(port.clone(), ui_support.create_ui_value(value)?);
+            }
+        }
+        // ui_support.create_ui_value(value);
+        Ok(())
     }
     /// Return the list of port names.
     pub fn ports(&self) -> Vec<PortName> {
@@ -1500,6 +1525,19 @@ impl BetulaViewer {
         Ok(())
     }
 
+    pub fn set_blackboard_values(
+        &mut self,
+        v: betula_common::control::BlackboardValues,
+    ) -> Result<(), BetulaError> {
+        for (blackboard_id, values) in v.blackboards.iter() {
+            if let Some(bb) = self.blackboards.get(&blackboard_id) {
+                let mut bb = (*bb).borrow_mut();
+                bb.update_values(&self.ui_support, values.clone())?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn set_blackboard_information(
         &mut self,
         v: betula_common::control::BlackboardInformation,
@@ -1513,8 +1551,7 @@ impl BetulaViewer {
                 if changed {
                     self.mark_blackboards_dirty(&v.id, snarl)?;
                 }
-                let ui_values = self.ui_support.create_ui_values(&v.port_values)?;
-                bb.set_values(ui_values);
+                bb.update_values(&self.ui_support, v.port_values)?;
                 (*bb).name_remote = v.name;
             }
 
@@ -1562,11 +1599,11 @@ impl BetulaViewer {
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionCommand::{AddBlackboard, RemoveBlackboard};
-        use betula_common::control::InteractionEvent::BlackboardInformation;
         use betula_common::control::InteractionEvent::CommandResult;
         use betula_common::control::InteractionEvent::NodeInformation;
         use betula_common::control::InteractionEvent::TreeRoots;
         use betula_common::control::InteractionEvent::TreeState;
+        use betula_common::control::InteractionEvent::{BlackboardInformation, BlackboardValues};
 
         // First, send changes to the server if necessary.
         self.send_changes_to_server(snarl)?;
@@ -1590,6 +1627,9 @@ impl BetulaViewer {
                     }
                     BlackboardInformation(v) => {
                         self.set_blackboard_information(v, snarl)?;
+                    }
+                    BlackboardValues(v) => {
+                        self.set_blackboard_values(v)?;
                     }
                     CommandResult(c) => {
                         match c.command {
