@@ -1,20 +1,12 @@
 use crate::{
     control::{
-        BlackboardValues, CommandResult, ExecutionResult, InteractionCommand, InteractionEvent,
-        TreeServer,
+        BlackboardValues, CommandResult, ExecutionResult, ExecutionStatus, InteractionCommand,
+        InteractionEvent, TreeServer,
     },
     TreeSupport,
 };
 use betula_core::{BetulaError, NodeError, NodeId, NodeStatus, RunContext, Tree};
 
-use serde::{Deserialize, Serialize};
-
-// Should this be called NodeStatus instead of ExecutionStatus??
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct ExecutionStatus {
-    pub node: NodeId,
-    pub status: NodeStatus,
-}
 use std::cell::RefCell;
 struct TrackedTreeContext<'a, 'b> {
     this_node: NodeId,

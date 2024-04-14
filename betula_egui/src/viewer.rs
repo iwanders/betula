@@ -60,7 +60,9 @@ use betula_core::{
     BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeStatus, NodeType,
 };
 
-use betula_common::control::{InteractionCommand, SerializedBlackboardValues, TreeClient};
+use betula_common::control::{
+    ExecutionStatus, InteractionCommand, SerializedBlackboardValues, TreeClient,
+};
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -1518,7 +1520,7 @@ impl BetulaViewer {
 
     pub fn set_execution_results(
         &mut self,
-        results: &[betula_common::ExecutionStatus],
+        results: &[ExecutionStatus],
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         for e in results {
@@ -2338,6 +2340,16 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
             BetulaViewerNode::Blackboard(_) => None,
         }
+    }
+
+    fn node_fill(
+        &mut self,
+        id: SnarlNodeId,
+        current: &Color32,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Option<Color32> {
+        let _ = (id, current, snarl);
+        None
     }
 }
 
