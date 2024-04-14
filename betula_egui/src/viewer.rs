@@ -630,14 +630,7 @@ impl ViewerBlackboard {
         for pending in self.pending_connections.drain() {
             if full_connections.contains(&pending) {
                 // Ensure that this port exists.
-                let v = self
-                    .ports
-                    .entry(pending.blackboard.name())
-                    .or_insert_with(|| ViewerBlackboardPort {
-                        connections: Default::default(),
-                        value_editor: false,
-                        port_name_editor: None,
-                    });
+                let v = self.ports.entry(pending.blackboard.name()).or_default();
                 v.connections.insert(pending);
                 changed = true;
             }
@@ -725,7 +718,28 @@ impl ViewerBlackboard {
             }
         });
 
-        ui.label("Ports");
+        ui.horizontal(|ui| {
+            ui.label("Ports");
+            if ui.button("None").clicked() {
+                self.ports.clear();
+                self.is_dirty = true;
+                ui.close_menu();
+            }
+            if ui.button("All").clicked() {
+                for name in data.ui_values.keys() {
+                    let v = self.ports.entry(name.clone()).or_default();
+                    v.connections = data
+                        .connections_remote
+                        .iter()
+                        .cloned()
+                        .filter(|c| c.blackboard.name() == *name)
+                        .collect();
+                }
+                self.is_dirty = true;
+                ui.close_menu();
+            }
+        });
+
         for name in data.ui_values.keys() {
             ui.menu_button(name.to_string(), |ui| {
                 let mut currently_shown = self.ports.contains_key(name);
