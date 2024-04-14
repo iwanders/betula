@@ -720,12 +720,12 @@ impl ViewerBlackboard {
 
         ui.horizontal(|ui| {
             ui.label("Ports");
-            if ui.button("None").clicked() {
+            if ui.button("none").clicked() {
                 self.ports.clear();
                 self.is_dirty = true;
                 ui.close_menu();
             }
-            if ui.button("All").clicked() {
+            if ui.button("all").clicked() {
                 for name in data.ui_values.keys() {
                     let v = self.ports.entry(name.clone()).or_default();
                     v.connections = data
@@ -746,18 +746,16 @@ impl ViewerBlackboard {
                 let r = ui.checkbox(&mut currently_shown, "Show");
                 if r.changed() {
                     if currently_shown {
-                        // Add this port
                         self.ports
                             .insert(name.clone(), ViewerBlackboardPort::default());
                     } else {
-                        // Remove this port
                         self.ports.remove(name);
                     }
                     self.is_dirty = true;
                 }
                 for (label, direction) in [
-                    ("Writers", PortDirection::Output),
-                    ("Readers", PortDirection::Input),
+                    ("⬅ Writers", PortDirection::Output),
+                    ("➡ Readers", PortDirection::Input),
                 ] {
                     let port_connections: Vec<_> = data
                         .connections_remote
@@ -767,29 +765,26 @@ impl ViewerBlackboard {
                     if port_connections.is_empty() {
                         continue;
                     }
-                    ui.menu_button(label, |ui| {
-                        for c in port_connections {
-                            let mut currently_shown = self
-                                .ports
-                                .get(name)
-                                .map(|z| z.connections.contains(c))
-                                .unwrap_or(false);
-                            let label = format!("{:?} ({:?})", c.node.name(), c.node.node());
-                            let r = ui.checkbox(&mut currently_shown, label.to_string());
-                            if r.changed() {
-                                if currently_shown {
-                                    // Add this port
-                                    let v = self.ports.entry(name.clone()).or_default();
-                                    v.connections.insert(c.clone());
-                                } else {
-                                    // Remove this port
-                                    let v = self.ports.entry(name.clone()).or_default();
-                                    v.connections.remove(c);
-                                }
-                                self.is_dirty = true;
+                    ui.label(label);
+                    for c in port_connections {
+                        let mut currently_shown = self
+                            .ports
+                            .get(name)
+                            .map(|z| z.connections.contains(c))
+                            .unwrap_or(false);
+                        let label = format!("{:}", c.node.name().as_ref());
+                        let r = ui.checkbox(&mut currently_shown, label.to_string());
+                        if r.changed() {
+                            if currently_shown {
+                                let v = self.ports.entry(name.clone()).or_default();
+                                v.connections.insert(c.clone());
+                            } else {
+                                let v = self.ports.entry(name.clone()).or_default();
+                                v.connections.remove(c);
                             }
+                            self.is_dirty = true;
                         }
-                    });
+                    }
                 }
             });
         }
