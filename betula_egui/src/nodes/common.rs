@@ -1,4 +1,4 @@
-use crate::{UiConfigResponse, UiNode};
+use crate::{ui::UiNodeCategory, UiConfigResponse, UiNode};
 use egui::Ui;
 
 use betula_common::nodes;
@@ -61,10 +61,23 @@ impl UiNode for nodes::DelayNode {
     fn ui_child_range(&self) -> std::ops::Range<usize> {
         0..1
     }
+
+    fn ui_category() -> Vec<UiNodeCategory> {
+        vec![
+            UiNodeCategory::Folder("common".to_owned()),
+            UiNodeCategory::Name("delay".to_owned()),
+        ]
+    }
 }
 
 impl UiNode for nodes::TimeNode {
     fn ui_child_range(&self) -> std::ops::Range<usize> {
         0..0
+    }
+    fn ui_category() -> Vec<UiNodeCategory> {
+        vec![
+            UiNodeCategory::Folder("common".to_owned()),
+            UiNodeCategory::Name("time".to_owned()),
+        ]
     }
 }

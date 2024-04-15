@@ -93,6 +93,13 @@ pub trait UiNode: Node {
             .filter(|p| p.direction() == PortDirection::Input)
             .position(|x| x.name() == *name)
     }
+
+    fn ui_category() -> Vec<UiNodeCategory>
+    where
+        Self: Sized,
+    {
+        vec![UiNodeCategory::Name(Self::static_type().into())]
+    }
 }
 
 type UiNodeFactory = Box<dyn Fn() -> Box<dyn UiNode>>;
@@ -106,6 +113,13 @@ type UiValueFactory =
 pub struct UiValueSupport {
     pub type_id: String,
     pub value_factory: UiValueFactory,
+}
+
+#[derive(Clone, Hash, Debug, Ord, Eq, PartialEq, PartialOrd)]
+pub enum UiNodeCategory {
+    Group(String),
+    Folder(String),
+    Name(String),
 }
 
 pub trait UiValue: std::fmt::Debug {
@@ -159,10 +173,18 @@ impl<T: Chalkable + std::fmt::Debug + Clone + 'static> UiValue for DefaultUiValu
     }
 }
 
+#[derive(Default, Debug)]
+pub struct UiCategoryTree {
+    pub leafs: BTreeMap<String, NodeType>,
+    pub subtrees: BTreeMap<UiNodeCategory, UiCategoryTree>,
+}
+
 pub struct UiSupport {
     ui_node: HashMap<NodeType, UiNodeSupport>,
     ui_value: HashMap<String, UiValueSupport>,
     tree: TreeSupport,
+
+    node_categories: UiCategoryTree,
 }
 
 impl UiSupport {
@@ -171,6 +193,7 @@ impl UiSupport {
             ui_value: Default::default(),
             ui_node: Default::default(),
             tree: Default::default(),
+            node_categories: Default::default(),
         }
     }
 
@@ -184,6 +207,10 @@ impl UiSupport {
 
     pub fn tree_support_mut(&mut self) -> &mut TreeSupport {
         &mut self.tree
+    }
+
+    pub fn node_categories(&self) -> &UiCategoryTree {
+        &self.node_categories
     }
 
     pub fn node_support(&self, node_type: &NodeType) -> Option<&UiNodeSupport> {
@@ -204,6 +231,31 @@ impl UiSupport {
             node_factory: Box::new(|| Box::new(T::default())),
         };
         self.ui_node.insert(T::static_type(), ui_support);
+
+        // Go from categories to the tree;
+        let category = T::ui_category();
+        let mut current = &mut self.node_categories;
+        for c in category {
+            match c {
+                UiNodeCategory::Group(g) => {
+                    let z = current
+                        .subtrees
+                        .entry(UiNodeCategory::Group(g))
+                        .or_default();
+                    current = z;
+                }
+                UiNodeCategory::Folder(v) => {
+                    let z = current
+                        .subtrees
+                        .entry(UiNodeCategory::Folder(v))
+                        .or_default();
+                    current = z;
+                }
+                UiNodeCategory::Name(v) => {
+                    current.leafs.insert(v, T::static_type());
+                }
+            }
+        }
     }
 
     pub fn add_node_default_with_config<

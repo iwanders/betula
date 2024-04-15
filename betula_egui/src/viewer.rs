@@ -2199,6 +2199,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         ui.label("Node");
+        /*
         for node_type in self.ui_support.node_types() {
             let name = self.ui_support.display_name(&node_type);
             if ui.button(name).clicked() {
@@ -2206,6 +2207,42 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 ui.close_menu();
             }
         }
+        */
+        let node_categories = self.ui_support.node_categories();
+        use crate::ui::{UiCategoryTree, UiNodeCategory};
+        fn node_recurser(category: &UiCategoryTree, ui: &mut Ui) -> Option<NodeType> {
+            for (name, node_type) in &category.leafs {
+                if ui.button(name).clicked() {
+                    ui.close_menu();
+                    return Some(node_type.clone());
+                }
+            }
+            for (subcategory, subtree) in &category.subtrees {
+                match subcategory {
+                    UiNodeCategory::Group(g) => {
+                        ui.label(g);
+                        if let Some(z) = node_recurser(subtree, ui) {
+                            return Some(z);
+                        }
+                    }
+                    UiNodeCategory::Folder(v) => {
+                        let z = ui.menu_button(v.to_string(), |ui| node_recurser(subtree, ui));
+                        if let Some(returned_node_type) = z.inner.flatten() {
+                            return Some(returned_node_type);
+                        }
+                    }
+                    UiNodeCategory::Name(_) => {
+                        unreachable!()
+                    }
+                }
+            }
+            None
+        }
+
+        if let Some(node_type) = node_recurser(node_categories, ui) {
+            self.ui_create_node(BetulaNodeId(Uuid::new_v4()), pos, node_type, snarl);
+        }
+
         ui.label("Blackboard");
         if ui.button("New").clicked() {
             self.ui_create_blackboard(BlackboardId(Uuid::new_v4()), pos, snarl);
@@ -2251,7 +2288,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     if let Err(v) = self.send_run_node(node_id) {
                         println!("Failed to send run node {v:?}");
                     }
-                    ui.close_menu();
+                    // ui.close_menu();
                 }
                 if ui.button("Remove").clicked() {
                     if let Err(v) = self.send_remove_node(node_id) {
