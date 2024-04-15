@@ -4,6 +4,10 @@ use egui::Ui;
 use betula_common::nodes;
 
 impl UiNode for nodes::DelayNode {
+    fn ui_title(&self) -> String {
+        "delay".to_owned()
+    }
+
     fn ui_config(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
         let mut ui_response = UiConfigResponse::UnChanged;
         ui.horizontal(|ui| {
@@ -71,6 +75,10 @@ impl UiNode for nodes::DelayNode {
 }
 
 impl UiNode for nodes::TimeNode {
+    fn ui_title(&self) -> String {
+        "time".to_owned()
+    }
+
     fn ui_child_range(&self) -> std::ops::Range<usize> {
         0..0
     }
