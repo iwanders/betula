@@ -2301,6 +2301,25 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         };
     }
 
+    /// Renders the node's header.
+    fn show_header(
+        &mut self,
+        node: SnarlNodeId,
+        inputs: &[InPin],
+        outputs: &[OutPin],
+        ui: &mut Ui,
+        scale: f32,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        let _ = (inputs, outputs, scale);
+        let w = 15.0;
+        ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
+        ui.add_sized(
+            [w * scale, w * scale],
+            egui::Image::new(egui::include_image!("../../media/icon.png")).rounding(1.0),
+        );
+    }
+
     fn node_stroke(
         &mut self,
         id: SnarlNodeId,

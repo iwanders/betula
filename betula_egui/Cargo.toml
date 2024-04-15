@@ -16,5 +16,9 @@ rfd = "0.14.1"
 smol = "2.0.0"
 serde_json = { version = "1.0" }
 
+# For loading icons.
+egui_extras = { version = "*", features = ["image"] }
+image = { version = "0.24", features = ["png"] }
+
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }

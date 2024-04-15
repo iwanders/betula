@@ -327,6 +327,7 @@ impl BetulaEditor {
 
 impl App for BetulaEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui_extras::install_image_loaders(ctx);
         let r = self.service(ctx);
         if r.is_err() {
             println!("Error servicing: {:?}", r.err());
