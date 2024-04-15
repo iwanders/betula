@@ -2244,7 +2244,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
 
         ui.label("Blackboard");
-        if ui.button("New").clicked() {
+        if ui.button("New...").clicked() {
             self.ui_create_blackboard(BlackboardId(Uuid::new_v4()), pos, snarl);
             ui.close_menu();
         }

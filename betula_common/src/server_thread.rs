@@ -101,9 +101,6 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
     server: impl TreeServer + std::marker::Send + 'static,
 ) -> std::thread::JoinHandle<Result<(), BetulaError>> {
     std::thread::spawn(move || -> Result<(), betula_core::BetulaError> {
-        // use betula_common::control::CommandResult;
-        // use betula_common::control::{InteractionEvent, BlackboardValues, ExecutionResult};
-
         let mut tree = T::new();
         let tree_support = tree_support();
 

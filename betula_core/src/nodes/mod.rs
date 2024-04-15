@@ -9,3 +9,6 @@ pub use failure_node::FailureNode;
 
 mod success_node;
 pub use success_node::SuccessNode;
+
+mod running_node;
+pub use running_node::RunningNode;

@@ -9,6 +9,7 @@ fn create_ui_support() -> UiSupport {
     ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
     ui_support.add_node_default::<betula_core::nodes::FailureNode>();
     ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
+    ui_support.add_node_default::<betula_core::nodes::RunningNode>();
     ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
     ui_support
         .tree_support_mut()
