@@ -2,6 +2,9 @@ use crate::{ui::UiNodeCategory, UiNode};
 use betula_core::nodes;
 
 impl UiNode for nodes::SequenceNode {
+    fn ui_title(&self) -> String {
+        "sequence ⮊".to_owned()
+    }
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
             UiNodeCategory::Folder("logic".to_owned()),
@@ -11,6 +14,10 @@ impl UiNode for nodes::SequenceNode {
     }
 }
 impl UiNode for nodes::SelectorNode {
+    fn ui_title(&self) -> String {
+        "selector ⛶".to_owned()
+    }
+
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
             UiNodeCategory::Folder("logic".to_owned()),
@@ -21,6 +28,9 @@ impl UiNode for nodes::SelectorNode {
 }
 
 impl UiNode for nodes::SuccessNode {
+    fn ui_title(&self) -> String {
+        "failure ✔".to_owned()
+    }
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
             UiNodeCategory::Folder("decorator".to_owned()),
@@ -31,6 +41,10 @@ impl UiNode for nodes::SuccessNode {
 }
 
 impl UiNode for nodes::FailureNode {
+    fn ui_title(&self) -> String {
+        "failure ❌".to_owned()
+    }
+
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
             UiNodeCategory::Folder("decorator".to_owned()),
@@ -41,6 +55,10 @@ impl UiNode for nodes::FailureNode {
 }
 
 impl UiNode for nodes::RunningNode {
+    fn ui_title(&self) -> String {
+        "running 🔃".to_owned()
+    }
+
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
             UiNodeCategory::Folder("decorator".to_owned()),
