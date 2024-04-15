@@ -2312,12 +2312,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         let _ = (inputs, outputs, scale);
-        let w = 15.0;
+        // let w = 15.0;
         ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
-        ui.add_sized(
-            [w * scale, w * scale],
-            egui::Image::new(egui::include_image!("../../media/icon.png")).rounding(1.0),
-        );
+        // let img_src = egui::include_image!("/tmp/drawing.svg");
+        // ui.ctx().forget_image(img_src.uri().unwrap());
+        // ui.add_sized([w * scale, w * scale], egui::Image::new(img_src).rounding(1.0));
     }
 
     fn node_stroke(
