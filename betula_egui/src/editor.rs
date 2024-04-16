@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 // Save / load through https://github.com/woelper/egui_pick_file and https://github.com/emilk/egui/issues/270
+// Oh; https://github.com/emilk/egui/tree/master/examples/file_dialog
 
 type SerializableHolder = serde_json::Value;
 
