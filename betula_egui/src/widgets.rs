@@ -97,14 +97,18 @@ impl SVGPaths {
         Ok(res)
     }
 
+    fn calculate_scale(&self, desired_size: Vec2) -> f32 {
+        let x_scaling = desired_size.x / self.viewbox.x;
+        let y_scaling = desired_size.y / self.viewbox.y;
+        x_scaling.min(y_scaling)
+    }
+
     pub fn to_shapes_within(
         &self,
         desired_size: Vec2,
     ) -> Result<Vec<Vec<Pos2>>, Box<dyn std::error::Error>> {
-        let x_scaling = desired_size.x / self.viewbox.x;
-        let y_scaling = desired_size.y / self.viewbox.y;
-        let smallest_scale = x_scaling.min(y_scaling);
-        let shapes = self.to_shapes(smallest_scale, Some(smallest_scale * 0.1))?;
+        let scale = self.calculate_scale(desired_size);
+        let shapes = self.to_shapes(scale, Some(scale * 0.1))?;
         Ok(shapes)
     }
 
@@ -165,6 +169,36 @@ impl SVGPaths {
         std::fs::write(path, self.to_svg()?).expect("Unable to write file");
         Ok(())
     }
+
+    pub fn write_svg_rasterized(
+        &self,
+        path: &std::path::Path,
+        desired_size: Vec2,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let shapes = self.to_shapes_within(desired_size)?;
+        let scale = self.calculate_scale(desired_size);
+
+        let paths: Vec<String> = shapes
+            .iter()
+            .map(|p| {
+                let mut v: String = Default::default();
+                v.push_str("M "); // absolute here.
+                for c in p {
+                    v.push_str(&format!("{},{} ", c.x, c.y));
+                }
+                v.push_str("z");
+                v
+            })
+            .collect();
+        let rasterized_path = SVGPaths {
+            viewbox: self.viewbox * scale,
+            transform: Default::default(),
+            paths,
+        };
+
+        std::fs::write(path, rasterized_path.to_svg()?).expect("Unable to write file");
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -180,8 +214,13 @@ mod test {
                 "m 55.279017,214.4122 -14.079612,13.51265 37.797618,5.48066 c 0,0 -24.190475,-19.0878 -6.898066,-11.52828 17.29241,7.55953 15.497024,-3.2128 15.308035,-4.34672 -0.188986,-1.13393 -32.127975,-3.11831 -32.127975,-3.11831 z".to_owned()
             ],
         };
-        let _ = svg_paths.to_widget(egui::vec2(10.0, 10.0));
+        let desired_size = egui::vec2(10.0, 10.0);
+        let _ = svg_paths.to_widget(desired_size);
         svg_paths.write_svg(&std::path::PathBuf::from("/tmp/test_svg_widget.svg"))?;
+        svg_paths.write_svg_rasterized(
+            &std::path::PathBuf::from("/tmp/test_svg_widget_rasterized.svg"),
+            desired_size,
+        )?;
 
         /*
 
