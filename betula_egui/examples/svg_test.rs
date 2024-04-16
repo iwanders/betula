@@ -14,9 +14,10 @@ struct SVGPaths {
 impl SVGPaths {
     pub fn to_shapes(
         &self,
-        tolerance: Option<f32>,
+        scale: f32,
+        bezier_tolerance: Option<f32>,
     ) -> Result<Vec<Vec<Pos2>>, Box<dyn std::error::Error>> {
-        // Calculate the desired
+        // Calculate the desired shapes
         let mut res = vec![];
         for svg_path in &self.paths {
             let mut this_path = vec![];
@@ -30,8 +31,8 @@ impl SVGPaths {
                 let left = it.next().ok_or("missing x coordinate")?;
                 let right = it.next().ok_or("missing y coordinate")?;
                 Ok(egui::Pos2 {
-                    x: left.parse()?,
-                    y: right.parse()?,
+                    x: left.parse::<f32>()? * scale,
+                    y: right.parse::<f32>()? * scale,
                 })
             };
             let pop_coordinate =
@@ -78,7 +79,7 @@ impl SVGPaths {
                                 fill: Color32::PLACEHOLDER,
                                 stroke: Stroke::NONE,
                             };
-                            this_path.extend(this_bezier.flatten(tolerance));
+                            this_path.extend(this_bezier.flatten(bezier_tolerance));
                             cursor = end;
                         }
                     }
@@ -89,8 +90,9 @@ impl SVGPaths {
                 }
             }
             for c in this_path.iter_mut() {
-                *c = *c + self.transform;
+                *c = *c + self.transform * scale;
             }
+            // println!("this_path len: {}", this_path.len());
             res.push(this_path);
         }
 
@@ -101,30 +103,16 @@ impl SVGPaths {
         &self,
         desired_size: Vec2,
     ) -> Result<Vec<Vec<Pos2>>, Box<dyn std::error::Error>> {
-        let tolerance_x = self.viewbox.x / desired_size.x;
-        let tolerance_y = self.viewbox.y / desired_size.y;
-        let f = 1.0;
-        let mut shapes = self.to_shapes(Some(tolerance_x.min(tolerance_y) * f))?;
-        // let mut shapes = self.to_shapes(Some(1.0))?;
-        let mut shapes = self.to_shapes(None)?;
-        // determine scaling.
         let x_scaling = desired_size.x / self.viewbox.x;
         let y_scaling = desired_size.y / self.viewbox.y;
         let smallest_scale = x_scaling.min(y_scaling);
-        // scale all points.
-        for shape in shapes.iter_mut() {
-            for point in shape.iter_mut() {
-                point.x = point.x * smallest_scale;
-                point.y = point.y * smallest_scale;
-            }
-        }
-        println!("shapes: {shapes:#?}");
+        let mut shapes = self.to_shapes(smallest_scale, Some(smallest_scale * 0.1))?;
         Ok(shapes)
     }
 
     pub fn to_widget(&self, desired_size: Vec2) -> impl egui::Widget + '_ {
         let shapes = self.to_shapes_within(desired_size).expect("should work");
-        // let shapes = self.to_shapes().expect("should work");
+
         move |ui: &mut egui::Ui| {
             let (response, painter) = ui.allocate_painter(desired_size, egui::Sense::hover());
             let response_rect = response.rect;
@@ -147,9 +135,37 @@ impl SVGPaths {
                     painter.add(shape);
                 }
             }
-            println!("painter clip rect: {:#?}", painter.clip_rect());
+
             response
         }
+    }
+
+    pub fn to_svg(&self) -> Result<String, Box<dyn std::error::Error>> {
+        let mut svg: String = r#"<?xml version="1.0" standalone="no"?>"#.to_owned();
+        svg.push_str(&format!(
+            r#"<svg width="{w}mm" height="{h}mm"
+               viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+               version="1.1">"#,
+            w = self.viewbox.x,
+            h = self.viewbox.y
+        ));
+        svg.push_str(&format!(
+            r#"<g transform="translate({x},{y})" >"#,
+            x = self.transform.x,
+            y = self.transform.y
+        ));
+        for path in &self.paths {
+            svg.push_str(&format!(
+                r#" <path d="{path}" style="fill:#000000;fill-opacity:1;stroke:none" />"#
+            ));
+        }
+        svg.push_str("</g></svg>");
+        Ok(svg)
+    }
+
+    pub fn write_svg(&self, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::write(path, self.to_svg()?).expect("Unable to write file");
+        Ok(())
     }
 }
 
@@ -158,10 +174,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         viewbox: egui::vec2(100.0, 100.0),
         transform: egui::vec2(0.0, -197.0),
         paths: vec![
-            // "m 50.648808,238.03571 c -30.680991,-5.86026 -26.209966,9.52808 -24.190476,23.43453 l 46.113096,6.42559 c -6.06106,-10.26228 36.409312,-32.55192 -21.92262,-29.86012 z",
+            "m 50.648808,238.03571 c -30.680991,-5.86026 -26.209966,9.52808 -24.190476,23.43453 l 46.113096,6.42559 c -6.06106,-10.26228 36.409312,-32.55192 -21.92262,-29.86012 z",
             "m 55.279017,214.4122 -14.079612,13.51265 37.797618,5.48066 c 0,0 -24.190475,-19.0878 -6.898066,-11.52828 17.29241,7.55953 15.497024,-3.2128 15.308035,-4.34672 -0.188986,-1.13393 -32.127975,-3.11831 -32.127975,-3.11831 z"
         ],
     };
+    svg_paths.write_svg(&std::path::PathBuf::from("/tmp/foo.svg"))?;
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
@@ -189,12 +206,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // let shapes = foo().expect("failed to parse svg");
 
             let desired_size = ui.spacing().interact_size.y * egui::vec2(1.0, 1.0);
-            println!("desired_size: {desired_size:?}");
+            // println!("desired_size: {desired_size:?}");
             ui.label(format!("Hsdfdsfdsf"));
             ui.add(svg_paths.to_widget(desired_size));
 
             let desired_size = ui.spacing().interact_size.y * egui::vec2(10.0, 10.0);
-            println!("desired_size: {desired_size:?}");
+            // println!("desired_size: {desired_size:?}");
             ui.label(format!("Hsdfdsfdsf"));
             ui.add(svg_paths.to_widget(desired_size));
         });
