@@ -14,3 +14,5 @@ pub mod editor;
 pub fn betula_icon() -> egui::IconData {
     eframe::icon_data::from_png_bytes(&include_bytes!("../../media/icon.png")[..]).unwrap()
 }
+
+pub mod widgets;

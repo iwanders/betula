@@ -1,14 +1,12 @@
-// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-
 use egui::{epaint, Color32, Pos2, Stroke, Vec2};
 
-struct SVGPaths {
+pub struct SVGPaths {
     /// Actual viewbox for this svg, top right only, bottom left is assumed as (0.0, 0.0);
-    viewbox: Vec2,
+    pub viewbox: Vec2,
     /// Transform to apply to the paths.
-    transform: Vec2,
+    pub transform: Vec2,
     /// SVG path strings.
-    paths: Vec<&'static str>,
+    pub paths: Vec<String>,
 }
 
 impl SVGPaths {
@@ -106,7 +104,7 @@ impl SVGPaths {
         let x_scaling = desired_size.x / self.viewbox.x;
         let y_scaling = desired_size.y / self.viewbox.y;
         let smallest_scale = x_scaling.min(y_scaling);
-        let mut shapes = self.to_shapes(smallest_scale, Some(smallest_scale * 0.1))?;
+        let shapes = self.to_shapes(smallest_scale, Some(smallest_scale * 0.1))?;
         Ok(shapes)
     }
 
@@ -118,7 +116,7 @@ impl SVGPaths {
             let response_rect = response.rect;
             if ui.is_rect_visible(response_rect) {
                 let visuals = ui.style().noninteractive();
-                let rect = response_rect.expand(visuals.expansion);
+                // let rect = response_rect.expand(visuals.expansion);
 
                 for points in shapes {
                     let shape = epaint::PathShape {
@@ -169,53 +167,28 @@ impl SVGPaths {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let svg_paths = SVGPaths{
-        viewbox: egui::vec2(100.0, 100.0),
-        transform: egui::vec2(0.0, -197.0),
-        paths: vec![
-            "m 50.648808,238.03571 c -30.680991,-5.86026 -26.209966,9.52808 -24.190476,23.43453 l 46.113096,6.42559 c -6.06106,-10.26228 36.409312,-32.55192 -21.92262,-29.86012 z",
-            "m 55.279017,214.4122 -14.079612,13.51265 37.797618,5.48066 c 0,0 -24.190475,-19.0878 -6.898066,-11.52828 17.29241,7.55953 15.497024,-3.2128 15.308035,-4.34672 -0.188986,-1.13393 -32.127975,-3.11831 -32.127975,-3.11831 z"
-        ],
-    };
-    svg_paths.write_svg(&std::path::PathBuf::from("/tmp/foo.svg"))?;
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_make_widget() -> Result<(), Box<dyn std::error::Error>> {
+        let svg_paths = SVGPaths{
+            viewbox: egui::vec2(100.0, 100.0),
+            transform: egui::vec2(0.0, -197.0),
+            paths: vec![
+                "m 50.648808,238.03571 c -30.680991,-5.86026 -26.209966,9.52808 -24.190476,23.43453 l 46.113096,6.42559 c -6.06106,-10.26228 36.409312,-32.55192 -21.92262,-29.86012 z".to_owned(),
+                "m 55.279017,214.4122 -14.079612,13.51265 37.797618,5.48066 c 0,0 -24.190475,-19.0878 -6.898066,-11.52828 17.29241,7.55953 15.497024,-3.2128 15.308035,-4.34672 -0.188986,-1.13393 -32.127975,-3.11831 -32.127975,-3.11831 z".to_owned()
+            ],
+        };
+        let _ = svg_paths.to_widget(egui::vec2(10.0, 10.0));
+        svg_paths.write_svg(&std::path::PathBuf::from("/tmp/test_svg_widget.svg"))?;
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
-        ..Default::default()
-    };
-
-    // Our application state:
-    let mut name = "Arthur".to_owned();
-    let mut age = 42;
-
-    eframe::run_simple_native("My egui App", options, move |ctx, _frame| {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("My egui Application");
-            ui.horizontal(|ui| {
-                let name_label = ui.label("Your name: ");
-                ui.text_edit_singleline(&mut name)
-                    .labelled_by(name_label.id);
-            });
-            ui.add(egui::Slider::new(&mut age, 0..=120).text("age"));
-            if ui.button("Increment").clicked() {
-                age += 1;
-            }
-            ui.label(format!("Hello '{name}', age {age}"));
-
-            // let shapes = foo().expect("failed to parse svg");
+        /*
 
             let desired_size = ui.spacing().interact_size.y * egui::vec2(1.0, 1.0);
             // println!("desired_size: {desired_size:?}");
-            ui.label(format!("Hsdfdsfdsf"));
             ui.add(svg_paths.to_widget(desired_size));
-
-            let desired_size = ui.spacing().interact_size.y * egui::vec2(10.0, 10.0);
-            // println!("desired_size: {desired_size:?}");
-            ui.label(format!("Hsdfdsfdsf"));
-            ui.add(svg_paths.to_widget(desired_size));
-        });
-    });
-
-    Ok(())
+        */
+        Ok(())
+    }
 }
