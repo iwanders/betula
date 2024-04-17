@@ -4,7 +4,13 @@ use crate::{Node, NodeError, NodeStatus, NodeType};
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SuccessNode {}
 impl Node for SuccessNode {
-    fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+        if ctx.children() == 1 {
+            let _ = ctx.run(0)?;
+        } else if ctx.children() > 1 {
+            return Err(format!("{:?} had more than one child", Self::static_type()).into());
+        }
+
         Ok(NodeStatus::Success)
     }
 
