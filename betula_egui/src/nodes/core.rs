@@ -38,6 +38,9 @@ impl UiNode for nodes::SuccessNode {
             UiNodeCategory::Name("success".to_owned()),
         ]
     }
+    fn ui_child_range(&self) -> std::ops::Range<usize> {
+        0..1
+    }
 }
 
 impl UiNode for nodes::FailureNode {
@@ -52,6 +55,9 @@ impl UiNode for nodes::FailureNode {
             UiNodeCategory::Name("failure".to_owned()),
         ]
     }
+    fn ui_child_range(&self) -> std::ops::Range<usize> {
+        0..1
+    }
 }
 
 impl UiNode for nodes::RunningNode {
@@ -65,5 +71,8 @@ impl UiNode for nodes::RunningNode {
             UiNodeCategory::Group("core".to_owned()),
             UiNodeCategory::Name("running".to_owned()),
         ]
+    }
+    fn ui_child_range(&self) -> std::ops::Range<usize> {
+        0..1
     }
 }
