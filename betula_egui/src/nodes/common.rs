@@ -89,3 +89,33 @@ impl UiNode for nodes::TimeNode {
         ]
     }
 }
+
+impl UiNode for nodes::ParallelNode {
+    fn ui_title(&self) -> String {
+        "parallel 🔀".to_owned()
+    }
+
+    fn ui_config(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+        let mut ui_response = UiConfigResponse::UnChanged;
+        ui.horizontal(|ui| {
+            ui.label("Threshold: ");
+            let r = ui.add(
+                egui::DragValue::new(&mut self.config.success_threshold)
+                    .update_while_editing(false),
+            );
+
+            if r.changed() {
+                ui_response = UiConfigResponse::Changed;
+            }
+        });
+
+        ui_response
+    }
+
+    fn ui_category() -> Vec<UiNodeCategory> {
+        vec![
+            UiNodeCategory::Folder("logic".to_owned()),
+            UiNodeCategory::Name("parallel".to_owned()),
+        ]
+    }
+}
