@@ -87,6 +87,7 @@ impl BetulaEditor {
 
         let mut style = SnarlStyle::new();
         style.simple_wire = true;
+        style.collapsible = false;
 
         BetulaEditor {
             viewer,
