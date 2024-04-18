@@ -52,7 +52,7 @@ For nodes:
         Ports are the remainder.
 */
 
-use crate::{UiConfigResponse, UiNode, UiSupport, UiValue};
+use crate::{UiConfigResponse, UiNode, UiNodeContext, UiSupport, UiValue};
 use egui::{Color32, Ui};
 
 use betula_core::{
@@ -329,6 +329,23 @@ impl ViewerNode {
             .map(|z| z.ui_input_port(port_index))
             .flatten()?;
         Some(port.into_node_port(self.id))
+    }
+}
+
+struct SimpleNodeContext {
+    children_count: usize,
+}
+
+impl SimpleNodeContext {
+    pub fn new(node: &ViewerNode) -> Self {
+        Self {
+            children_count: node.desired_children().len(),
+        }
+    }
+}
+impl UiNodeContext for SimpleNodeContext {
+    fn children_count(&self) -> usize {
+        self.children_count
     }
 }
 
@@ -2327,7 +2344,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
-                let r = node.ui_node.as_mut().map(|e| e.ui_config(ui, scale));
+                let node_context = SimpleNodeContext::new(node);
+                let r = node
+                    .ui_node
+                    .as_mut()
+                    .map(|e| e.ui_config(&node_context, ui, scale));
                 if let Some(response) = r {
                     if response == UiConfigResponse::Changed {
                         node.set_config_needs_send()

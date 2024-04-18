@@ -19,6 +19,10 @@ pub enum UiConfigResponse {
     Changed,
 }
 
+pub trait UiNodeContext {
+    fn children_count(&self) -> usize;
+}
+
 /// Trait for nodes in the ui.
 ///
 /// It will never be executed, but sharing functionality from Node is
@@ -30,13 +34,17 @@ pub trait UiNode: Node {
         self.node_type().0.clone()
     }
 
-    /// The range of children this node has.
+    /// The range of children this node may have.
     fn ui_child_range(&self) -> std::ops::Range<usize> {
         0..usize::MAX
     }
 
     /// Function to render the ui, responds whether changes were made.
-    fn ui_config(&mut self, _ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+    ///
+    /// This should also update the configuration appropriately when the context
+    /// changes.
+    fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut Ui, scale: f32) -> UiConfigResponse {
+        let _ = (ctx, ui, scale);
         UiConfigResponse::UnChanged
     }
 

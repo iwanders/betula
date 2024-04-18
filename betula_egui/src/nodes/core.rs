@@ -29,7 +29,7 @@ impl UiNode for nodes::SelectorNode {
 
 impl UiNode for nodes::SuccessNode {
     fn ui_title(&self) -> String {
-        "failure ✔".to_owned()
+        "success ✔".to_owned()
     }
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![

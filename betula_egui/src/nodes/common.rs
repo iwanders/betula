@@ -1,4 +1,4 @@
-use crate::{ui::UiNodeCategory, UiConfigResponse, UiNode};
+use crate::{ui::UiNodeCategory, UiConfigResponse, UiNode, UiNodeContext};
 use egui::Ui;
 
 use betula_common::nodes;
@@ -8,7 +8,8 @@ impl UiNode for nodes::DelayNode {
         "delay ⏱".to_owned()
     }
 
-    fn ui_config(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+    fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+        let _ = ctx;
         let mut ui_response = UiConfigResponse::UnChanged;
         ui.horizontal(|ui| {
             ui.label("Delay: ");
@@ -95,12 +96,19 @@ impl UiNode for nodes::ParallelNode {
         "parallel 🔀".to_owned()
     }
 
-    fn ui_config(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+    fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+        let children_count = ctx.children_count();
         let mut ui_response = UiConfigResponse::UnChanged;
+
+        if self.config.success_threshold > children_count {
+            self.config.success_threshold = children_count;
+            ui_response = UiConfigResponse::Changed;
+        }
         ui.horizontal(|ui| {
             ui.label("Threshold: ");
             let r = ui.add(
                 egui::DragValue::new(&mut self.config.success_threshold)
+                    .clamp_range(0..=children_count)
                     .update_while_editing(false),
             );
 
