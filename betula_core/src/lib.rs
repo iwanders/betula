@@ -188,13 +188,15 @@ impl Into<String> for NodeType {
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
-    ///   The return of Result is only there to indicate failure that would halt
-    ///   behaviour tree execution on the spot. `Status::Failure` should be propagated
-    ///   in the Ok() type.
     ///
+    /// Nodes should either return:
+    ///   - [`NodeStatus::Success`] if their execution successfully completed.
+    ///   - [`NodeStatus::Running`] if they are still performing their action.
+    ///   - [`NodeStatus::Failure`] if they failed to perform their action.
     ///
-    ///   self_id: The id of the current node being executed.
-    ///   tree: The context in which this node is being ran.
+    ///   If any child node returns [`Err`], this [`Result`] should be returned immediately.
+    ///
+    /// * `ctx` - The context in which this node is being ran. See [`RunContext`].
     fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
 
     /// Called for the node to setup its outputs.
