@@ -3,10 +3,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DelayNodeConfig {
+    /// The interval to wait between executions in 'time' unit.
     pub interval: f64,
 }
 impl IsNodeConfig for DelayNodeConfig {}
 
+/// Node to delay execution of its children.
+///
+/// Returns [`NodeStatus::Running`] while the interval since the last
+/// execution is not yet exceeded. When the interval is exceeded it runs
+/// its one child node and returns its status. If there is no child node
+/// to be executed it returns [`NodeStatus::Running`].
+///
+/// One input port `time`, of type `f64`, which usually is time in seconds.
 #[derive(Debug, Default)]
 pub struct DelayNode {
     time: Input<f64>,

@@ -1,9 +1,14 @@
 use betula_core::node_prelude::*;
 
+/// Node that writes the time to a blackboard.
+///
+/// One output port `time`, of type `f64`, which is time in seconds since
+/// the unix epoch.
 #[derive(Debug, Default)]
 pub struct TimeNode {
     time_output: Output<f64>,
 }
+
 impl TimeNode {
     pub fn new() -> Self {
         TimeNode::default()

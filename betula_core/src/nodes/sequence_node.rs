@@ -1,6 +1,12 @@
 use crate::prelude::*;
 use crate::{Node, NodeError, NodeStatus, NodeType};
 
+/// Node that executes nodes in sequence until one does not return [`NodeStatus::Success`].
+///
+/// Runs nodes from left to right, ignoring [`NodeStatus::Success`] but
+/// returning the first [`NodeStatus::Failure`] or [`NodeStatus::Running`]
+/// encountered, at this point that value is returned.
+/// The node returns [`NodeStatus::Success`] if all child nodes succceed.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SequenceNode {}
 impl Node for SequenceNode {

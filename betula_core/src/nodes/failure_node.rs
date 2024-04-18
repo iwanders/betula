@@ -1,6 +1,10 @@
 use crate::prelude::*;
 use crate::{Node, NodeError, NodeStatus, NodeType};
 
+/// Node that always returns [`NodeStatus::Failure`].
+///
+/// Node may have one child, in which case it gets executed but its status
+/// is ignored, [`NodeStatus::Failure`] is always returned.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct FailureNode {}
 impl Node for FailureNode {

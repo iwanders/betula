@@ -3,10 +3,18 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ParallelNodeConfig {
+    /// If this at least this many children return Success, report Success.
     pub success_threshold: usize,
 }
 impl IsNodeConfig for ParallelNodeConfig {}
 
+/// Node for parallel execution of its children.
+///
+/// All children are executed, if the number of children returning success
+/// exceeds the `success_threshold`, it returns [`NodeStatus::Success`], if
+/// the success status can no longer be achieved it returns
+/// [`NodeStatus::Failure`],
+/// in other situations it returns [`NodeStatus::Running`].
 #[derive(Debug, Default)]
 pub struct ParallelNode {
     pub config: ParallelNodeConfig,
