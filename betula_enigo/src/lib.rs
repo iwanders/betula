@@ -13,9 +13,9 @@ enum EnigoTask {
 }
 
 // use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU32};
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::channel;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::Sender;
 
 pub struct EnigoRunner {
     thread: Option<std::thread::JoinHandle<()>>,
@@ -32,7 +32,7 @@ impl EnigoRunner {
             ..Default::default()
         };
 
-        let mut enigo = Arc::new(Mutex::new(Enigo::new(&settings)?));
+        let enigo = Arc::new(Mutex::new(Enigo::new(&settings)?));
         let enigo_t = Arc::clone(&enigo);
         let thread = Some(std::thread::spawn(move || {
             let enigo = enigo_t;

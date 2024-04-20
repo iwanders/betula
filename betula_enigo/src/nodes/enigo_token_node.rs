@@ -89,7 +89,7 @@ mod ui_support {
                         ui_response = UiConfigResponse::Changed;
                     }
                     if ui.add(egui::Button::new("➖")).clicked() {
-                        if (!self.config.tokens.is_empty()) {
+                        if !self.config.tokens.is_empty() {
                             self.config.tokens.truncate(self.config.tokens.len() - 1);
                             ui_response = UiConfigResponse::Changed;
                         }
@@ -117,6 +117,7 @@ mod ui_support {
                                 _ => unreachable!(),
                             };
                             let z = egui::ComboBox::from_id_source(i)
+                                .width(0.0)
                                 .selected_text(format!("{:?}", selected))
                                 .show_index(ui, &mut selected, options.len(), |i| options[i].0);
                             if z.changed() {
@@ -130,7 +131,72 @@ mod ui_support {
                                         ui_response = UiConfigResponse::Changed;
                                     }
                                 }
-                                Token::Key(k, d) => {}
+                                Token::Key(ref mut k, ref mut d) => {
+                                    let z = egui::ComboBox::from_id_source(format!("keydir{i}"))
+                                        .width(0.0)
+                                        .selected_text(format!("{:?}", d))
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(
+                                                d,
+                                                enigo::Direction::Press,
+                                                "⬇ Press",
+                                            ) | ui.selectable_value(
+                                                d,
+                                                enigo::Direction::Release,
+                                                "⬆ Release",
+                                            ) | ui.selectable_value(
+                                                d,
+                                                enigo::Direction::Click,
+                                                "❇ Click",
+                                            )
+                                        });
+                                    let response = z.inner.unwrap_or(z.response);
+                                    if response.changed() {
+                                        ui_response = UiConfigResponse::Changed;
+                                    }
+                                    // There's 95 options here :(
+
+                                    let y = egui::ComboBox::from_id_source(format!("key{i}"))
+                                        .selected_text(format!("{:?}", k))
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(k, enigo::Key::Alt, "Alt")
+                                                | ui.selectable_value(k, enigo::Key::Space, "Space")
+                                                | ui.selectable_value(
+                                                    k,
+                                                    if matches!(k, enigo::Key::Unicode(_)) {
+                                                        *k
+                                                    } else {
+                                                        enigo::Key::Unicode('a')
+                                                    },
+                                                    "Unicode",
+                                                )
+                                        });
+                                    let response = y.inner.unwrap_or(y.response);
+                                    if response.changed() {
+                                        ui_response = UiConfigResponse::Changed;
+                                    }
+                                    match k {
+                                        enigo::Key::Unicode(ref mut c) => {
+                                            let mut buffer = format!("{c}");
+                                            let output = egui::TextEdit::singleline(&mut buffer)
+                                                .hint_text("select text to edit")
+                                                .char_limit(1)
+                                                .show(ui);
+                                            // output.response
+                                            if output
+                                                .response
+                                                .on_hover_text("select the character, replace it")
+                                                .changed()
+                                            {
+                                                ui_response = UiConfigResponse::Changed;
+                                                if let Some(v) = buffer.chars().next() {
+                                                    *c = v;
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
                                 _ => {}
                             }
                         });
