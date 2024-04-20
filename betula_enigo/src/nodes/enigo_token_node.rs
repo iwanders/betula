@@ -67,6 +67,14 @@ mod ui_support {
     use super::*;
     use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
+    fn direction_to_str(d: enigo::Direction) -> &'static str {
+        match d {
+            enigo::Direction::Press => "⬇ Press",
+            enigo::Direction::Release => "⬆ Release",
+            enigo::Direction::Click => "❇ Click",
+        }
+    }
+
     impl UiNode for EnigoTokenNode {
         fn ui_title(&self) -> String {
             "enigo_token 🖱🖮 ".to_owned()
@@ -134,41 +142,114 @@ mod ui_support {
                                 Token::Key(ref mut k, ref mut d) => {
                                     let z = egui::ComboBox::from_id_source(format!("keydir{i}"))
                                         .width(0.0)
-                                        .selected_text(format!("{:?}", d))
+                                        .selected_text(format!("{:}", direction_to_str(*d)))
                                         .show_ui(ui, |ui| {
                                             ui.selectable_value(
                                                 d,
                                                 enigo::Direction::Press,
-                                                "⬇ Press",
+                                                direction_to_str(enigo::Direction::Press),
                                             ) | ui.selectable_value(
                                                 d,
                                                 enigo::Direction::Release,
-                                                "⬆ Release",
+                                                direction_to_str(enigo::Direction::Release),
                                             ) | ui.selectable_value(
                                                 d,
                                                 enigo::Direction::Click,
-                                                "❇ Click",
+                                                direction_to_str(enigo::Direction::Click),
                                             )
                                         });
                                     let response = z.inner.unwrap_or(z.response);
                                     if response.changed() {
                                         ui_response = UiConfigResponse::Changed;
                                     }
-                                    // There's 95 options here :(
+                                    // There's 96 options here :(
+                                    // https://docs.rs/enigo/latest/enigo/enum.Key.html#variant.Unicode
 
                                     let y = egui::ComboBox::from_id_source(format!("key{i}"))
                                         .selected_text(format!("{:?}", k))
+                                        .height(10000.0)
                                         .show_ui(ui, |ui| {
-                                            ui.selectable_value(k, enigo::Key::Alt, "Alt")
+                                            ui.selectable_value(
+                                                k,
+                                                if matches!(k, enigo::Key::Unicode(_)) {
+                                                    *k
+                                                } else {
+                                                    enigo::Key::Unicode('a')
+                                                },
+                                                "Unicode",
+                                            ) | ui.label("Modifiers")
+                                                | ui.selectable_value(k, enigo::Key::Alt, "Alt")
+                                                | ui.selectable_value(k, enigo::Key::Meta, "Meta")
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::LShift,
+                                                    "LeftShift",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::LControl,
+                                                    "LeftControl",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::RShift,
+                                                    "RightShift",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::RControl,
+                                                    "RightControl",
+                                                )
+                                                | ui.label("Whitespace")
                                                 | ui.selectable_value(k, enigo::Key::Space, "Space")
                                                 | ui.selectable_value(
                                                     k,
-                                                    if matches!(k, enigo::Key::Unicode(_)) {
-                                                        *k
-                                                    } else {
-                                                        enigo::Key::Unicode('a')
-                                                    },
-                                                    "Unicode",
+                                                    enigo::Key::Backspace,
+                                                    "Backspace",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::Escape,
+                                                    "Escape",
+                                                )
+                                                | ui.selectable_value(k, enigo::Key::Tab, "Tab")
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::Return,
+                                                    "Return",
+                                                )
+                                                | ui.label("Arrow")
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::LeftArrow,
+                                                    "LeftArrow",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::RightArrow,
+                                                    "RightArrow",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::DownArrow,
+                                                    "DownArrow",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::UpArrow,
+                                                    "UpArrow",
+                                                )
+                                                | ui.label("Misc")
+                                                | ui.selectable_value(k, enigo::Key::Print, "Print")
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::PageUp,
+                                                    "PageUp",
+                                                )
+                                                | ui.selectable_value(
+                                                    k,
+                                                    enigo::Key::PageDown,
+                                                    "PageDown",
                                                 )
                                         });
                                     let response = y.inner.unwrap_or(y.response);
@@ -182,14 +263,13 @@ mod ui_support {
                                                 .hint_text("select text to edit")
                                                 .char_limit(1)
                                                 .show(ui);
-                                            // output.response
                                             if output
                                                 .response
                                                 .on_hover_text("select the character, replace it")
                                                 .changed()
                                             {
-                                                ui_response = UiConfigResponse::Changed;
                                                 if let Some(v) = buffer.chars().next() {
+                                                    ui_response = UiConfigResponse::Changed;
                                                     *c = v;
                                                 }
                                             }
