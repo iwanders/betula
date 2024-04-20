@@ -50,8 +50,8 @@ On blackboards:
         an input changed down. And we can stop executing if at any point we
         reach the prior state.
         If multiple trees share the same blackboard, we can always add a
-        tick value on the blackboard, nodes that want to execute each tick
-        can use the ticks as an input, and be guaranteed execution.
+        execution counter value on the blackboard, nodes that want to execute
+        each cycle can use the counter as an input, and be guaranteed execution.
 */
 
 pub mod basic;
@@ -187,7 +187,7 @@ impl Into<String> for NodeType {
 
 /// Trait that nodes must implement.
 pub trait Node: std::fmt::Debug + AsAny {
-    /// The tick function for each node to perform actions / return status.
+    /// The execution function for each node to perform actions / return status.
     ///
     /// Nodes should either return:
     ///   - [`ExecutionStatus::Success`] if their execution successfully completed.
@@ -306,7 +306,7 @@ pub trait Tree: std::fmt::Debug + AsAny {
     /// Set the children of a particular parent node.
     fn set_children(&mut self, parent: NodeId, children: &[NodeId]) -> Result<(), BetulaError>;
 
-    /// Execute the tick, starting at the provided node.
+    /// Execute a particular node, starting at the provided node.
     fn execute(&self, id: NodeId) -> Result<ExecutionStatus, NodeError>;
 
     /// Get a list of the blackboard ids.
