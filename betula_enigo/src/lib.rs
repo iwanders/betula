@@ -8,7 +8,7 @@ use enigo::agent::Agent;
 use enigo::agent::Token;
 
 enum EnigoTask {
-    SetDelay(u32),
+    // SetDelay(u32),
     Tokens(Vec<Token>),
 }
 
@@ -41,9 +41,9 @@ impl EnigoRunner {
                 while let Ok(v) = receiver.recv_timeout(std::time::Duration::from_millis(1)) {
                     let mut locked = enigo.lock().unwrap();
                     match v {
-                        EnigoTask::SetDelay(d) => {
-                            locked.set_delay(d);
-                        }
+                        // EnigoTask::SetDelay(d) => {
+                        // locked.set_delay(d);
+                        // },
                         EnigoTask::Tokens(z) => {
                             //// Don't really know how to handle this Result.
                             for t in z {
@@ -80,6 +80,9 @@ use std::sync::{Arc, Mutex};
 pub struct EnigoInterface {
     sender: Sender<EnigoTask>,
     enigo: Arc<Mutex<Enigo>>,
+
+    // dead code allowed, it contains the execution thread.
+    #[allow(dead_code)]
     runner: Arc<EnigoRunner>,
 }
 
@@ -94,13 +97,13 @@ impl std::cmp::PartialEq for EnigoInterface {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct EnigoBlackboard {
     #[serde(skip)]
     pub interface: Option<EnigoInterface>,
 }
 impl EnigoBlackboard {
-    pub fn execute(&mut self, tokens: &[Token]) -> Result<(), betula_core::BetulaError> {
+    pub fn execute(&self, tokens: &[Token]) -> Result<(), betula_core::BetulaError> {
         let interface = self
             .interface
             .as_ref()
@@ -111,12 +114,21 @@ impl EnigoBlackboard {
         }
         Ok(())
     }
-    pub fn execute_async(&mut self, tokens: &[Token]) -> Result<(), betula_core::BetulaError> {
+    pub fn execute_async(&self, tokens: &[Token]) -> Result<(), betula_core::BetulaError> {
         let interface = self
             .interface
             .as_ref()
             .ok_or(format!("no interface present in value"))?;
         interface.sender.send(EnigoTask::Tokens(tokens.to_vec()))?;
+        Ok(())
+    }
+    pub fn set_delay(&self, delay: u32) -> Result<(), betula_core::BetulaError> {
+        let interface = self
+            .interface
+            .as_ref()
+            .ok_or(format!("no interface present in value"))?;
+        let mut locked = interface.enigo.lock().expect("should not be poisoned");
+        locked.set_delay(delay);
         Ok(())
     }
 }

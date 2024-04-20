@@ -25,7 +25,7 @@ impl EnigoNode {
 
 impl Node for EnigoNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
-        let mut interface = self.input.get()?;
+        let interface = self.input.get()?;
         if self.config.execute_async {
             interface.execute_async(&self.config.tokens)?;
         } else {
@@ -46,7 +46,7 @@ impl Node for EnigoNode {
     }
 
     fn static_type() -> NodeType {
-        "enigo_token".into()
+        "enigo_node".into()
     }
 
     fn node_type(&self) -> NodeType {
