@@ -1,7 +1,7 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{EnigoBlackboard, EnigoRunner};
+use crate::EnigoBlackboard;
 
 use enigo::agent::Token;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -66,13 +66,112 @@ impl Node for EnigoTokenNode {
 mod ui_support {
     use super::*;
     use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+    use enigo::Direction;
 
-    fn direction_to_str(d: enigo::Direction) -> &'static str {
+    fn direction_to_str(d: Direction) -> &'static str {
         match d {
-            enigo::Direction::Press => "⬇ Press",
-            enigo::Direction::Release => "⬆ Release",
-            enigo::Direction::Click => "❇ Click",
+            Direction::Press => "⬇",
+            Direction::Release => "⬆",
+            Direction::Click => "❇",
         }
+    }
+
+    fn direction_ui(
+        id_source: impl std::hash::Hash,
+        d: &mut Direction,
+        ui: &mut egui::Ui,
+    ) -> egui::Response {
+        let z = egui::ComboBox::from_id_source(id_source)
+            .width(0.0)
+            .selected_text(format!("{:}", direction_to_str(*d)))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    d,
+                    enigo::Direction::Press,
+                    direction_to_str(enigo::Direction::Press),
+                )
+                .on_hover_text("press")
+                    | ui.selectable_value(
+                        d,
+                        enigo::Direction::Release,
+                        direction_to_str(enigo::Direction::Release),
+                    )
+                    .on_hover_text("release")
+                    | ui.selectable_value(
+                        d,
+                        enigo::Direction::Click,
+                        direction_to_str(enigo::Direction::Click),
+                    )
+                    .on_hover_text("click")
+            });
+        z.inner.unwrap_or(z.response)
+    }
+
+    fn button_to_str(d: enigo::Button) -> &'static str {
+        match d {
+            enigo::Button::Left => "Left",
+            enigo::Button::Middle => "Middle",
+            enigo::Button::Right => "Right",
+            enigo::Button::Back => "Back",
+            enigo::Button::Forward => "Forward",
+            enigo::Button::ScrollUp => "ScrollUp",
+            enigo::Button::ScrollDown => "ScrollDown",
+            enigo::Button::ScrollLeft => "ScrollLeft",
+            enigo::Button::ScrollRight => "ScrollRight",
+        }
+    }
+    fn button_ui(
+        id_source: impl std::hash::Hash,
+        d: &mut enigo::Button,
+        ui: &mut egui::Ui,
+    ) -> egui::Response {
+        let z = egui::ComboBox::from_id_source(id_source)
+            .width(0.0)
+            .selected_text(format!("{:}", button_to_str(*d)))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(d, enigo::Button::Left, button_to_str(enigo::Button::Left))
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::Middle,
+                        button_to_str(enigo::Button::Middle),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::Right,
+                        button_to_str(enigo::Button::Right),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::Back,
+                        button_to_str(enigo::Button::Back),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::Forward,
+                        button_to_str(enigo::Button::Forward),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::ScrollUp,
+                        button_to_str(enigo::Button::ScrollUp),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::ScrollDown,
+                        button_to_str(enigo::Button::ScrollDown),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::ScrollLeft,
+                        button_to_str(enigo::Button::ScrollLeft),
+                    )
+                    | ui.selectable_value(
+                        d,
+                        enigo::Button::ScrollRight,
+                        button_to_str(enigo::Button::ScrollRight),
+                    )
+            });
+        z.inner.unwrap_or(z.response)
     }
 
     impl UiNode for EnigoTokenNode {
@@ -84,7 +183,7 @@ mod ui_support {
             &mut self,
             ctx: &dyn UiNodeContext,
             ui: &mut egui::Ui,
-            _scale: f32,
+            scale: f32,
         ) -> UiConfigResponse {
             let _ = ctx;
             let mut ui_response = UiConfigResponse::UnChanged;
@@ -112,16 +211,21 @@ mod ui_support {
                     for (i, t) in self.config.tokens.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
                             let options = [
-                                ("Text", Token::Text("".to_owned())),
+                                ("📖Text", Token::Text("".to_owned())),
                                 (
-                                    "Key",
+                                    "🖮 Key",
                                     Token::Key(enigo::Key::Unicode('a'), enigo::Direction::Click),
+                                ),
+                                (
+                                    "🖱 Button",
+                                    Token::Button(enigo::Button::Left, enigo::Direction::Click),
                                 ),
                             ];
                             // let alternatives = ["Text", "Key"];
                             let mut selected = match t {
                                 Token::Text(_) => 0,
                                 Token::Key(_, _) => 1,
+                                Token::Button(_, _) => 2,
                                 _ => unreachable!(),
                             };
                             let z = egui::ComboBox::from_id_source(i)
@@ -134,31 +238,18 @@ mod ui_support {
                             }
                             match t {
                                 Token::Text(ref mut v) => {
-                                    let response = ui.add(egui::TextEdit::singleline(v));
-                                    if response.changed() {
+                                    let text = "text to be inserted, doesn't work for shortcuts";
+                                    let response = ui.add(
+                                        egui::TextEdit::singleline(v)
+                                            .hint_text(text)
+                                            .min_size(egui::vec2(100.0 * scale, 0.0)),
+                                    );
+                                    if response.on_hover_text(text).changed() {
                                         ui_response = UiConfigResponse::Changed;
                                     }
                                 }
                                 Token::Key(ref mut k, ref mut d) => {
-                                    let z = egui::ComboBox::from_id_source(format!("keydir{i}"))
-                                        .width(0.0)
-                                        .selected_text(format!("{:}", direction_to_str(*d)))
-                                        .show_ui(ui, |ui| {
-                                            ui.selectable_value(
-                                                d,
-                                                enigo::Direction::Press,
-                                                direction_to_str(enigo::Direction::Press),
-                                            ) | ui.selectable_value(
-                                                d,
-                                                enigo::Direction::Release,
-                                                direction_to_str(enigo::Direction::Release),
-                                            ) | ui.selectable_value(
-                                                d,
-                                                enigo::Direction::Click,
-                                                direction_to_str(enigo::Direction::Click),
-                                            )
-                                        });
-                                    let response = z.inner.unwrap_or(z.response);
+                                    let response = direction_ui(format!("keydir{i}"), d, ui);
                                     if response.changed() {
                                         ui_response = UiConfigResponse::Changed;
                                     }
@@ -262,6 +353,7 @@ mod ui_support {
                                             let output = egui::TextEdit::singleline(&mut buffer)
                                                 .hint_text("select text to edit")
                                                 .char_limit(1)
+                                                .desired_width(15.0)
                                                 .show(ui);
                                             if output
                                                 .response
@@ -275,6 +367,16 @@ mod ui_support {
                                             }
                                         }
                                         _ => {}
+                                    }
+                                }
+                                Token::Button(ref mut b, ref mut d) => {
+                                    let response = direction_ui(format!("buttondir{i}"), d, ui);
+                                    if response.changed() {
+                                        ui_response = UiConfigResponse::Changed;
+                                    }
+                                    let response = button_ui(format!("button{i}"), b, ui);
+                                    if response.changed() {
+                                        ui_response = UiConfigResponse::Changed;
                                     }
                                 }
                                 _ => {}
