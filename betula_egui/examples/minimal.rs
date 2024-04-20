@@ -5,6 +5,11 @@ use betula_egui::{editor::BetulaEditor, UiSupport};
 // Factory function for the ui support.
 fn create_ui_support() -> UiSupport {
     let mut ui_support = UiSupport::new();
+    ui_support
+        .tree_support_mut()
+        .set_blackboard_factory(Box::new(|| {
+            Box::new(betula_core::basic::BasicBlackboard::default())
+        }));
     betula_egui::add_ui_support(&mut ui_support);
     ui_support
 }

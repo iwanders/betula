@@ -30,11 +30,6 @@ pub fn add_ui_support(ui_support: &mut crate::UiSupport) {
     ui_support.add_node_default::<betula_core::nodes::RunningNode>();
     ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
     ui_support.add_node_default_with_config::<betula_common::nodes::ParallelNode, betula_common::nodes::ParallelNodeConfig>();
-    ui_support
-        .tree_support_mut()
-        .set_blackboard_factory(Box::new(|| {
-            Box::new(betula_core::basic::BasicBlackboard::default())
-        }));
     ui_support.add_node_default::<betula_common::nodes::TimeNode>();
     ui_support.add_value_default::<f64>();
 }

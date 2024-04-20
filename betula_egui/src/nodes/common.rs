@@ -69,7 +69,8 @@ impl UiNode for nodes::DelayNode {
 
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
-            UiNodeCategory::Folder("common".to_owned()),
+            UiNodeCategory::Folder("decorator".to_owned()),
+            UiNodeCategory::Group("time".to_owned()),
             UiNodeCategory::Name("delay".to_owned()),
         ]
     }
@@ -85,7 +86,7 @@ impl UiNode for nodes::TimeNode {
     }
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
-            UiNodeCategory::Folder("common".to_owned()),
+            UiNodeCategory::Folder("provider".to_owned()),
             UiNodeCategory::Name("time".to_owned()),
         ]
     }
@@ -122,7 +123,7 @@ impl UiNode for nodes::ParallelNode {
 
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
-            UiNodeCategory::Folder("logic".to_owned()),
+            UiNodeCategory::Folder("control".to_owned()),
             UiNodeCategory::Name("parallel".to_owned()),
         ]
     }

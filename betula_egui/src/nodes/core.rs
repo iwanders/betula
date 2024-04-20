@@ -7,7 +7,7 @@ impl UiNode for nodes::SequenceNode {
     }
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
-            UiNodeCategory::Folder("logic".to_owned()),
+            UiNodeCategory::Folder("control".to_owned()),
             // UiNodeCategory::Group("core".to_owned()),
             UiNodeCategory::Name("sequence".to_owned()),
         ]
@@ -20,7 +20,7 @@ impl UiNode for nodes::SelectorNode {
 
     fn ui_category() -> Vec<UiNodeCategory> {
         vec![
-            UiNodeCategory::Folder("logic".to_owned()),
+            UiNodeCategory::Folder("control".to_owned()),
             // UiNodeCategory::Group("core".to_owned()),
             UiNodeCategory::Name("selector".to_owned()),
         ]
