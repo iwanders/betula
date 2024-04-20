@@ -1,0 +1,15 @@
+[package]
+name = "betula_std"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-3-Clause"
+
+
+[features]
+default = []
+
+[dependencies]
+betula_core = { workspace = true, default-features = false }
+betula_egui = { workspace = true, default-features = false, optional=true}
+serde =  { version = "1.0", features = ["derive"] }
+

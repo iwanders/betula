@@ -73,3 +73,51 @@ impl Node for ParallelNode {
         Self::static_type()
     }
 }
+
+#[cfg(feature = "betula_egui")]
+mod ui_support {
+    use super::*;
+    use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+
+    impl UiNode for ParallelNode {
+        fn ui_title(&self) -> String {
+            "parallel 🔀".to_owned()
+        }
+
+        fn ui_config(
+            &mut self,
+            ctx: &dyn UiNodeContext,
+            ui: &mut egui::Ui,
+            _scale: f32,
+        ) -> UiConfigResponse {
+            let children_count = ctx.children_count();
+            let mut ui_response = UiConfigResponse::UnChanged;
+
+            if self.config.success_threshold > children_count {
+                self.config.success_threshold = children_count;
+                ui_response = UiConfigResponse::Changed;
+            }
+            ui.horizontal(|ui| {
+                ui.label("Threshold: ");
+                let r = ui.add(
+                    egui::DragValue::new(&mut self.config.success_threshold)
+                        .clamp_range(0..=children_count)
+                        .update_while_editing(false),
+                );
+
+                if r.changed() {
+                    ui_response = UiConfigResponse::Changed;
+                }
+            });
+
+            ui_response
+        }
+
+        fn ui_category() -> Vec<UiNodeCategory> {
+            vec![
+                UiNodeCategory::Folder("control".to_owned()),
+                UiNodeCategory::Name("parallel".to_owned()),
+            ]
+        }
+    }
+}

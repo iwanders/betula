@@ -549,6 +549,7 @@ dependencies = [
  "betula_core",
  "betula_egui",
  "betula_enigo",
+ "betula_std",
  "eframe",
  "egui",
 ]
@@ -576,6 +577,15 @@ dependencies = [
  "betula_core",
  "betula_egui",
  "enigo",
+ "serde",
+]
+
+[[package]]
+name = "betula_std"
+version = "0.0.1"
+dependencies = [
+ "betula_core",
+ "betula_egui",
  "serde",
 ]
 

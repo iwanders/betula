@@ -9,5 +9,6 @@ betula_common = { workspace = true }
 betula_core = { workspace = true }
 betula_egui = { workspace = true }
 betula_enigo = { workspace = true, features=["betula_egui"] }
+betula_std = { workspace = true, features=["betula_egui"] }
 eframe = { version = "0.26", features = ["serde", "persistence"] }
 egui = { version = "0.26" }

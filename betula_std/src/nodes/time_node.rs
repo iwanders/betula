@@ -43,6 +43,28 @@ impl Node for TimeNode {
     }
 }
 
+#[cfg(feature = "betula_egui")]
+mod ui_support {
+    use super::*;
+    use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+
+    impl UiNode for TimeNode {
+        fn ui_title(&self) -> String {
+            "time 🕓".to_owned()
+        }
+
+        fn ui_child_range(&self) -> std::ops::Range<usize> {
+            0..0
+        }
+        fn ui_category() -> Vec<UiNodeCategory> {
+            vec![
+                UiNodeCategory::Folder("provider".to_owned()),
+                UiNodeCategory::Name("time".to_owned()),
+            ]
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
