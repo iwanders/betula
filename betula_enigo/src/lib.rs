@@ -137,34 +137,12 @@ impl std::fmt::Debug for EnigoBlackboard {
         write!(fmt, "Enigo")
     }
 }
-/*
 
+/// Register enigo nodes to the ui support.
 #[cfg(feature = "betula_egui")]
-mod ui_support {
-    use super::*;
-    use betula_egui::{UiNodeCategory, UiConfigResponse, UiNode, UiNodeContext, egui, UiValue};
-    use betula_core::{blackboard::Chalkable, BetulaError};
-
-    impl UiValue for EnigoBlackboard {
-        fn ui(&mut self, _ui: &mut egui::Ui, _scale: f32) -> UiConfigResponse {
-            UiConfigResponse::UnChanged
-        }
-
-        fn value(&self) -> Box<dyn Chalkable> {
-            Box::new(Self::default())
-        }
-        fn set_value(&mut self, value: Box<dyn Chalkable>) -> Result<(), BetulaError>{
-            Ok(())
-        }
-
-        fn value_type(&self) -> String {
-            Self::static_type()
-        }
-
-        fn static_type() -> String {
-            "enigo".to_owned()
-        }
-    }
+pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
+    ui_support
+        .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
+    ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
+    ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
 }
-
-*/

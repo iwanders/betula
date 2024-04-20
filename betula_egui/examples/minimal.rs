@@ -5,20 +5,7 @@ use betula_egui::{editor::BetulaEditor, UiSupport};
 // Factory function for the ui support.
 fn create_ui_support() -> UiSupport {
     let mut ui_support = UiSupport::new();
-    ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
-    ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
-    ui_support.add_node_default::<betula_core::nodes::FailureNode>();
-    ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-    ui_support.add_node_default::<betula_core::nodes::RunningNode>();
-    ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>();
-    ui_support.add_node_default_with_config::<betula_common::nodes::ParallelNode, betula_common::nodes::ParallelNodeConfig>();
-    ui_support
-        .tree_support_mut()
-        .set_blackboard_factory(Box::new(|| {
-            Box::new(betula_core::basic::BasicBlackboard::default())
-        }));
-    ui_support.add_node_default::<betula_common::nodes::TimeNode>();
-    ui_support.add_value_default::<f64>();
+    betula_egui::add_ui_support(&mut ui_support);
     ui_support
 }
 
