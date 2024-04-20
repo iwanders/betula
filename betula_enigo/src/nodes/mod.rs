@@ -1,5 +1,5 @@
-mod enigo_node;
-pub use enigo_node::EnigoNode;
+mod enigo_instance_node;
+pub use enigo_instance_node::EnigoInstanceNode;
 
-mod enigo_token_node;
-pub use enigo_token_node::{EnigoTokenNode, EnigoTokenNodeConfig};
+mod enigo_node;
+pub use enigo_node::{EnigoNode, EnigoNodeConfig};

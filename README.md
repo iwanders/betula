@@ -48,8 +48,8 @@ Betula node for [enigo](https://github.com/enigo-rs/enigo): `Cross platform inpu
 This crate provides both the `Node` as well as the `UiNode` if the `betula_egui` feature is enabled.
 
 - Nodes:
-  - `EnigoNode`: Provides an `Enigo` instance to the blackboard.
-  - `EnigoTokenNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
+  - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
+  - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
 
 
 
