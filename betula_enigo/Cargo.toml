@@ -1,0 +1,11 @@
+[package]
+name = "betula_enigo"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-3-Clause"
+
+[dependencies]
+betula_core = { workspace = true, default-features = false }
+serde =  { version = "1.0", features = ["derive"] }
+enigo = {version = "0.2.0", features = ["serde"] }
+

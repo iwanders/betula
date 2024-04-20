@@ -5,6 +5,7 @@ members = [
     "betula_core",
     "betula_common",
     "betula_egui",
+    "betula_enigo",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html
