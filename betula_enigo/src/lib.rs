@@ -9,7 +9,7 @@ use enigo::agent::Token;
 
 enum EnigoTask {
     SetDelay(u32),
-    Token(Token),
+    Tokens(Vec<Token>),
 }
 
 // use std::cell::RefCell;
@@ -44,11 +44,13 @@ impl EnigoRunner {
                         EnigoTask::SetDelay(d) => {
                             locked.set_delay(d);
                         }
-                        EnigoTask::Token(t) => {
+                        EnigoTask::Tokens(z) => {
                             //// Don't really know how to handle this Result.
-                            let _ = locked
-                                .execute(&t)
-                                .expect(&format!("failed to execute {t:?}"));
+                            for t in z {
+                                let _ = locked
+                                    .execute(&t)
+                                    .expect(&format!("failed to execute {t:?}"));
+                            }
                         }
                     }
                 }
@@ -98,13 +100,23 @@ pub struct EnigoBlackboard {
     pub interface: Option<EnigoInterface>,
 }
 impl EnigoBlackboard {
-    pub fn execute(&mut self, token: &Token) -> Result<(), betula_core::BetulaError> {
+    pub fn execute(&mut self, tokens: &[Token]) -> Result<(), betula_core::BetulaError> {
         let interface = self
             .interface
             .as_ref()
             .ok_or(format!("no interface present in value"))?;
         let mut locked = interface.enigo.lock().expect("should not be poisoned");
-        locked.execute(token)?;
+        for t in tokens {
+            locked.execute(t)?;
+        }
+        Ok(())
+    }
+    pub fn execute_async(&mut self, tokens: &[Token]) -> Result<(), betula_core::BetulaError> {
+        let interface = self
+            .interface
+            .as_ref()
+            .ok_or(format!("no interface present in value"))?;
+        interface.sender.send(EnigoTask::Tokens(tokens.to_vec()))?;
         Ok(())
     }
 }
