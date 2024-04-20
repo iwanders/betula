@@ -66,7 +66,7 @@ impl Node for EnigoTokenNode {
 mod ui_support {
     use super::*;
     use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
-    use enigo::{Coordinate, Direction};
+    use enigo::{Axis, Coordinate, Direction};
 
     fn direction_to_str(d: Direction) -> &'static str {
         match d {
@@ -205,6 +205,34 @@ mod ui_support {
         z.inner.unwrap_or(z.response)
     }
 
+    fn axis_to_str(d: Axis) -> &'static str {
+        match d {
+            Axis::Horizontal => "Horizontal",
+            Axis::Vertical => "Vertical",
+        }
+    }
+    fn axis_ui(
+        id_source: impl std::hash::Hash,
+        d: &mut enigo::Axis,
+        ui: &mut egui::Ui,
+    ) -> egui::Response {
+        let z = egui::ComboBox::from_id_source(id_source)
+            .width(0.0)
+            .selected_text(format!("{:}", axis_to_str(*d)))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    d,
+                    enigo::Axis::Horizontal,
+                    axis_to_str(enigo::Axis::Horizontal),
+                ) | ui.selectable_value(
+                    d,
+                    enigo::Axis::Vertical,
+                    axis_to_str(enigo::Axis::Vertical),
+                )
+            });
+        z.inner.unwrap_or(z.response)
+    }
+
     impl UiNode for EnigoTokenNode {
         fn ui_title(&self) -> String {
             "enigo_token 🖱🖮 ".to_owned()
@@ -252,6 +280,7 @@ mod ui_support {
                                     Token::Button(enigo::Button::Left, enigo::Direction::Click),
                                 ),
                                 ("👆Mouse", Token::MoveMouse(0, 0, enigo::Coordinate::Rel)),
+                                ("📜Scroll", Token::Scroll(0, enigo::Axis::Vertical)),
                             ];
                             // let alternatives = ["Text", "Key"];
                             let mut selected = match t {
@@ -259,6 +288,7 @@ mod ui_support {
                                 Token::Key(_, _) => 1,
                                 Token::Button(_, _) => 2,
                                 Token::MoveMouse(_, _, _) => 3,
+                                Token::Scroll(_, _) => 4,
                                 _ => unreachable!(),
                             };
                             let z = egui::ComboBox::from_id_source(i)
@@ -426,6 +456,17 @@ mod ui_support {
                                         ui_response = UiConfigResponse::Changed;
                                     }
                                     let response = coordinate_ui(format!("coordinate{i}"), c, ui);
+                                    if response.changed() {
+                                        ui_response = UiConfigResponse::Changed;
+                                    }
+                                }
+                                Token::Scroll(ref mut v, ref mut c) => {
+                                    let r =
+                                        ui.add(egui::DragValue::new(v).update_while_editing(false));
+                                    if r.changed() {
+                                        ui_response = UiConfigResponse::Changed;
+                                    }
+                                    let response = axis_ui(format!("axis{i}"), c, ui);
                                     if response.changed() {
                                         ui_response = UiConfigResponse::Changed;
                                     }
