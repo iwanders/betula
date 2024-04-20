@@ -75,7 +75,7 @@ impl Node for ParallelNode {
 }
 
 #[cfg(feature = "betula_egui")]
-mod ui_support {
+pub mod ui_support {
     use super::*;
     use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 

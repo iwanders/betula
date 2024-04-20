@@ -44,9 +44,9 @@ impl Node for TimeNode {
 }
 
 #[cfg(feature = "betula_egui")]
-mod ui_support {
+pub mod ui_support {
     use super::*;
-    use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+    use betula_egui::{UiNode, UiNodeCategory};
 
     impl UiNode for TimeNode {
         fn ui_title(&self) -> String {

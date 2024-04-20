@@ -6,3 +6,6 @@ pub use delay_node::DelayNodeConfig;
 mod parallel_node;
 pub use parallel_node::ParallelNode;
 pub use parallel_node::ParallelNodeConfig;
+
+#[cfg(feature = "betula_egui")]
+pub use time_node::ui_support;

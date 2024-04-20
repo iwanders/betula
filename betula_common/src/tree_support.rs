@@ -521,7 +521,7 @@ mod test {
     #[test]
     fn test_config() -> Result<(), BetulaError> {
         let mut tree_support = TreeSupport::new();
-        use crate::nodes::{DelayNode, DelayNodeConfig};
+        use betula_std::nodes::{DelayNode, DelayNodeConfig};
         tree_support.add_node_default_with_config::<DelayNode, DelayNodeConfig>();
         let interval = 3.3;
         let config: Box<dyn NodeConfig> = Box::new(DelayNodeConfig { interval });
@@ -541,7 +541,7 @@ mod test {
         tree_support.add_node_default::<betula_core::nodes::FailureNode>();
         tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
         tree_support
-            .add_node_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
+            .add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
             );
         println!("loader: {tree_support:#?}");
 
@@ -581,9 +581,9 @@ mod test {
         tree_support.add_node_default::<betula_core::nodes::FailureNode>();
         tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
         tree_support
-            .add_node_default_with_config::<crate::nodes::DelayNode, crate::nodes::DelayNodeConfig>(
+            .add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
             );
-        tree_support.add_node_default::<crate::nodes::TimeNode>();
+        tree_support.add_node_default::<betula_std::nodes::TimeNode>();
         tree_support.add_value_default::<f64>();
 
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
@@ -593,11 +593,11 @@ mod test {
         )?;
         let time_node = tree.add_node_boxed(
             NodeId(Uuid::new_v4()),
-            Box::new(crate::nodes::TimeNode::default()),
+            Box::new(betula_std::nodes::TimeNode::default()),
         )?;
         let delay_node = tree.add_node_boxed(
             NodeId(Uuid::new_v4()),
-            Box::new(crate::nodes::DelayNode::default()),
+            Box::new(betula_std::nodes::DelayNode::default()),
         )?;
         tree.set_children(root, &vec![time_node, delay_node])?;
         tree.set_roots(&[root])?;

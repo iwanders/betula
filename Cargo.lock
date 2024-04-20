@@ -527,6 +527,7 @@ name = "betula_common"
 version = "0.0.1"
 dependencies = [
  "betula_core",
+ "betula_std",
  "erased-serde",
  "serde",
  "serde_json",
@@ -560,6 +561,7 @@ version = "0.0.1"
 dependencies = [
  "betula_common",
  "betula_core",
+ "betula_std",
  "eframe",
  "egui",
  "egui-snarl",
@@ -587,6 +589,7 @@ dependencies = [
  "betula_core",
  "betula_egui",
  "serde",
+ "uuid",
 ]
 
 [[package]]

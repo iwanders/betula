@@ -2432,6 +2432,9 @@ mod test {
     use super::*;
     use betula_common::{control::InProcessControlServer, TreeSupport};
 
+    impl UiNode for betula_std::nodes::DelayNode {}
+    impl UiNode for betula_std::nodes::TimeNode {}
+
     use betula_core::{BetulaError, Node};
 
     fn service_for_ms(
@@ -2463,10 +2466,10 @@ mod test {
             tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
             tree_support.add_node_default::<betula_core::nodes::FailureNode>();
             tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
-            tree_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>(
+            tree_support.add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
                 );
-            tree_support.add_node_default::<betula_common::nodes::TimeNode>();
-            tree_support.add_node_default::<betula_common::nodes::DelayNode>();
+            tree_support.add_node_default::<betula_std::nodes::TimeNode>();
+            tree_support.add_node_default::<betula_std::nodes::DelayNode>();
             tree_support.set_blackboard_factory(Box::new(|| {
                 Box::new(betula_core::basic::BasicBlackboard::default())
             }));
@@ -2521,7 +2524,7 @@ mod test {
             // ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
             // ui_support.add_node_default::<betula_core::nodes::FailureNode>();
             // ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-            ui_support.add_node_default_with_config::<betula_common::nodes::DelayNode, betula_common::nodes::DelayNodeConfig>(
+            ui_support.add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
                 );
             // ui_support.add_node_default::<betula_common::nodes::TimeNode>();
             // ui_support.add_node_default::<betula_common::nodes::DelayNode>();
@@ -2535,19 +2538,19 @@ mod test {
             viewer.ui_create_node(
                 delay1,
                 egui::pos2(0.0, 0.0),
-                betula_common::nodes::DelayNode::static_type(),
+                betula_std::nodes::DelayNode::static_type(),
                 &mut snarl,
             );
             viewer.ui_create_node(
                 delay2,
                 egui::pos2(0.0, 0.0),
-                betula_common::nodes::DelayNode::static_type(),
+                betula_std::nodes::DelayNode::static_type(),
                 &mut snarl,
             );
             viewer.ui_create_node(
                 delay3,
                 egui::pos2(0.0, 0.0),
-                betula_common::nodes::DelayNode::static_type(),
+                betula_std::nodes::DelayNode::static_type(),
                 &mut snarl,
             );
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -2599,7 +2602,7 @@ mod test {
         {
             let mut ui_support = UiSupport::new();
 
-            ui_support.add_node_default::<betula_common::nodes::TimeNode>();
+            ui_support.add_node_default::<betula_std::nodes::TimeNode>();
             ui_support.add_value_default::<f64>();
             let mut viewer = BetulaViewer::new(Box::new(client), ui_support);
             viewer
@@ -2611,7 +2614,7 @@ mod test {
             viewer.ui_create_node(
                 time1,
                 egui::pos2(0.0, 0.0),
-                betula_common::nodes::TimeNode::static_type(),
+                betula_std::nodes::TimeNode::static_type(),
                 &mut snarl,
             );
             service_for_ms(&mut viewer, &mut snarl, 50)?;
@@ -2634,7 +2637,7 @@ mod test {
             viewer.ui_create_node(
                 time2,
                 egui::pos2(0.0, 0.0),
-                betula_common::nodes::TimeNode::static_type(),
+                betula_std::nodes::TimeNode::static_type(),
                 &mut snarl,
             );
             service_for_ms(&mut viewer, &mut snarl, 50)?;

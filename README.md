@@ -15,6 +15,7 @@ Brief overview of the crates in this workspace.
 - The `basic` module holds the standard (non-event) implementation for a blackboard and a tree.
 - Holds helpers for `Port`s and `BlackboardValue`.
 ### Nodes
+The following nodes are created in this crate to facilitate unit testing.
   - `SuccessNode`: Always returns `Success`, may be a decorator.
   - `RunningNode`: Always returns `Running`, may be a decorator.
   - `FailureNode`: Always returns `Failure`, may be a decorator.
@@ -28,10 +29,6 @@ Main components:
 - Control protocol to manipulate a tree.
 - Server thread to allow running a tree in the background.
 
-### Nodes
-  - `TimeNode`: Write the unix time to a blackboard as `f64`.
-  - `DelayNode`: Delays execution of the child node with the specified interval.
-
 ## betula_egui
 - Uses the control protocol from `betula_common`.
 - `UiNode` trait that must be implemented for `Node`s to provide editor support.
@@ -39,9 +36,18 @@ Main components:
 - `UiSupport` that allows registering new nodes.
 - `Editor`, an `eframe::App` that can be instantiated.
 - `UiNode` implementation for `betula_common` and `betula_core`.
+- Also provides ui support for the nodes from `betula_core`.
 
 ## betula_demo
 - Application that instantiates an editor with all nodes that exist in the workspace.
+
+## betula_std
+A collection of standard nodes.
+
+### Nodes
+  - `ParallelNode`: A node that executes all children and determines status based on their return.
+  - `TimeNode`: Write the unix time to a blackboard as `f64`.
+  - `DelayNode`: Delays execution of the child node with the specified interval.
 
 ## betula_enigo
 Betula node for [enigo](https://github.com/enigo-rs/enigo): `Cross platform input simulation in Rust`.

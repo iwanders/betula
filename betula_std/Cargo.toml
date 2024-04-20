@@ -13,3 +13,6 @@ betula_core = { workspace = true, default-features = false }
 betula_egui = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
+
+[dev-dependencies]
+uuid = {version = "1.8.0", features=["v4"]}
