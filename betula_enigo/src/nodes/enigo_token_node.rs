@@ -1,42 +1,44 @@
 use betula_core::node_prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::{EnigoBlackboard, EnigoRunner};
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct EnigoTokenNodeConfig {}
+impl IsNodeConfig for EnigoTokenNodeConfig {}
+
 #[derive(Debug, Default)]
-pub struct EnigoNode {
-    is_created: bool,
-    output: Output<EnigoBlackboard>,
+pub struct EnigoTokenNode {
+    input: Input<EnigoBlackboard>,
 }
 
-impl EnigoNode {
+impl EnigoTokenNode {
     pub fn new() -> Self {
-        EnigoNode::default()
+        EnigoTokenNode::default()
     }
 }
 
-impl Node for EnigoNode {
+impl Node for EnigoTokenNode {
     fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
-        if !self.is_created {
-            let v = EnigoRunner::new()?;
-            self.output.set(EnigoBlackboard { interface: Some(v) })?;
-            self.is_created = true;
-        }
+        let mut interface = self.input.get()?;
+        use enigo::agent::Token;
+        interface.execute(&Token::Text("Hello World! ❤️".to_string()))?;
         Ok(NodeStatus::Success)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
-        Ok(vec![Port::output::<EnigoBlackboard>("enigo")])
+        Ok(vec![Port::input::<EnigoBlackboard>("enigo")])
     }
-    fn setup_outputs(
+    fn setup_inputs(
         &mut self,
-        interface: &mut dyn BlackboardOutputInterface,
+        interface: &mut dyn BlackboardInputInterface,
     ) -> Result<(), NodeError> {
-        self.output = interface.output::<EnigoBlackboard>("enigo", EnigoBlackboard::default())?;
+        self.input = interface.input::<EnigoBlackboard>("enigo")?;
         Ok(())
     }
 
     fn static_type() -> NodeType {
-        "enigo_provider".into()
+        "enigo_token".into()
     }
 
     fn node_type(&self) -> NodeType {
@@ -49,14 +51,14 @@ mod ui_support {
     use super::*;
     use betula_egui::{UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
-    impl UiNode for EnigoNode {
+    impl UiNode for EnigoTokenNode {
         fn ui_title(&self) -> String {
-            "enigo ".to_owned()
+            "enigo_token ".to_owned()
         }
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("provider".to_owned()),
+                UiNodeCategory::Folder("action".to_owned()),
                 UiNodeCategory::Name("enigo".to_owned()),
             ]
         }

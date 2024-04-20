@@ -97,3 +97,14 @@ pub struct EnigoBlackboard {
     #[serde(skip)]
     pub interface: Option<EnigoInterface>,
 }
+impl EnigoBlackboard {
+    pub fn execute(&mut self, token: &Token) -> Result<(), betula_core::BetulaError> {
+        let interface = self
+            .interface
+            .as_ref()
+            .ok_or(format!("no interface present in value"))?;
+        let mut locked = interface.enigo.lock().expect("should not be poisoned");
+        locked.execute(token)?;
+        Ok(())
+    }
+}
