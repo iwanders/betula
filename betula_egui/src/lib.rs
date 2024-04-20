@@ -16,3 +16,4 @@ pub fn betula_icon() -> egui::IconData {
 }
 
 pub mod widgets;
+pub use egui;
