@@ -4,7 +4,7 @@ use crate::{EnigoBlackboard, EnigoRunner};
 
 #[derive(Debug, Default)]
 pub struct EnigoNode {
-    needs_creation: bool,
+    is_created: bool,
     output: Output<EnigoBlackboard>,
 }
 
@@ -16,10 +16,10 @@ impl EnigoNode {
 
 impl Node for EnigoNode {
     fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
-        if self.needs_creation {
+        if !self.is_created {
             let v = EnigoRunner::new()?;
             self.output.set(EnigoBlackboard { interface: Some(v) })?;
-            self.needs_creation = false;
+            self.is_created = true;
         }
         Ok(NodeStatus::Success)
     }
@@ -41,5 +41,27 @@ impl Node for EnigoNode {
 
     fn node_type(&self) -> NodeType {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "betula_egui")]
+mod ui_support {
+    use super::*;
+    use betula_egui::{UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+
+    impl UiNode for EnigoNode {
+        fn ui_title(&self) -> String {
+            "enigo ".to_owned()
+        }
+
+        fn ui_category() -> Vec<UiNodeCategory> {
+            vec![
+                UiNodeCategory::Folder("provider".to_owned()),
+                UiNodeCategory::Name("enigo".to_owned()),
+            ]
+        }
+        fn ui_child_range(&self) -> std::ops::Range<usize> {
+            0..0 // todo without this we encounter an unreachable in the ui!
+        }
     }
 }

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 pub mod nodes;
 
 use enigo::Enigo;
@@ -90,7 +92,8 @@ impl std::cmp::PartialEq for EnigoInterface {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Default)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct EnigoBlackboard {
+    #[serde(skip)]
     pub interface: Option<EnigoInterface>,
 }

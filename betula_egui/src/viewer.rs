@@ -2108,10 +2108,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                                 unreachable!("tried to get pin for input beyond range");
                             }
                         } else {
-                            unreachable!("tried to get non input pin");
+                            unreachable!("tried to get non input pin {pin:?} on {node:?}");
                         }
                     } else {
-                        unreachable!("cant show input for pending node");
+                        unreachable!("cant show input for pending node {node:?}");
                     }
                 }
             }

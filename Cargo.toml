@@ -6,6 +6,7 @@ members = [
     "betula_common",
     "betula_egui",
     "betula_enigo",
+    "betula_demo",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html
@@ -21,3 +22,5 @@ members = [
 betula_core = { version = "0.0.1", path = "betula_core", default-features = false }
 betula_egui = { version = "0.0.1", path = "betula_egui", default-features = false }
 betula_common = { version = "0.0.1", path = "betula_common", default-features = false }
+betula_enigo = { version = "0.0.1", path = "betula_enigo", default-features = false }
+betula_demo = { version = "0.0.1", path = "betula_demo", default-features = false }
