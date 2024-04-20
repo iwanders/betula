@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     blackboard::{PortConnection, PortDirection, PortName},
-    BetulaError, Blackboard, BlackboardId, Node, NodeError, NodeId, NodePort, NodeStatus,
+    BetulaError, Blackboard, BlackboardId, ExecutionStatus, Node, NodeError, NodeId, NodePort,
 };
 
 struct TreeContext<'a> {
@@ -18,7 +18,7 @@ impl RunContext for TreeContext<'_> {
             .expect("node must exist in tree")
             .len()
     }
-    fn run(&self, index: usize) -> Result<NodeStatus, NodeError> {
+    fn run(&self, index: usize) -> Result<ExecutionStatus, NodeError> {
         let ids = self.tree.children(self.this_node)?;
         self.tree.execute(ids[index])
     }
@@ -355,7 +355,7 @@ impl Tree for BasicTree {
         Ok(())
     }
 
-    fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError> {
+    fn execute(&self, id: NodeId) -> Result<ExecutionStatus, NodeError> {
         let mut n = self
             .nodes
             .get(&id)
@@ -367,7 +367,7 @@ impl Tree for BasicTree {
             tree: &self,
         };
 
-        n.tick(&mut context)
+        n.execute(&mut context)
     }
 
     fn blackboards(&self) -> Vec<BlackboardId> {
@@ -653,7 +653,7 @@ mod tests {
         let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
         tree.set_children(root, &vec![f1])?;
         let res = tree.execute(root)?;
-        assert_eq!(res, NodeStatus::Failure);
+        assert_eq!(res, ExecutionStatus::Failure);
         Ok(())
     }
 
@@ -665,7 +665,7 @@ mod tests {
         let s1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SuccessNode {}))?;
         tree.set_children(root, &vec![f1, s1])?;
         let res = tree.execute(root)?;
-        assert_eq!(res, NodeStatus::Success);
+        assert_eq!(res, ExecutionStatus::Success);
         Ok(())
     }
 
@@ -709,9 +709,9 @@ mod tests {
         a_output: Output<f64>,
     }
     impl Node for OutputNode {
-        fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+        fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
             self.a_output.set(3.3f64)?;
-            Ok(NodeStatus::Success)
+            Ok(ExecutionStatus::Success)
         }
         fn ports(&self) -> Result<Vec<Port>, NodeError> {
             Ok(vec![Port::output::<f64>("a")])
@@ -743,12 +743,12 @@ mod tests {
         a_input: Input<f64>,
     }
     impl Node for InputNode {
-        fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+        fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
             let value = self.a_input.get()?;
             if value != 0.0 {
-                Ok(NodeStatus::Success)
+                Ok(ExecutionStatus::Success)
             } else {
-                Ok(NodeStatus::Failure)
+                Ok(ExecutionStatus::Failure)
             }
         }
         fn ports(&self) -> Result<Vec<Port>, NodeError> {
@@ -811,7 +811,7 @@ mod tests {
         tree.connect_port_to_blackboard(&input_ports[0], bb1)?;
 
         let res = tree.execute(root)?;
-        assert_eq!(res, NodeStatus::Success);
+        assert_eq!(res, ExecutionStatus::Success);
 
         // get the value from the blackboard.
         let bbref = tree.blackboard_ref(bb1).unwrap();

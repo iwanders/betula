@@ -57,11 +57,11 @@ use egui::{Color32, Ui};
 
 use betula_core::{
     blackboard::{BlackboardPort, NodePort, PortConnection, PortDirection, PortName},
-    BetulaError, BlackboardId, NodeId as BetulaNodeId, NodeStatus, NodeType,
+    BetulaError, BlackboardId, ExecutionStatus, NodeId as BetulaNodeId, NodeType,
 };
 
 use betula_common::control::{
-    ExecutionStatus, InteractionCommand, SerializedBlackboardValues, TreeClient,
+    InteractionCommand, NodeStatus, SerializedBlackboardValues, TreeClient,
 };
 
 use serde::{Deserialize, Serialize};
@@ -123,7 +123,7 @@ pub struct ViewerNode {
     ///
     /// Used for coloring the node border if enabled.
     #[serde(skip)]
-    node_status: Option<NodeStatus>,
+    node_status: Option<ExecutionStatus>,
 }
 
 impl ViewerNode {
@@ -1537,7 +1537,7 @@ impl BetulaViewer {
 
     pub fn set_execution_results(
         &mut self,
-        results: &[ExecutionStatus],
+        results: &[NodeStatus],
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         for e in results {
@@ -2398,9 +2398,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
                 if let Some(node_status) = node.node_status.as_ref() {
                     let hue = match node_status {
-                        NodeStatus::Success => hue_success,
-                        NodeStatus::Failure => hue_failure,
-                        NodeStatus::Running => hue_running,
+                        ExecutionStatus::Success => hue_success,
+                        ExecutionStatus::Failure => hue_failure,
+                        ExecutionStatus::Running => hue_running,
                     };
                     current_hsva.s = (current_hsva.s + satutarion_bump).min(1.0);
                     if current_hsva.v < 0.5 {

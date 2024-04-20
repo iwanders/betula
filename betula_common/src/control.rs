@@ -1,6 +1,6 @@
 use betula_core::{
     blackboard::{BlackboardId, PortConnection},
-    BetulaError, NodeId, NodeStatus, NodeType,
+    BetulaError, ExecutionStatus, NodeId, NodeType,
 };
 
 pub use crate::tree_support::SerializedBlackboardValues;
@@ -495,15 +495,14 @@ impl BlackboardValues {
     }
 }
 
-// Should this be called NodeStatus instead of ExecutionStatus??
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct ExecutionStatus {
+pub struct NodeStatus {
     pub node: NodeId,
-    pub status: NodeStatus,
+    pub status: ExecutionStatus,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecutionResult {
-    pub node_status: Vec<ExecutionStatus>,
+    pub node_status: Vec<NodeStatus>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

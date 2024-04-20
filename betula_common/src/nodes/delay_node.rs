@@ -10,10 +10,10 @@ impl IsNodeConfig for DelayNodeConfig {}
 
 /// Node to delay execution of its children.
 ///
-/// Returns [`NodeStatus::Running`] while the interval since the last
+/// Returns [`ExecutionStatus::Running`] while the interval since the last
 /// execution is not yet exceeded. When the interval is exceeded it runs
 /// its one child node and returns its status. If there is no child node
-/// to be executed it returns [`NodeStatus::Running`].
+/// to be executed it returns [`ExecutionStatus::Running`].
 ///
 /// One input port `time`, of type `f64`, which usually is time in seconds.
 #[derive(Debug, Default)]
@@ -33,17 +33,17 @@ impl DelayNode {
 }
 
 impl Node for DelayNode {
-    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let time = self.time.get()?;
         if time < (self.last_time + self.config.interval) {
-            return Ok(NodeStatus::Running);
+            return Ok(ExecutionStatus::Running);
         }
         self.last_time = time;
 
         if ctx.children() == 1 {
             ctx.run(0)
         } else {
-            Ok(NodeStatus::Success)
+            Ok(ExecutionStatus::Success)
         }
     }
 
@@ -96,19 +96,19 @@ mod tests {
         tree.node_mut(root)
             .ok_or("node not found")?
             .setup_inputs(&mut bb)?;
-        assert!(tree.execute(root)? == NodeStatus::Running);
+        assert!(tree.execute(root)? == ExecutionStatus::Running);
         time.set(2.0)?;
-        assert!(tree.execute(root)? == NodeStatus::Running);
+        assert!(tree.execute(root)? == ExecutionStatus::Running);
         time.set(6.0)?;
-        assert!(tree.execute(root)? == NodeStatus::Success);
-        assert!(tree.execute(root)? == NodeStatus::Running);
+        assert!(tree.execute(root)? == ExecutionStatus::Success);
+        assert!(tree.execute(root)? == ExecutionStatus::Running);
         time.set(7.0)?;
-        assert!(tree.execute(root)? == NodeStatus::Running);
+        assert!(tree.execute(root)? == ExecutionStatus::Running);
         time.set(10.0)?;
-        assert!(tree.execute(root)? == NodeStatus::Running);
+        assert!(tree.execute(root)? == ExecutionStatus::Running);
         time.set(11.0)?;
-        assert!(tree.execute(root)? == NodeStatus::Success);
-        assert!(tree.execute(root)? == NodeStatus::Running);
+        assert!(tree.execute(root)? == ExecutionStatus::Success);
+        assert!(tree.execute(root)? == ExecutionStatus::Running);
         Ok(())
     }
 }

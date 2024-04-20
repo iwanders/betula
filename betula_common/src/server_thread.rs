@@ -1,17 +1,17 @@
 use crate::{
     control::{
-        BlackboardValues, CommandResult, ExecutionResult, ExecutionStatus, InteractionCommand,
-        InteractionEvent, TreeServer,
+        BlackboardValues, CommandResult, ExecutionResult, InteractionCommand, InteractionEvent,
+        NodeStatus, TreeServer,
     },
     TreeSupport,
 };
-use betula_core::{BetulaError, NodeError, NodeId, NodeStatus, RunContext, Tree};
+use betula_core::{BetulaError, ExecutionStatus, NodeError, NodeId, RunContext, Tree};
 
 use std::cell::RefCell;
 struct TrackedTreeContext<'a, 'b> {
     this_node: NodeId,
     tree: &'a dyn Tree,
-    status: &'b RefCell<Vec<ExecutionStatus>>,
+    status: &'b RefCell<Vec<NodeStatus>>,
 }
 impl RunContext for TrackedTreeContext<'_, '_> {
     fn children(&self) -> usize {
@@ -20,7 +20,7 @@ impl RunContext for TrackedTreeContext<'_, '_> {
             .expect("node must exist in tree")
             .len()
     }
-    fn run(&self, index: usize) -> Result<NodeStatus, NodeError> {
+    fn run(&self, index: usize) -> Result<ExecutionStatus, NodeError> {
         let ids = self.tree.children(self.this_node)?;
         let (v, all) = execute_tracked(self.tree, ids[index])?;
         let mut status = self.status.borrow_mut();
@@ -35,8 +35,8 @@ impl RunContext for TrackedTreeContext<'_, '_> {
 pub fn execute_tracked(
     tree: &dyn Tree,
     id: NodeId,
-) -> Result<(NodeStatus, Vec<ExecutionStatus>), NodeError> {
-    let mut res: RefCell<Vec<ExecutionStatus>> = RefCell::new(vec![]);
+) -> Result<(ExecutionStatus, Vec<NodeStatus>), NodeError> {
+    let mut res: RefCell<Vec<NodeStatus>> = RefCell::new(vec![]);
     let mut n = tree
         .node_ref(id)
         .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
@@ -48,10 +48,10 @@ pub fn execute_tracked(
         status: &mut res,
     };
 
-    let v = n.tick(&mut context)?;
+    let v = n.execute(&mut context)?;
     {
         let mut modifyable = res.borrow_mut();
-        modifyable.push(ExecutionStatus {
+        modifyable.push(NodeStatus {
             node: id,
             status: v,
         });
@@ -68,7 +68,7 @@ fn run_nodes(
     roots: &[betula_core::NodeId],
 ) -> Result<Vec<InteractionEvent>, BetulaError> {
     let mut events = vec![];
-    let mut status: Vec<ExecutionStatus> = vec![];
+    let mut status: Vec<NodeStatus> = vec![];
     for r in roots.iter() {
         match execute_tracked(tree, *r) {
             Ok((_this_node, mut all_nodes)) => {
@@ -180,14 +180,14 @@ mod tests {
         tree.set_children(root, &vec![f1, s1])?;
         let (this_node, all_nodes) = execute_tracked(&*tree, root)?;
         println!("All nodes: {all_nodes:#?}");
-        assert_eq!(this_node, NodeStatus::Success);
+        assert_eq!(this_node, ExecutionStatus::Success);
         assert_eq!(all_nodes.len(), 3);
         assert_eq!(all_nodes[0].node, f1_id);
-        assert_eq!(all_nodes[0].status, NodeStatus::Failure);
+        assert_eq!(all_nodes[0].status, ExecutionStatus::Failure);
         assert_eq!(all_nodes[1].node, s1_id);
-        assert_eq!(all_nodes[1].status, NodeStatus::Success);
+        assert_eq!(all_nodes[1].status, ExecutionStatus::Success);
         assert_eq!(all_nodes[2].node, root_id);
-        assert_eq!(all_nodes[2].status, NodeStatus::Success);
+        assert_eq!(all_nodes[2].status, ExecutionStatus::Success);
         Ok(())
     }
 }

@@ -186,10 +186,10 @@ mod test {
     }
 
     impl Node for DummyNode {
-        fn tick(
+        fn execute(
             &mut self,
             _: &dyn betula_core::RunContext,
-        ) -> Result<betula_core::NodeStatus, BetulaError> {
+        ) -> Result<betula_core::ExecutionStatus, BetulaError> {
             todo!()
         }
 

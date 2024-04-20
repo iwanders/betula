@@ -16,12 +16,12 @@ impl TimeNode {
 }
 
 impl Node for TimeNode {
-    fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         use std::time::{SystemTime, UNIX_EPOCH};
         let start = SystemTime::now();
         let since_the_epoch = start.duration_since(UNIX_EPOCH)?;
         self.time_output.set(since_the_epoch.as_secs_f64())?;
-        Ok(NodeStatus::Success)
+        Ok(ExecutionStatus::Success)
     }
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
         Ok(vec![Port::output::<f64>("time")])

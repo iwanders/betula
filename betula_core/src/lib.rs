@@ -72,12 +72,12 @@ pub mod node_prelude {
         //
         blackboard::{Input, Output, Port},
         prelude::*,
+        ExecutionStatus,
         IsNodeConfig,
         Node,
         //
         NodeConfig,
         NodeError,
-        NodeStatus,
         NodeType,
     };
 }
@@ -98,7 +98,7 @@ use serde::{Deserialize, Serialize};
 
 /// The result states returned by a node.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum NodeStatus {
+pub enum ExecutionStatus {
     Running,
     Failure,
     Success,
@@ -115,7 +115,7 @@ pub trait RunContext {
     fn children(&self) -> usize;
 
     /// Run a child node.
-    fn run(&self, index: usize) -> Result<NodeStatus, NodeError>;
+    fn run(&self, index: usize) -> Result<ExecutionStatus, NodeError>;
 }
 
 /// The error type.
@@ -190,14 +190,14 @@ pub trait Node: std::fmt::Debug + AsAny {
     /// The tick function for each node to perform actions / return status.
     ///
     /// Nodes should either return:
-    ///   - [`NodeStatus::Success`] if their execution successfully completed.
-    ///   - [`NodeStatus::Running`] if they are still performing their action.
-    ///   - [`NodeStatus::Failure`] if they failed to perform their action.
+    ///   - [`ExecutionStatus::Success`] if their execution successfully completed.
+    ///   - [`ExecutionStatus::Running`] if they are still performing their action.
+    ///   - [`ExecutionStatus::Failure`] if they failed to perform their action.
     ///
     ///   If any child node returns [`Err`], this [`Result`] should be returned immediately.
     ///
     /// * `ctx` - The context in which this node is being ran. See [`RunContext`].
-    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError>;
+    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError>;
 
     /// Called for the node to setup its outputs.
     ///
@@ -307,7 +307,7 @@ pub trait Tree: std::fmt::Debug + AsAny {
     fn set_children(&mut self, parent: NodeId, children: &[NodeId]) -> Result<(), BetulaError>;
 
     /// Execute the tick, starting at the provided node.
-    fn execute(&self, id: NodeId) -> Result<NodeStatus, NodeError>;
+    fn execute(&self, id: NodeId) -> Result<ExecutionStatus, NodeError>;
 
     /// Get a list of the blackboard ids.
     fn blackboards(&self) -> Vec<BlackboardId>;

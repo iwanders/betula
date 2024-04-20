@@ -19,11 +19,11 @@ impl EnigoTokenNode {
 }
 
 impl Node for EnigoTokenNode {
-    fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let mut interface = self.input.get()?;
         use enigo::agent::Token;
         interface.execute(&Token::Text("Hello World! ❤️".to_string()))?;
-        Ok(NodeStatus::Success)
+        Ok(ExecutionStatus::Success)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {

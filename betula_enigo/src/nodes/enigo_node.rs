@@ -15,13 +15,13 @@ impl EnigoNode {
 }
 
 impl Node for EnigoNode {
-    fn tick(&mut self, _ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if !self.is_created {
             let v = EnigoRunner::new()?;
             self.output.set(EnigoBlackboard { interface: Some(v) })?;
             self.is_created = true;
         }
-        Ok(NodeStatus::Success)
+        Ok(ExecutionStatus::Success)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {

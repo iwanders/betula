@@ -11,10 +11,10 @@ impl IsNodeConfig for ParallelNodeConfig {}
 /// Node for parallel execution of its children.
 ///
 /// All children are executed, if the number of children returning success
-/// exceeds the `success_threshold`, it returns [`NodeStatus::Success`], if
+/// exceeds the `success_threshold`, it returns [`ExecutionStatus::Success`], if
 /// the success status can no longer be achieved it returns
-/// [`NodeStatus::Failure`],
-/// in other situations it returns [`NodeStatus::Running`].
+/// [`ExecutionStatus::Failure`],
+/// in other situations it returns [`ExecutionStatus::Running`].
 #[derive(Debug, Default)]
 pub struct ParallelNode {
     pub config: ParallelNodeConfig,
@@ -29,15 +29,15 @@ impl ParallelNode {
 }
 
 impl Node for ParallelNode {
-    fn tick(&mut self, ctx: &dyn RunContext) -> Result<NodeStatus, NodeError> {
+    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let mut success_count = 0;
         let mut failure_count = 0;
         let n = ctx.children();
         for id in 0..n {
             match ctx.run(id)? {
-                NodeStatus::Success => success_count += 1,
-                NodeStatus::Failure => failure_count += 1,
-                NodeStatus::Running => {}
+                ExecutionStatus::Success => success_count += 1,
+                ExecutionStatus::Failure => failure_count += 1,
+                ExecutionStatus::Running => {}
             }
         }
 
@@ -48,13 +48,13 @@ impl Node for ParallelNode {
         let failure_threshold = n.saturating_sub(self.config.success_threshold);
         if success_count >= self.config.success_threshold {
             // Required success criteria met.
-            Ok(NodeStatus::Success)
+            Ok(ExecutionStatus::Success)
         } else if failure_count > failure_threshold {
             // Can no longer return success.
-            Ok(NodeStatus::Failure)
+            Ok(ExecutionStatus::Failure)
         } else {
             // Still undecided
-            Ok(NodeStatus::Running)
+            Ok(ExecutionStatus::Running)
         }
     }
 
