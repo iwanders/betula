@@ -173,33 +173,28 @@ impl ViewerNode {
     /// Update the local children list with the bounds and possible new pins.
     #[track_caller]
     fn update_children_local(&mut self) {
+        // println!("Running update local");
         // TODO This function could do with a test...
         let allowed = self
             .ui_node
             .as_ref()
             .map(|n| n.ui_child_range())
             .unwrap_or(0..0);
-        if self.children_local.len() < allowed.start {
-            // ensure lower bound.
-            self.children_local
-                .append(&mut vec![None; allowed.start - self.children_local.len()]);
-        } else {
-            // ensure upper bound.
-            if self.children_local.len() < allowed.end {
-                if self.children_local.is_empty() {
-                    self.children_local.push(None);
-                }
-                if !self.children_local.last().copied().flatten().is_none() {
-                    self.children_local.push(None);
-                }
-                // need to drop entries from the rear if there's two none's
-                if self.children_local.len() > allowed.start && self.children_local.len() > 2 {
-                    let last = self.children_local[self.children_local.len() - 1];
-                    let second_last = self.children_local[self.children_local.len() - 2];
-                    if last.is_none() && second_last.is_none() {
-                        self.children_local.pop();
-                    }
-                }
+
+        if self.children_local.len() < allowed.end {
+            if self.children_local.is_empty() {
+                self.children_local.push(None);
+            }
+            if !self.children_local.last().copied().flatten().is_none() {
+                self.children_local.push(None);
+            }
+        }
+        // need to drop entries from the rear if there's two none's
+        if self.children_local.len() > allowed.start && self.children_local.len() > 2 {
+            let last = self.children_local[self.children_local.len() - 1];
+            let second_last = self.children_local[self.children_local.len() - 2];
+            if last.is_none() && second_last.is_none() {
+                self.children_local.pop();
             }
         }
     }
@@ -227,8 +222,14 @@ impl ViewerNode {
     }
 
     fn pin_to_output(&self, output: &OutPinId) -> Option<usize> {
-        if output.output >= self.children_local.len() {
-            Some(output.output - self.children_local.len())
+        let output_count = self
+            .ui_node
+            .as_ref()
+            .map(|n| n.ui_output_port_count())
+            .unwrap_or(0);
+        // Ports are first, children are remainder.
+        if output.output < output_count {
+            Some(output.output)
         } else {
             None
         }
@@ -2108,10 +2109,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                                 unreachable!("tried to get pin for input beyond range");
                             }
                         } else {
-                            unreachable!("tried to get non input pin {pin:?} on {node:?}");
+                            unreachable!("tried to get non output pin {pin:?} on {node:?}");
                         }
                     } else {
-                        unreachable!("cant show input for pending node {node:?}");
+                        unreachable!("cant show output for pending node {node:?}");
                     }
                 }
             }

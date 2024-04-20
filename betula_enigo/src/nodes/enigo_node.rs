@@ -60,8 +60,8 @@ mod ui_support {
                 UiNodeCategory::Name("enigo".to_owned()),
             ]
         }
-        fn ui_child_range(&self) -> std::ops::Range<usize> {
-            0..0 // todo without this we encounter an unreachable in the ui!
-        }
+        // fn ui_child_range(&self) -> std::ops::Range<usize> {
+        // 0..0 // todo without this we encounter an unreachable in the ui!
+        // }
     }
 }
