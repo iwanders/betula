@@ -4,7 +4,7 @@
 pub mod nodes;
 
 mod ui;
-pub use ui::{UiConfigResponse, UiNode, UiNodeContext, UiSupport, UiValue};
+pub use ui::{UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext, UiSupport, UiValue};
 
 mod viewer;
 pub use viewer::{BetulaViewer, BetulaViewerNode, ViewerNode};
