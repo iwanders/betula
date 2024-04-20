@@ -97,7 +97,7 @@ impl std::cmp::PartialEq for EnigoInterface {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct EnigoBlackboard {
     #[serde(skip)]
     pub interface: Option<EnigoInterface>,
@@ -132,3 +132,39 @@ impl EnigoBlackboard {
         Ok(())
     }
 }
+impl std::fmt::Debug for EnigoBlackboard {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "Enigo")
+    }
+}
+/*
+
+#[cfg(feature = "betula_egui")]
+mod ui_support {
+    use super::*;
+    use betula_egui::{UiNodeCategory, UiConfigResponse, UiNode, UiNodeContext, egui, UiValue};
+    use betula_core::{blackboard::Chalkable, BetulaError};
+
+    impl UiValue for EnigoBlackboard {
+        fn ui(&mut self, _ui: &mut egui::Ui, _scale: f32) -> UiConfigResponse {
+            UiConfigResponse::UnChanged
+        }
+
+        fn value(&self) -> Box<dyn Chalkable> {
+            Box::new(Self::default())
+        }
+        fn set_value(&mut self, value: Box<dyn Chalkable>) -> Result<(), BetulaError>{
+            Ok(())
+        }
+
+        fn value_type(&self) -> String {
+            Self::static_type()
+        }
+
+        fn static_type() -> String {
+            "enigo".to_owned()
+        }
+    }
+}
+
+*/

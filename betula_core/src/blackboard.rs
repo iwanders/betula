@@ -51,6 +51,9 @@ impl PortType {
             type_name: std::any::type_name::<T>(),
         }
     }
+    pub fn type_name(&self) -> &'static str {
+        self.type_name
+    }
 }
 
 impl std::fmt::Debug for PortType {

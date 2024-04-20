@@ -1,11 +1,12 @@
 use betula_common::{
-    tree_support::SerializedBlackboardValues, tree_support::SerializedValue, TreeSupport,
+    tree_support::SerializedBlackboardValues, tree_support::SerializedValue,
+    type_support::DefaultValueRequirements, TreeSupport,
 };
 use egui::Ui;
 use std::collections::HashMap;
 
 use betula_core::{
-    blackboard::{Chalkable, Port, PortDirection, PortName},
+    blackboard::{Chalkable, Port, PortDirection, PortName, PortType},
     BetulaError, Node, NodeType,
 };
 
@@ -120,6 +121,7 @@ type UiValueFactory =
     Box<dyn Fn(&TreeSupport, SerializedValue) -> Result<Box<dyn UiValue>, BetulaError>>;
 pub struct UiValueSupport {
     pub type_id: String,
+    pub display_name: String,
     pub value_factory: UiValueFactory,
 }
 
@@ -276,13 +278,17 @@ impl UiSupport {
         self.add_node_default::<N>();
     }
 
-    pub fn add_value_default<V: betula_common::type_support::DefaultValueRequirements>(&mut self) {
+    pub fn add_value_default_named<V: betula_common::type_support::DefaultValueRequirements>(
+        &mut self,
+        name: &str,
+    ) {
         self.tree.add_value_default::<V>();
         use betula_core::as_any::AsAnyHelper;
-        let name = std::any::type_name::<V>().to_owned();
+        let name = name.to_owned();
         let name_for_closure = name.clone();
         let value_support = UiValueSupport {
-            type_id: name.clone(),
+            type_id: std::any::type_name::<V>().to_owned(),
+            display_name: name.to_owned(),
             value_factory: Box::new(move |tree_support: &TreeSupport, v: SerializedValue| {
                 let z = tree_support.value_deserialize(v.clone())?;
                 if let Some(v) = (*z).downcast_ref::<V>() {
@@ -292,7 +298,18 @@ impl UiSupport {
                 }
             }),
         };
-        self.ui_value.insert(name, value_support);
+        self.ui_value
+            .insert(std::any::type_name::<V>().to_owned(), value_support);
+    }
+
+    pub fn add_value_default<V: betula_common::type_support::DefaultValueRequirements>(&mut self) {
+        self.add_value_default_named::<V>(std::any::type_name::<V>());
+    }
+
+    pub fn add_value_custom<V: DefaultValueRequirements>(&mut self, value_support: UiValueSupport) {
+        self.tree.add_value_default::<V>();
+        self.ui_value
+            .insert(std::any::type_name::<V>().to_owned(), value_support);
     }
 
     /*
@@ -321,7 +338,7 @@ impl UiSupport {
         if let Some(node_support) = self.node_support(node_type) {
             Ok((node_support.node_factory)())
         } else {
-            Err("no ui node support for {node_type:?}".into())
+            Err(format!("no ui node support for {node_type:?}").into())
         }
     }
 
@@ -330,7 +347,7 @@ impl UiSupport {
         if let Some(value_support) = self.value_support(&value_type) {
             Ok((value_support.value_factory)(&self.tree, value)?)
         } else {
-            Err("no ui value support for {value_type:?}".into())
+            Err(format!("no ui value support for {value_type:?}").into())
         }
     }
 
@@ -343,5 +360,13 @@ impl UiSupport {
             res.insert(k.clone(), self.create_ui_value(v.clone())?);
         }
         Ok(res)
+    }
+
+    pub fn port_display_name(&self, port_type: &PortType) -> String {
+        if let Some(value_support) = self.value_support(port_type.type_name()) {
+            value_support.display_name.clone()
+        } else {
+            format!("{port_type:?}")
+        }
     }
 }

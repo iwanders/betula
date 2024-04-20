@@ -22,7 +22,7 @@ fn create_ui_support() -> UiSupport {
         }));
     ui_support.add_node_default::<betula_common::nodes::TimeNode>();
     ui_support.add_value_default::<f64>();
-    ui_support.add_value_default::<betula_enigo::EnigoBlackboard>();
+    ui_support.add_value_default_named::<betula_enigo::EnigoBlackboard>("Enigo");
     ui_support
 }
 

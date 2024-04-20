@@ -2099,11 +2099,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     if let Some(ui_node) = &node.ui_node {
                         if let Some(input_port) = node.pin_to_output(&pin.id) {
                             if let Some(port) = ui_node.ui_output_port(input_port) {
-                                ui.label(format!(
-                                    "{:} [{:?}]",
-                                    port.name().as_ref(),
-                                    port.port_type()
-                                ));
+                                // get the pretty ui name...
+                                let display_name =
+                                    self.ui_support.port_display_name(&port.port_type());
+                                ui.label(format!("{:} [{:}]", port.name().as_ref(), display_name));
                                 PinInfo::triangle().with_fill(BLACKBOARD_COLOR)
                             } else {
                                 unreachable!("tried to get pin for input beyond range");
@@ -2171,11 +2170,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     if let Some(ui_node) = &node.ui_node {
                         if let Some(input_port) = node.pin_to_input(&pin.id) {
                             if let Some(port) = ui_node.ui_input_port(input_port) {
-                                ui.label(format!(
-                                    "{:} [{:?}]",
-                                    port.name().as_ref(),
-                                    port.port_type()
-                                ));
+                                let display_name =
+                                    self.ui_support.port_display_name(&port.port_type());
+                                ui.label(format!("{:} [{:}]", port.name().as_ref(), display_name));
                                 PinInfo::triangle().with_fill(BLACKBOARD_COLOR)
                             } else {
                                 unreachable!("tried to get pin for input beyond range");
