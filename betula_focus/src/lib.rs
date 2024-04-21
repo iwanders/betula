@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub type WindowFocusError = Box<dyn std::error::Error + Send + Sync + 'static >;
+pub type WindowFocusError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[cfg(target_os = "linux")]
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
