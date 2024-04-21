@@ -8,12 +8,9 @@ pub type CacheKey = std::ffi::c_ulong;
 // https://github.com/david-cattermole/timetracker/blob/2591383f45667e7be0378c7abffcad62c3a914aa/recorder-bin/src/linux_x11.rs
 // MIT license, so large parts copied.
 
-use x11_dl::{
-    keysym,
-    xlib::{self, Xlib, _XDisplay},
-};
+use x11_dl::xlib::{self, Xlib, _XDisplay};
 
-use std::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
+use std::ffi::{c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 use std::sync::Mutex;
 
 pub type ProcessID = c_uint;
@@ -58,7 +55,7 @@ impl Handler {
         unsafe {
             let mut window: std::ffi::c_ulong = 0;
             let mut ret: std::ffi::c_int = 0;
-            let z = (self.instance.XGetInputFocus)(self.display, &mut window, &mut ret);
+            (self.instance.XGetInputFocus)(self.display, &mut window, &mut ret);
             Ok(window)
         }
     }
@@ -233,7 +230,7 @@ impl X11FocusHandler {
 
     pub fn process_id(&self) -> Result<u32, WindowFocusError> {
         self.setup()?;
-        let mut locked = self
+        let locked = self
             .handle
             .lock()
             .map_err(|_| format!("failed to lock mutex"))?;
@@ -245,7 +242,7 @@ impl X11FocusHandler {
 
     pub fn cache_key(&self) -> Result<CacheKey, WindowFocusError> {
         self.setup()?;
-        let mut locked = self
+        let locked = self
             .handle
             .lock()
             .map_err(|_| format!("failed to lock mutex"))?;
@@ -257,7 +254,7 @@ impl X11FocusHandler {
 
     pub fn cache(&self) -> Result<(CacheKey, String), WindowFocusError> {
         self.setup()?;
-        let mut locked = self
+        let locked = self
             .handle
             .lock()
             .map_err(|_| format!("failed to lock mutex"))?;

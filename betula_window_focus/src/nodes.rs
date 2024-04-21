@@ -24,7 +24,7 @@ impl WindowFocusNode {
 }
 
 impl Node for WindowFocusNode {
-    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let name = self.focus.process_name()?;
         for re in &self.matches {
             if re.is_match(&name) {
@@ -63,7 +63,7 @@ pub mod ui_support {
 
     impl UiNode for WindowFocusNode {
         fn ui_title(&self) -> String {
-            "focus 🔍".to_owned()
+            "window_focus 🗖".to_owned()
         }
 
         fn ui_config(
@@ -89,10 +89,12 @@ pub mod ui_support {
                     }
                 });
                 ui.vertical(|ui| {
-                    for (i, t) in self.config.matches.iter_mut().enumerate() {
+                    for t in self.config.matches.iter_mut() {
                         let text = "regex";
                         let response = ui.add(
-                            egui::TextEdit::singleline(t).hint_text(text), //.min_size(egui::vec2(100.0 * scale, 0.0)),
+                            egui::TextEdit::singleline(t)
+                                .hint_text(text)
+                                .min_size(egui::vec2(100.0 * scale, 0.0)),
                         );
                         if response.on_hover_text(text).changed() {
                             ui_response = UiConfigResponse::Changed;
@@ -110,7 +112,7 @@ pub mod ui_support {
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
                 UiNodeCategory::Folder("leaf".to_owned()),
-                UiNodeCategory::Name("focus".to_owned()),
+                UiNodeCategory::Name("window_focus".to_owned()),
             ]
         }
     }

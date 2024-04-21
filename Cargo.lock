@@ -551,8 +551,8 @@ dependencies = [
  "betula_core",
  "betula_egui",
  "betula_enigo",
- "betula_focus",
  "betula_std",
+ "betula_window_focus",
  "eframe",
  "egui",
 ]
@@ -585,7 +585,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "betula_focus"
+name = "betula_std"
+version = "0.0.1"
+dependencies = [
+ "betula_core",
+ "betula_egui",
+ "serde",
+ "uuid",
+]
+
+[[package]]
+name = "betula_window_focus"
 version = "0.0.1"
 dependencies = [
  "betula_core",
@@ -594,16 +604,6 @@ dependencies = [
  "serde",
  "windows 0.56.0",
  "x11-dl",
-]
-
-[[package]]
-name = "betula_std"
-version = "0.0.1"
-dependencies = [
- "betula_core",
- "betula_egui",
- "serde",
- "uuid",
 ]
 
 [[package]]

@@ -12,7 +12,7 @@ fn create_ui_support() -> UiSupport {
         }));
     betula_enigo::add_ui_support(&mut ui_support);
     betula_std::add_ui_support(&mut ui_support);
-    betula_focus::add_ui_support(&mut ui_support);
+    betula_window_focus::add_ui_support(&mut ui_support);
     ui_support
 }
 

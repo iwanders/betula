@@ -50,7 +50,11 @@ pub fn main_test() {
 
     loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
-
+        {
+            let pid = helper.raw_process_id().unwrap();
+            let name = helper.raw_process_name(pid).unwrap();
+            println!("{pid} -> {name}");
+        }
         if let Ok(n) = helper.process_name() {
             println!("{n}");
         }

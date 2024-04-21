@@ -8,7 +8,7 @@ members = [
     "betula_enigo",
     "betula_std",
     "betula_demo",
-    "betula_focus",
+    "betula_window_focus",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html
@@ -27,4 +27,4 @@ betula_common = { version = "0.0.1", path = "betula_common", default-features = 
 betula_enigo = { version = "0.0.1", path = "betula_enigo", default-features = false }
 betula_std = { version = "0.0.1", path = "betula_std", default-features = false }
 betula_demo = { version = "0.0.1", path = "betula_demo", default-features = false }
-betula_focus = { version = "0.0.1", path = "betula_focus", default-features = false }
+betula_window_focus = { version = "0.0.1", path = "betula_window_focus", default-features = false }
