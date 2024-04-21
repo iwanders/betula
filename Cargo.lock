@@ -591,6 +591,7 @@ dependencies = [
  "betula_egui",
  "serde",
  "windows 0.56.0",
+ "x11-dl",
 ]
 
 [[package]]

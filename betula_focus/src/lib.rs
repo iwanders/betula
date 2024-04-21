@@ -12,6 +12,7 @@ mod backend;
 
 #[derive(Debug, Default)]
 struct WindowFocus {
+    backend: backend::BackendType,
     cache: Option<(u32, String)>,
 }
 impl WindowFocus {
@@ -20,15 +21,15 @@ impl WindowFocus {
     }
 
     pub fn raw_focussed_process_id(&self) -> Result<u32, WindowFocusError> {
-        backend::BackendType::focussed_process_id()
+        self.backend.focussed_process_id()
     }
 
     pub fn raw_process_name(&self, pid: u32) -> Result<String, WindowFocusError> {
-        backend::BackendType::process_name(pid)
+        self.backend.process_name(pid)
     }
 
     pub fn process_name(&mut self) -> Result<String, WindowFocusError> {
-        let id = backend::BackendType::focussed_process_id()?;
+        let id = self.backend.focussed_process_id()?;
         if let Some((cached_id, cached_name)) = self.cache.as_ref() {
             if *cached_id == id {
                 return Ok(cached_name.clone());

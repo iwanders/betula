@@ -18,7 +18,7 @@ pub type BackendType = WindowsFocusHandler;
 pub struct WindowsFocusHandler {}
 impl WindowsFocusHandler {
     // This doesn't actually get us any more than the direct process id from the handle.
-    pub fn get_process_ids() -> Result<Vec<u32>, WindowFocusError> {
+    pub fn get_process_ids(&self) -> Result<Vec<u32>, WindowFocusError> {
         unsafe {
             // EnumProcesses returns how many bytes it wrote :/
             const MAX_PROCESS_COUNT: usize = 4096;
@@ -36,7 +36,7 @@ impl WindowsFocusHandler {
         }
     }
 
-    pub fn process_name(pid: u32) -> Result<String, WindowFocusError> {
+    pub fn process_name(&self, pid: u32) -> Result<String, WindowFocusError> {
         let h_process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)? };
         if h_process == HANDLE(0) {
             return Err(format!("failed to open process with pid {pid}").into());
@@ -52,7 +52,7 @@ impl WindowsFocusHandler {
         }
     }
 
-    pub fn focussed_process_id() -> Result<u32, WindowFocusError> {
+    pub fn focussed_process_id(&self) -> Result<u32, WindowFocusError> {
         unsafe {
             let fg: HWND = GetForegroundWindow();
             let mut out: DWORD = 0;
