@@ -235,7 +235,7 @@ mod ui_support {
 
     impl UiNode for EnigoNode {
         fn ui_title(&self) -> String {
-            "enigo_token 🖱🖮 ".to_owned()
+            "enigo 🖱🖮 ".to_owned()
         }
 
         fn ui_config(

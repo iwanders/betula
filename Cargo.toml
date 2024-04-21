@@ -6,6 +6,7 @@ members = [
     "betula_common",
     "betula_egui",
     "betula_enigo",
+    "betula_global_hotkey",
     "betula_std",
     "betula_demo",
     "betula_window_focus",
@@ -26,5 +27,6 @@ betula_egui = { version = "0.0.1", path = "betula_egui", default-features = fals
 betula_common = { version = "0.0.1", path = "betula_common", default-features = false }
 betula_enigo = { version = "0.0.1", path = "betula_enigo", default-features = false }
 betula_std = { version = "0.0.1", path = "betula_std", default-features = false }
+betula_global_hotkey = { version = "0.0.1", path = "betula_global_hotkey", default-features = false }
 betula_demo = { version = "0.0.1", path = "betula_demo", default-features = false }
 betula_window_focus = { version = "0.0.1", path = "betula_window_focus", default-features = false }
