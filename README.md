@@ -8,7 +8,7 @@ It is created with the goal of automating a computer game, but the library itsel
 
 # Crates
 
-Brief overview of the crates in this workspace.
+Overview of the crates in this workspace. Crates with nodes provide the `UiNode` implementaiton if the `betula_egui` feature is enabled.
 
 ## betula_core
 - Holds the traits for `Node` and `Tree`.
@@ -34,9 +34,7 @@ Main components:
 - Application that instantiates an editor with all nodes that exist in the workspace.
 
 ## betula_std
-A collection of standard nodes.
-
-This crate provides both the `Node` as well as the `UiNode` if the `betula_egui` feature is enabled.
+A collection of standard nodes, that don't have any additional dependencies.
 
 #### Nodes
   - `TimeNode`: Write the unix time to a blackboard as `f64`.
@@ -54,15 +52,17 @@ Decorators:
 
 
 ## betula_enigo
-Betula node for [enigo](https://github.com/enigo-rs/enigo): `Cross platform input simulation in Rust`.
-This crate provides both the `Node` as well as the `UiNode` if the `betula_egui` feature is enabled.
+Betula nodes for [enigo](https://github.com/enigo-rs/enigo): `Cross platform input simulation in Rust`.
 
 #### Nodes:
   - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
   - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
 
+## betula_window_focus
+Provides a node that checks if the window that has the current focus is the desired one, works on X11 and Windows.
 
-
+#### Nodes:
+  - `WindowFocusNode`: Returns `Success` if the regex matches the binary that created the window that has focus.
 
 
 
