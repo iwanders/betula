@@ -13,18 +13,20 @@ use crate::WindowFocusError;
 type DWORD = u32;
 
 pub type BackendType = WindowsFocusHandler;
+pub type CacheKey = u32;
 
 #[derive(Default, Debug)]
 pub struct WindowsFocusHandler {}
 impl WindowsFocusHandler {
     // This doesn't actually get us any more than the direct process id from the handle.
-    pub fn get_process_ids(&self) -> Result<Vec<u32>, WindowFocusError> {
+    #[allow(dead_code)]
+    fn get_process_ids(&self) -> Result<Vec<u32>, WindowFocusError> {
         unsafe {
             // EnumProcesses returns how many bytes it wrote :/
             const MAX_PROCESS_COUNT: usize = 4096;
             let mut bytes_written: u32 = 0;
             let mut buffer: Vec<u32> = Vec::with_capacity(MAX_PROCESS_COUNT);
-            let result = EnumProcesses(
+            EnumProcesses(
                 buffer.as_mut_ptr(),
                 (MAX_PROCESS_COUNT * std::mem::size_of::<u32>()) as u32,
                 &mut bytes_written,
@@ -52,12 +54,22 @@ impl WindowsFocusHandler {
         }
     }
 
-    pub fn focussed_process_id(&self) -> Result<u32, WindowFocusError> {
+    pub fn process_id(&self) -> Result<u32, WindowFocusError> {
         unsafe {
             let fg: HWND = GetForegroundWindow();
             let mut out: DWORD = 0;
             GetWindowThreadProcessId(fg, Some(&mut out));
             Ok(out)
         }
+    }
+
+    pub fn cache_key(&self) -> Result<CacheKey, WindowFocusError> {
+        Ok(self.process_id()?)
+    }
+
+    pub fn cache(&self) -> Result<(CacheKey, String), WindowFocusError> {
+        let key = self.process_id()?;
+        let name = self.process_name(key)?;
+        return Ok((key, name));
     }
 }
