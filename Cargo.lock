@@ -551,6 +551,7 @@ dependencies = [
  "betula_core",
  "betula_egui",
  "betula_enigo",
+ "betula_focus",
  "betula_std",
  "eframe",
  "egui",
@@ -589,6 +590,7 @@ version = "0.0.1"
 dependencies = [
  "betula_core",
  "betula_egui",
+ "regex",
  "serde",
  "windows 0.56.0",
  "x11-dl",

@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-
 pub type WindowFocusError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+pub mod nodes;
 
 #[cfg(target_os = "linux")]
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
@@ -20,11 +20,11 @@ impl WindowFocus {
         Self::default()
     }
 
-    pub fn raw_process_id(&self) -> Result<u32, WindowFocusError> {
+    fn raw_process_id(&self) -> Result<u32, WindowFocusError> {
         self.backend.process_id()
     }
 
-    pub fn raw_process_name(&self, pid: u32) -> Result<String, WindowFocusError> {
+    fn raw_process_name(&self, pid: u32) -> Result<String, WindowFocusError> {
         self.backend.process_name(pid)
     }
 
@@ -55,4 +55,11 @@ pub fn main_test() {
             println!("{n}");
         }
     }
+}
+
+/// Register enigo nodes to the ui support.
+#[cfg(feature = "betula_egui")]
+pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
+    ui_support
+        .add_node_default_with_config::<nodes::WindowFocusNode, nodes::WindowFocusNodeConfig>();
 }
