@@ -1595,8 +1595,7 @@ dependencies = [
 [[package]]
 name = "global-hotkey"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b0d37e95d3937251ee2019709389bb793c1237f16d45fc0fe7b2464b5f97c68"
+source = "git+https://github.com/iwanders/tauri-global-hotkey?rev=e8c2d5a35e1b2e963ca6e271091eb4c207bbacd4#e8c2d5a35e1b2e963ca6e271091eb4c207bbacd4"
 dependencies = [
  "crossbeam-channel",
  "keyboard-types",
