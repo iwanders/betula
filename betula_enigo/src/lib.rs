@@ -122,15 +122,6 @@ impl EnigoBlackboard {
         interface.sender.send(EnigoTask::Tokens(tokens.to_vec()))?;
         Ok(())
     }
-    pub fn set_delay(&self, delay: u32) -> Result<(), betula_core::BetulaError> {
-        let interface = self
-            .interface
-            .as_ref()
-            .ok_or(format!("no interface present in value"))?;
-        let mut locked = interface.enigo.lock().expect("should not be poisoned");
-        locked.set_delay(delay);
-        Ok(())
-    }
 }
 impl std::fmt::Debug for EnigoBlackboard {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -141,8 +132,7 @@ impl std::fmt::Debug for EnigoBlackboard {
 /// Register enigo nodes to the ui support.
 #[cfg(feature = "betula_egui")]
 pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
-    ui_support
-        .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
+    ui_support.add_node_default::<nodes::EnigoInstanceNode>();
     ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
     ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
 }
