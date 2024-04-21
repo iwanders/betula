@@ -15,6 +15,8 @@ pub struct WindowFocusNode {
     pub config: WindowFocusNodeConfig,
     focus: WindowFocus,
     matches: Vec<Regex>,
+
+    regex_editor: Option<(usize, String)>,
 }
 
 impl WindowFocusNode {
@@ -83,21 +85,55 @@ pub mod ui_support {
                     }
                     if ui.add(egui::Button::new("➖")).clicked() {
                         if !self.config.matches.is_empty() {
-                            self.config.matches.truncate(self.config.matches.len() - 1);
+                            let new_length = self.config.matches.len() - 1;
+                            self.config.matches.truncate(new_length);
+
+                            if let Some(edit_i) = self.regex_editor.as_ref().map(|z| z.0) {
+                                if edit_i >= new_length {
+                                    self.regex_editor = None;
+                                }
+                            }
                             ui_response = UiConfigResponse::Changed;
                         }
                     }
                 });
                 ui.vertical(|ui| {
-                    for t in self.config.matches.iter_mut() {
-                        let text = "regex";
-                        let response = ui.add(
-                            egui::TextEdit::singleline(t)
-                                .hint_text(text)
-                                .min_size(egui::vec2(100.0 * scale, 0.0)),
-                        );
-                        if response.on_hover_text(text).changed() {
-                            ui_response = UiConfigResponse::Changed;
+                    let edit_i = self.regex_editor.as_ref().map(|z| z.0);
+                    for (i, t) in self.config.matches.iter_mut().enumerate() {
+                        if edit_i == Some(i) {
+                            if let Some((_i, ref mut edit_t)) = self.regex_editor.as_mut() {
+                                let is_valid = Regex::new(&edit_t).is_ok();
+                                let text_color = if is_valid {
+                                    None
+                                } else {
+                                    Some(egui::Color32::RED)
+                                };
+                                let hint_text = "regex";
+                                let response = ui.add(
+                                    egui::TextEdit::singleline(edit_t)
+                                        .hint_text(hint_text)
+                                        .min_size(egui::vec2(100.0 * scale, 0.0))
+                                        .text_color_opt(text_color),
+                                );
+                                if response.lost_focus() {
+                                    if is_valid {
+                                        ui_response = UiConfigResponse::Changed;
+                                        *t = edit_t.clone();
+                                        self.regex_editor = None;
+                                    }
+                                }
+                            }
+                        } else {
+                            let r = ui.add(
+                                egui::Label::new(format!(
+                                    "{}",
+                                    if t.is_empty() { "/regex/" } else { &t }
+                                ))
+                                .wrap(false),
+                            );
+                            if r.clicked() {
+                                self.regex_editor = Some((i, t.to_owned()));
+                            }
                         }
                     }
                 });
