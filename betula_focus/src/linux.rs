@@ -147,6 +147,7 @@ impl Handler {
                     &mut child_count,
                 )
             };
+
             unsafe {
                 (self.instance.XSetErrorHandler)(None);
             }
@@ -161,12 +162,15 @@ impl Handler {
                 }
             }
 
-            if status == (xlib::Success as i32) {
+            // https://docs.rs/x11-dl/2.21.0/x11_dl/xlib/constant.Success.html
+            // pub const Success: c_uchar = 0;
+            // Yet docs for XQueryTree state:
+            // XQueryTree() returns zero if it fails and nonzero if it succeeds
+            if status != 0 {
                 unsafe {
                     (self.instance.XFree)(child_window_ids as *mut c_void);
                 };
             }
-
             // let num_properties = list_window_properties(display_ptr, window_id);
             process_id = self.get_process_id_from_window_id(window_id, property_id);
             if process_id > 0 {

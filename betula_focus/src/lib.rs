@@ -46,6 +46,7 @@ impl WindowFocus {
 
 pub fn main_test() {
     let mut helper = WindowFocus::new();
+
     loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
 
