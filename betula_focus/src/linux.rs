@@ -1,5 +1,6 @@
 use crate::WindowFocusError;
 pub type BackendType = X11FocusHandler;
+pub type CacheKey = std::ffi::c_ulong;
 
 // Okay so this is kinda tricky and requires traversing things;
 // https://stackoverflow.com/q/151407
@@ -58,7 +59,6 @@ impl Handler {
             let mut window: std::ffi::c_ulong = 0;
             let mut ret: std::ffi::c_int = 0;
             let z = (self.instance.XGetInputFocus)(self.display, &mut window, &mut ret);
-            println!("window: {window:?}, ret: {ret:?}");
             Ok(window)
         }
     }
@@ -181,11 +181,16 @@ impl Handler {
         process_id
     }
 
-    fn focussed_process_id(&self) -> Result<u32, WindowFocusError> {
+    fn focussed_window_pid(&self) -> Result<(CacheKey, u32), WindowFocusError> {
         let window_id = self.get_window_id_with_focus()?;
         let property_id = self.get_process_id_property_id()?;
         let process_id = self.get_process_id_from_window_tree(window_id, property_id);
-        Ok(process_id)
+        Ok((window_id, process_id))
+    }
+
+    fn focussed_window_id(&self) -> Result<CacheKey, WindowFocusError> {
+        let window_id = self.get_window_id_with_focus()?;
+        Ok(window_id)
     }
 }
 
@@ -218,10 +223,6 @@ impl X11FocusHandler {
         Ok(())
     }
 
-    pub fn get_process_ids(&self) -> Result<Vec<u32>, WindowFocusError> {
-        todo!()
-    }
-
     pub fn process_name(&self, pid: u32) -> Result<String, WindowFocusError> {
         let path = std::fs::read_link(format!("/proc/{pid}/exe"))?;
         Ok(path
@@ -230,14 +231,39 @@ impl X11FocusHandler {
             .map_err(|e| format!("failed to convert link to string {e:?}"))?)
     }
 
-    pub fn focussed_process_id(&self) -> Result<u32, WindowFocusError> {
+    pub fn process_id(&self) -> Result<u32, WindowFocusError> {
         self.setup()?;
         let mut locked = self
             .handle
             .lock()
             .map_err(|_| format!("failed to lock mutex"))?;
         if let Some(v) = locked.as_ref() {
-            return v.focussed_process_id();
+            return Ok(v.focussed_window_pid()?.1);
+        }
+        Err("failed to obtain focussed process id".into())
+    }
+
+    pub fn cache_key(&self) -> Result<CacheKey, WindowFocusError> {
+        self.setup()?;
+        let mut locked = self
+            .handle
+            .lock()
+            .map_err(|_| format!("failed to lock mutex"))?;
+        if let Some(v) = locked.as_ref() {
+            return v.focussed_window_id();
+        }
+        Err("failed to obtain focussed process id".into())
+    }
+
+    pub fn cache(&self) -> Result<(CacheKey, String), WindowFocusError> {
+        self.setup()?;
+        let mut locked = self
+            .handle
+            .lock()
+            .map_err(|_| format!("failed to lock mutex"))?;
+        if let Some(v) = locked.as_ref() {
+            let (cache_key, pid) = v.focussed_window_pid()?;
+            return Ok((cache_key, self.process_name(pid)?));
         }
         Err("failed to obtain focussed process id".into())
     }
