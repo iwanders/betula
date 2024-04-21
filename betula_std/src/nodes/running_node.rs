@@ -1,5 +1,5 @@
-use crate::prelude::*;
-use crate::{ExecutionStatus, Node, NodeError, NodeType};
+use betula_core::prelude::*;
+use betula_core::{ExecutionStatus, Node, NodeError, NodeType};
 
 /// Node that always returns [`ExecutionStatus::Running`].
 ///
@@ -27,5 +27,28 @@ impl Node for RunningNode {
 
     fn node_type(&self) -> NodeType {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "betula_egui")]
+pub mod ui_support {
+    use super::*;
+    use betula_egui::{UiNode, UiNodeCategory};
+
+    impl UiNode for RunningNode {
+        fn ui_title(&self) -> String {
+            "running 🔃".to_owned()
+        }
+
+        fn ui_category() -> Vec<UiNodeCategory> {
+            vec![
+                UiNodeCategory::Folder("decorator".to_owned()),
+                UiNodeCategory::Group("core".to_owned()),
+                UiNodeCategory::Name("running".to_owned()),
+            ]
+        }
+        fn ui_child_range(&self) -> std::ops::Range<usize> {
+            0..1
+        }
     }
 }

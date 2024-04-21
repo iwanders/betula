@@ -15,13 +15,3 @@ pub fn betula_icon() -> egui::IconData {
 
 pub mod widgets;
 pub use egui;
-pub mod core;
-
-/// Register core nodes to the ui support.
-pub fn add_ui_support(ui_support: &mut UiSupport) {
-    ui_support.add_node_default::<betula_core::nodes::SequenceNode>();
-    ui_support.add_node_default::<betula_core::nodes::SelectorNode>();
-    ui_support.add_node_default::<betula_core::nodes::FailureNode>();
-    ui_support.add_node_default::<betula_core::nodes::SuccessNode>();
-    ui_support.add_node_default::<betula_core::nodes::RunningNode>();
-}

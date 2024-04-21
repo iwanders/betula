@@ -515,8 +515,8 @@ impl<'a, 'b> serde::Serialize for TreeSerializer<'a, 'b> {
 mod test {
     use super::*;
     use betula_core::basic::{BasicBlackboard, BasicTree};
-    use betula_core::nodes::{FailureNode, SelectorNode, SuccessNode};
     use betula_core::{as_any::AsAnyHelper, BlackboardId, NodeId};
+    use betula_std::nodes::{FailureNode, SelectorNode, SuccessNode};
     use uuid::Uuid;
     #[test]
     fn test_config() -> Result<(), BetulaError> {
@@ -536,10 +536,10 @@ mod test {
     #[test]
     fn test_tree() -> Result<(), BetulaError> {
         let mut tree_support = TreeSupport::new();
-        tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
-        tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
-        tree_support.add_node_default::<betula_core::nodes::FailureNode>();
-        tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        tree_support.add_node_default::<betula_std::nodes::SequenceNode>();
+        tree_support.add_node_default::<betula_std::nodes::SelectorNode>();
+        tree_support.add_node_default::<betula_std::nodes::FailureNode>();
+        tree_support.add_node_default::<betula_std::nodes::SuccessNode>();
         tree_support
             .add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
             );
@@ -576,10 +576,10 @@ mod test {
     #[test]
     fn test_with_blackboard() -> Result<(), BetulaError> {
         let mut tree_support = TreeSupport::new();
-        tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
-        tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
-        tree_support.add_node_default::<betula_core::nodes::FailureNode>();
-        tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
+        tree_support.add_node_default::<betula_std::nodes::SequenceNode>();
+        tree_support.add_node_default::<betula_std::nodes::SelectorNode>();
+        tree_support.add_node_default::<betula_std::nodes::FailureNode>();
+        tree_support.add_node_default::<betula_std::nodes::SuccessNode>();
         tree_support
             .add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
             );
@@ -589,7 +589,7 @@ mod test {
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(
             NodeId(Uuid::new_v4()),
-            Box::new(betula_core::nodes::SequenceNode {}),
+            Box::new(betula_std::nodes::SequenceNode {}),
         )?;
         let time_node = tree.add_node_boxed(
             NodeId(Uuid::new_v4()),

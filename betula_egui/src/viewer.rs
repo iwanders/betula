@@ -2462,10 +2462,10 @@ mod test {
 
             let mut tree = BasicTree::new();
             let mut tree_support = TreeSupport::new();
-            tree_support.add_node_default::<betula_core::nodes::SequenceNode>();
-            tree_support.add_node_default::<betula_core::nodes::SelectorNode>();
-            tree_support.add_node_default::<betula_core::nodes::FailureNode>();
-            tree_support.add_node_default::<betula_core::nodes::SuccessNode>();
+            tree_support.add_node_default::<betula_std::nodes::SequenceNode>();
+            tree_support.add_node_default::<betula_std::nodes::SelectorNode>();
+            tree_support.add_node_default::<betula_std::nodes::FailureNode>();
+            tree_support.add_node_default::<betula_std::nodes::SuccessNode>();
             tree_support.add_node_default_with_config::<betula_std::nodes::DelayNode, betula_std::nodes::DelayNodeConfig>(
                 );
             tree_support.add_node_default::<betula_std::nodes::TimeNode>();

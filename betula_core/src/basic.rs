@@ -644,30 +644,7 @@ impl Blackboard for BasicBlackboard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::*;
-
-    #[test]
-    fn sequence_fail() -> Result<(), NodeError> {
-        let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
-        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
-        tree.set_children(root, &vec![f1])?;
-        let res = tree.execute(root)?;
-        assert_eq!(res, ExecutionStatus::Failure);
-        Ok(())
-    }
-
-    #[test]
-    fn fallback_success() -> Result<(), NodeError> {
-        let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SelectorNode {}))?;
-        let f1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(FailureNode {}))?;
-        let s1 = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SuccessNode {}))?;
-        tree.set_children(root, &vec![f1, s1])?;
-        let res = tree.execute(root)?;
-        assert_eq!(res, ExecutionStatus::Success);
-        Ok(())
-    }
+    use crate::Node;
 
     #[test]
     fn blackboard_output() {
@@ -775,11 +752,36 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    pub struct DummyParallelNode {}
+    impl Node for DummyParallelNode {
+        fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+            for id in 0..ctx.children() {
+                ctx.run(id)?;
+            }
+            Ok(ExecutionStatus::Success)
+        }
+
+        fn static_type() -> NodeType
+        where
+            Self: Sized,
+        {
+            "sequence".into()
+        }
+
+        fn node_type(&self) -> NodeType {
+            Self::static_type()
+        }
+    }
+
     #[test]
     fn test_input_output() -> Result<(), NodeError> {
         // use crate::blackboard::Chalkable;
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
-        let root = tree.add_node_boxed(NodeId(crate::Uuid::new_v4()), Box::new(SequenceNode {}))?;
+        let root = tree.add_node_boxed(
+            NodeId(crate::Uuid::new_v4()),
+            Box::new(DummyParallelNode {}),
+        )?;
         let o1 = tree.add_node_boxed(
             NodeId(crate::Uuid::new_v4()),
             Box::new(OutputNode::default()),

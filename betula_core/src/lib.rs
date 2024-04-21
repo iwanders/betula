@@ -56,7 +56,6 @@ On blackboards:
 
 pub mod basic;
 pub mod blackboard;
-pub mod nodes;
 
 /// Prelude with only traits.
 pub mod prelude {

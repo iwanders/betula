@@ -1,5 +1,5 @@
-use crate::prelude::*;
-use crate::{ExecutionStatus, Node, NodeError, NodeType};
+use betula_core::prelude::*;
+use betula_core::{ExecutionStatus, Node, NodeError, NodeType};
 
 /// Node that always returns [`ExecutionStatus::Failure`].
 ///
@@ -26,5 +26,28 @@ impl Node for FailureNode {
 
     fn node_type(&self) -> NodeType {
         Self::static_type()
+    }
+}
+
+#[cfg(feature = "betula_egui")]
+pub mod ui_support {
+    use super::*;
+    use betula_egui::{UiNode, UiNodeCategory};
+
+    impl UiNode for FailureNode {
+        fn ui_title(&self) -> String {
+            "failure ❌".to_owned()
+        }
+
+        fn ui_category() -> Vec<UiNodeCategory> {
+            vec![
+                UiNodeCategory::Folder("decorator".to_owned()),
+                UiNodeCategory::Group("core".to_owned()),
+                UiNodeCategory::Name("failure".to_owned()),
+            ]
+        }
+        fn ui_child_range(&self) -> std::ops::Range<usize> {
+            0..1
+        }
     }
 }

@@ -10,7 +10,6 @@ fn create_ui_support() -> UiSupport {
         .set_blackboard_factory(Box::new(|| {
             Box::new(betula_core::basic::BasicBlackboard::default())
         }));
-    betula_egui::add_ui_support(&mut ui_support);
     betula_enigo::add_ui_support(&mut ui_support);
     betula_std::add_ui_support(&mut ui_support);
     ui_support

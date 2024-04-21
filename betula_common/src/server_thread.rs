@@ -164,7 +164,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 mod tests {
     use super::*;
     use betula_core::basic::BasicTree;
-    use betula_core::nodes::*;
+    use betula_std::nodes::*;
     use uuid::Uuid;
 
     #[test]

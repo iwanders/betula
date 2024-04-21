@@ -538,6 +538,7 @@ dependencies = [
 name = "betula_core"
 version = "0.0.1"
 dependencies = [
+ "betula_std",
  "serde",
  "uuid",
 ]
