@@ -584,6 +584,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "betula_hotkey"
+version = "0.0.1"
+dependencies = [
+ "betula_core",
+ "betula_egui",
+ "serde",
+ "x11-dl",
+]
+
+[[package]]
 name = "betula_std"
 version = "0.0.1"
 dependencies = [

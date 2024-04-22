@@ -1,6 +1,16 @@
 use betula_core::BetulaError;
 pub mod nodes;
 
+pub type HotkeyError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+#[cfg(target_os = "linux")]
+#[cfg_attr(target_os = "linux", path = "linux.rs")]
+mod backend;
+
+#[cfg(target_os = "windows")]
+#[cfg_attr(target_os = "windows", path = "windows.rs")]
+mod backend;
+
 enum HotkeyTask {}
 
 // use std::cell::RefCell;

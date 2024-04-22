@@ -13,3 +13,5 @@ betula_core = { workspace = true, default-features = false }
 betula_egui = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
+[target.'cfg(any(target_os = "linux"))'.dependencies]
+x11-dl = "2.21"
