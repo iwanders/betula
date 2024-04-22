@@ -592,6 +592,7 @@ dependencies = [
  "betula_egui",
  "global-hotkey",
  "serde",
+ "windows 0.56.0",
 ]
 
 [[package]]

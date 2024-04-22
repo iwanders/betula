@@ -4,6 +4,16 @@ use std::collections::HashMap;
 
 pub mod nodes;
 
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, GetMessageW,PeekMessageA , PostThreadMessageA, SetWindowsHookExA, UnhookWindowsHookEx, HHOOK,
+    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,PM_REMOVE,
+                TranslateMessage,
+                DispatchMessageW,
+                GetMessageA,
+};
+use windows::Win32::System::Threading::GetCurrentThreadId;
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+
 use global_hotkey::{
     hotkey::{Code, HotKey, Modifiers},
     GlobalHotKeyEvent, GlobalHotKeyManager,
@@ -69,6 +79,19 @@ impl GlobalHotkeyInterface {
         let (state_sender, state_receiver) = channel::<StateMap>();
         let thread = Some(std::thread::spawn(move || {
             let mut our_state_map = StateMap::default();
+
+            // from https://stackoverflow.com/a/51943720
+            // The queue only gets created when we look at the queue from a thread.
+            unsafe {
+                let mut msg : MSG = Default::default();
+                PeekMessageA(&mut msg, HWND(0), 0, 0, PM_REMOVE);
+                let current_id = GetCurrentThreadId();
+                PostThreadMessageA(current_id, 0, WPARAM(0), LPARAM(0)).expect("other thread must be running");
+                GetMessageA(&mut msg, HWND(0), 0, 0);
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            //
             // Spawn the manager in the thread that will service it.
             // This will likely also need an event loop for windows.
             let manager;
@@ -98,6 +121,19 @@ impl GlobalHotkeyInterface {
                 if let Ok(v) = state_receiver.try_recv() {
                     our_state_map = v;
                 }
+
+                // process windows event loop.
+                /*
+                {
+
+                    MSG msg = { };
+                    while (GetMessage(&msg, NULL, 0, 0) > 0)
+                    {
+                        TranslateMessage(&msg);
+                        DispatchMessage(&msg);
+                    }
+                }*/
+
             }
         }));
 
