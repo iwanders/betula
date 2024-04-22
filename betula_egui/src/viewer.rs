@@ -405,6 +405,11 @@ impl BlackboardData {
         }
         changed
     }
+
+    /// Discard local connections in favour of remote connections.
+    pub fn reset_connections_local(&mut self) {
+        self.connections_local = self.connections_remote.clone();
+    }
     /// Set the values.
     pub fn set_values(&mut self, values: std::collections::BTreeMap<PortName, Box<dyn UiValue>>) {
         self.ui_values = values;
@@ -717,6 +722,11 @@ impl ViewerBlackboard {
         if changed {
             self.mark_dirty();
         }
+    }
+
+    pub fn clear_pending(&mut self) {
+        self.pending_connections = Default::default();
+        self.mark_dirty();
     }
 
     pub fn drop_removed(&mut self) {
@@ -1586,6 +1596,24 @@ impl BetulaViewer {
         Ok(())
     }
 
+    pub fn discard_blackboard_changes(
+        &mut self,
+        blackboard_id: BlackboardId,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) -> Result<(), BetulaError> {
+        if let Some(bb) = self.blackboards.get(&blackboard_id) {
+            let mut bb = (*bb).borrow_mut();
+            bb.reset_connections_local();
+        }
+        let snarl_ids = self.get_blackboard_snarl_ids(&blackboard_id)?;
+        for id in snarl_ids {
+            if let BetulaViewerNode::Blackboard(bb) = &mut snarl[id] {
+                bb.clear_pending();
+            }
+        }
+        Ok(())
+    }
+
     pub fn set_blackboard_values(
         &mut self,
         v: betula_common::control::BlackboardValues,
@@ -1659,7 +1687,9 @@ impl BetulaViewer {
     #[track_caller]
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
-        use betula_common::control::InteractionCommand::{AddBlackboard, RemoveBlackboard};
+        use betula_common::control::InteractionCommand::{
+            AddBlackboard, PortDisconnectConnect, RemoveBlackboard,
+        };
         use betula_common::control::InteractionEvent;
 
         // First, send changes to the server if necessary.
@@ -1702,6 +1732,21 @@ impl BetulaViewer {
                                     let ids = self.remove_blackboard(blackboard_id)?;
                                     for snarl_id in ids {
                                         snarl.remove_node(snarl_id);
+                                    }
+                                }
+                            }
+                            PortDisconnectConnect(port_changes) => {
+                                if let Some(failure_reason) = c.error {
+                                    println!("Port connect / disconnect failed: {failure_reason}");
+                                    for connection in port_changes
+                                        .disconnect
+                                        .iter()
+                                        .chain(port_changes.connect.iter())
+                                    {
+                                        self.discard_blackboard_changes(
+                                            connection.blackboard.blackboard(),
+                                            snarl,
+                                        )?;
                                     }
                                 }
                             }
