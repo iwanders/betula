@@ -4,15 +4,13 @@ use std::collections::HashMap;
 
 pub mod nodes;
 
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW,PeekMessageA , PostThreadMessageA, SetWindowsHookExA, UnhookWindowsHookEx, HHOOK,
-    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,PM_REMOVE,
-                TranslateMessage,
-                DispatchMessageW,
-                GetMessageA,
-};
-use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::System::Threading::GetCurrentThreadId;
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, DispatchMessageW, GetMessageA, GetMessageW, PeekMessageA, PostThreadMessageA,
+    SetWindowsHookExA, TranslateMessage, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG,
+    PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+};
 
 use global_hotkey::{
     hotkey::{Code, HotKey, Modifiers},
@@ -83,10 +81,11 @@ impl GlobalHotkeyInterface {
             // from https://stackoverflow.com/a/51943720
             // The queue only gets created when we look at the queue from a thread.
             unsafe {
-                let mut msg : MSG = Default::default();
+                let mut msg: MSG = Default::default();
                 PeekMessageA(&mut msg, HWND(0), 0, 0, PM_REMOVE);
                 let current_id = GetCurrentThreadId();
-                PostThreadMessageA(current_id, 0, WPARAM(0), LPARAM(0)).expect("other thread must be running");
+                PostThreadMessageA(current_id, 0, WPARAM(0), LPARAM(0))
+                    .expect("other thread must be running");
                 GetMessageA(&mut msg, HWND(0), 0, 0);
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -133,7 +132,6 @@ impl GlobalHotkeyInterface {
                         DispatchMessage(&msg);
                     }
                 }*/
-
             }
         }));
 
