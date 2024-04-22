@@ -495,10 +495,10 @@ impl BlackboardValues {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct NodeStatus {
     pub node: NodeId,
-    pub status: ExecutionStatus,
+    pub status: Result<ExecutionStatus, String>,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecutionResult {

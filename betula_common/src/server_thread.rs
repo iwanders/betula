@@ -27,7 +27,7 @@ impl RunContext for TrackedTreeContext<'_, '_> {
         for s in all {
             status.push(s);
         }
-        Ok(v)
+        Ok(v?)
     }
 }
 
@@ -35,7 +35,7 @@ impl RunContext for TrackedTreeContext<'_, '_> {
 pub fn execute_tracked(
     tree: &dyn Tree,
     id: NodeId,
-) -> Result<(ExecutionStatus, Vec<NodeStatus>), NodeError> {
+) -> Result<(Result<ExecutionStatus, BetulaError>, Vec<NodeStatus>), BetulaError> {
     let mut res: RefCell<Vec<NodeStatus>> = RefCell::new(vec![]);
     let mut n = tree
         .node_ref(id)
@@ -48,15 +48,28 @@ pub fn execute_tracked(
         status: &mut res,
     };
 
-    let v = n.execute(&mut context)?;
+    let v = n.execute(&mut context);
+    if let Err(e) = v {
+        {
+            let e_string = format!("{}", e);
+            let mut modifyable = res.borrow_mut();
+            modifyable.push(NodeStatus {
+                node: id,
+                status: Err(e_string),
+            });
+        }
+        return Ok((Err(e), res.into_inner()));
+    }
+
+    let v = v.unwrap();
     {
         let mut modifyable = res.borrow_mut();
         modifyable.push(NodeStatus {
             node: id,
-            status: v,
+            status: Ok(v),
         });
     }
-    Ok((v, res.into_inner()))
+    Ok((Ok(v), res.into_inner()))
 }
 
 /// Function to create the tree support in the background server thread.
@@ -137,7 +150,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                             }
                         }
                         Err(e) => {
-                            println!("failed to execute: {e:?}");
+                            // println!("failed to execute: {e:?}");
                             server.send_event(InteractionEvent::CommandResult(CommandResult {
                                 command: command,
                                 error: Some(format!("{e:?}")),

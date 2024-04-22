@@ -123,7 +123,7 @@ pub struct ViewerNode {
     ///
     /// Used for coloring the node border if enabled.
     #[serde(skip)]
-    node_status: Option<ExecutionStatus>,
+    node_status: Option<Result<ExecutionStatus, String>>,
 }
 
 impl ViewerNode {
@@ -1543,7 +1543,7 @@ impl BetulaViewer {
     ) {
         for e in results {
             if let Ok(v) = self.get_node_mut(e.node, snarl) {
-                v.node_status = Some(e.status);
+                v.node_status = Some(e.status.clone());
             }
         }
     }
@@ -2369,7 +2369,15 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         let _ = (inputs, outputs, scale);
         // let w = 15.0;
-        ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
+        let r = ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
+        match &mut snarl[node] {
+            BetulaViewerNode::Node(ref mut node) => {
+                if let Some(Err(e)) = &node.node_status {
+                    r.on_hover_text(e);
+                }
+            }
+            _ => {}
+        }
         // let img_src = egui::include_image!("/tmp/drawing.svg");
         // ui.ctx().forget_image(img_src.uri().unwrap());
         // ui.add_sized([w * scale, w * scale], egui::Image::new(img_src).rounding(1.0));
@@ -2391,14 +2399,16 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 let hue_success = 100.0 / 360.0;
                 let hue_failure = 1.0;
                 let hue_running = 41.0 / 360.0;
+                let hue_error = 300.0 / 360.0;
                 let satutarion_bump = 0.75;
                 let value_bump = 0.5;
 
                 if let Some(node_status) = node.node_status.as_ref() {
                     let hue = match node_status {
-                        ExecutionStatus::Success => hue_success,
-                        ExecutionStatus::Failure => hue_failure,
-                        ExecutionStatus::Running => hue_running,
+                        Ok(ExecutionStatus::Success) => hue_success,
+                        Ok(ExecutionStatus::Failure) => hue_failure,
+                        Ok(ExecutionStatus::Running) => hue_running,
+                        Err(_e) => hue_error,
                     };
                     current_hsva.s = (current_hsva.s + satutarion_bump).min(1.0);
                     if current_hsva.v < 0.5 {
