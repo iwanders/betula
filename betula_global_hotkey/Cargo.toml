@@ -12,6 +12,10 @@ default = []
 betula_core = { workspace = true, default-features = false }
 betula_egui = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
+keyboard-types = "0.7"
+
+
+[target.'cfg(any(target_os = "linux"))'.dependencies]
 #global-hotkey = "0.5.1"
 # Pending https://github.com/tauri-apps/global-hotkey/pull/73
 global-hotkey = {git = "https://github.com/iwanders/tauri-global-hotkey", rev = "e8c2d5a35e1b2e963ca6e271091eb4c207bbacd4"  }

@@ -1,28 +1,61 @@
 use betula_core::BetulaError;
+use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
 pub mod nodes;
+pub use keyboard_types::{Code, Modifiers};
 
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageA, GetMessageW, PeekMessageA, PostThreadMessageA,
-    SetWindowsHookExA, TranslateMessage, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG,
-    PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
-};
+pub type HotkeyError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
-    GlobalHotKeyEvent, GlobalHotKeyManager,
-};
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct Hotkey {
+    pub modifiers: Modifiers,
+    pub key: Code,
+}
+impl Hotkey {
+    pub fn new(mods: Option<Modifiers>, key: Code) -> Self {
+        let mut modifiers = mods.unwrap_or_else(Modifiers::empty);
+        Self { modifiers, key }
+    }
+}
+pub use keyboard_types::KeyState;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct HotkeyEvent {
+    pub state: KeyState,
+    pub hotkey: Hotkey,
+}
+
+#[cfg(target_os = "linux")]
+#[cfg_attr(target_os = "linux", path = "linux.rs")]
+mod backend;
+
+#[cfg(target_os = "windows")]
+#[cfg_attr(target_os = "windows", path = "windows.rs")]
+mod backend;
 
 // From the docs
 // On Windows a win32 event loop must be running on the thread. It doesn’t need to be the main thread but you have to create the global hotkey manager on the same thread as the event loop.
 
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::mpsc::Sender;
+// use std::sync::mpsc::Sender;
+
+#[derive(Debug, Default)]
+pub struct State {
+    /// Whether the key is currently depressed.
+    pub is_pressed: AtomicBool,
+    /// Boolean that's toggled when the key is depressed.
+    pub is_toggled: AtomicBool,
+}
+
+type StatePtr = Arc<State>;
+
+pub struct HotkeyToken {
+    state: StatePtr,
+    // something that on drop removes the entry
+}
 
 pub struct GlobalHotkeyRunner {
     thread: Option<std::thread::JoinHandle<()>>,
@@ -38,30 +71,29 @@ impl Drop for GlobalHotkeyRunner {
     }
 }
 
-#[derive(Debug, Default)]
-struct State {
-    /// Whether the key is currently depressed.
-    is_pressed: AtomicBool,
-    /// Boolean that's toggled when the key is depressed.
-    is_toggled: AtomicBool,
+struct CountedState {
+    count: usize,
+    state: StatePtr,
 }
-type StatePtr = Arc<State>;
-type StateMap = HashMap<HotKeyId, StatePtr>;
-type HotKeyId = u32;
+impl Default for CountedState {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            state: Default::default(),
+        }
+    }
+}
+
+type TrackedStateMap = Arc<Mutex<HashMap<Hotkey, CountedState>>>;
 
 use std::sync::{Arc, Mutex};
 #[derive(Clone)]
 pub struct GlobalHotkeyInterface {
     /// Pointer to the actual manager used by the runner.
-    manager: Arc<Mutex<GlobalHotKeyManager>>,
-
-    /// Actual map of states that gets updated.
-    state: StateMap,
-
-    /// Sender to provide the runner thread with the map to be updated.
-    state_sender: Sender<StateMap>,
-
+    backend: Arc<Mutex<backend::BackendType>>,
     // dead code allowed, it contains the execution thread.
+    key_map: TrackedStateMap,
+
     #[allow(dead_code)]
     runner: Arc<GlobalHotkeyRunner>,
 }
@@ -71,124 +103,48 @@ impl GlobalHotkeyInterface {
         let running = std::sync::Arc::new(AtomicBool::new(true));
         let t_running = running.clone();
 
-        // Channel to exfiltrate the pointer from the thread servicing the manager.
-        use std::sync::mpsc::channel;
-        let (sender, receiver) = channel::<Option<Arc<Mutex<GlobalHotKeyManager>>>>();
-        let (state_sender, state_receiver) = channel::<StateMap>();
+        let backend = Arc::new(Mutex::new(backend::BackendType::new()?));
+        let backend_t = Arc::clone(&backend);
         let thread = Some(std::thread::spawn(move || {
-            let mut our_state_map = StateMap::default();
-
-            // from https://stackoverflow.com/a/51943720
-            // The queue only gets created when we look at the queue from a thread.
-            unsafe {
-                let mut msg: MSG = Default::default();
-                PeekMessageA(&mut msg, HWND(0), 0, 0, PM_REMOVE);
-                let current_id = GetCurrentThreadId();
-                PostThreadMessageA(current_id, 0, WPARAM(0), LPARAM(0))
-                    .expect("other thread must be running");
-                GetMessageA(&mut msg, HWND(0), 0, 0);
-                TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-            }
-            //
-            // Spawn the manager in the thread that will service it.
-            // This will likely also need an event loop for windows.
-            let manager;
-            if let Ok(manager_res) = GlobalHotKeyManager::new() {
-                manager = Arc::new(Mutex::new(manager_res));
-            } else {
-                return;
-            }
-
-            if sender.send(Some(Arc::clone(&manager))).is_err() {
-                return;
-            }
-
+            let backend = backend_t;
             while t_running.load(Relaxed) {
-                if let Ok(event) =
-                    GlobalHotKeyEvent::receiver().recv_timeout(std::time::Duration::from_millis(1))
-                {
-                    if let Some(v) = our_state_map.get(&event.id()) {
-                        v.is_pressed
-                            .store(event.state == global_hotkey::HotKeyState::Pressed, Relaxed);
-                        if event.state == global_hotkey::HotKeyState::Pressed {
-                            v.is_toggled.fetch_xor(true, Relaxed);
-                        }
-                    }
-                    println!("{:?}", our_state_map);
-                }
-                if let Ok(v) = state_receiver.try_recv() {
-                    our_state_map = v;
-                }
-
-                // process windows event loop.
-                /*
-                {
-
-                    MSG msg = { };
-                    while (GetMessage(&msg, NULL, 0, 0) > 0)
-                    {
-                        TranslateMessage(&msg);
-                        DispatchMessage(&msg);
-                    }
-                }*/
+                let locked = backend.lock().unwrap();
+                let events = (*locked).get_events();
+                // do something with events... dispatch them to the state map.
             }
         }));
 
-        let manager = receiver.recv_timeout(std::time::Duration::from_millis(1000))?;
-        let manager = if let Some(manager) = manager {
-            manager
-        } else {
-            return Err(format!("failed to create hotkey manager").into());
-        };
-
         let runner = Arc::new(GlobalHotkeyRunner { thread, running });
-        let state = Default::default();
+        let key_map = Default::default();
         Ok(GlobalHotkeyInterface {
             runner,
-            manager,
-            state,
-            state_sender,
+            backend,
+            key_map,
         })
     }
 
-    pub fn register(&mut self, hotkey: HotKey) -> Result<(), BetulaError> {
-        let locked = self.manager.lock().unwrap();
-        locked.register(hotkey)?;
-        self.state
-            .entry(hotkey.id())
-            .or_insert_with(|| Arc::new(Default::default()));
-        self.state_sender.send(self.state.clone())?;
-        Ok(())
-    }
-    pub fn unregister(&mut self, hotkey: HotKey) -> Result<(), BetulaError> {
-        let locked = self.manager.lock().unwrap();
-        locked.unregister(hotkey)?;
-        self.state.remove(&hotkey.id());
-        self.state_sender.send(self.state.clone())?;
-        Ok(())
-    }
+    pub fn register(&self, key: Hotkey) -> Result<HotkeyToken, HotkeyError> {
+        // lock the map
+        let (new_registration, state) = {
+            let mut locked = self.key_map.lock().unwrap();
+            let mut value = locked.entry(key.clone()).or_default();
+            value.count += 1;
+            (value.count == 1, Arc::clone(&value.state))
+        };
 
-    pub fn is_pressed(&self, hotkey: HotKey) -> Result<bool, BetulaError> {
-        if let Some(v) = self.state.get(&hotkey.id()) {
-            Ok(v.is_pressed.load(Relaxed))
-        } else {
-            Err(format!("hotkey {hotkey:?} not registered").into())
+        if new_registration {
+            // lets also let the backend know.
+            let locked = self.backend.lock().unwrap();
+            locked.register(key)?;
         }
-    }
 
-    pub fn is_toggled(&self, hotkey: HotKey) -> Result<bool, BetulaError> {
-        if let Some(v) = self.state.get(&hotkey.id()) {
-            Ok(v.is_toggled.load(Relaxed))
-        } else {
-            Err(format!("hotkey {hotkey:?} not registered").into())
-        }
+        Ok(HotkeyToken { state })
     }
 }
 
 impl std::fmt::Debug for GlobalHotkeyInterface {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(fmt, "GlobalHotkeyRunner<{:?}>", Arc::as_ptr(&self.runner))
+        write!(fmt, "GlobalHotkeyRunner<{:?}>", Arc::as_ptr(&self.backend))
     }
 }
 
