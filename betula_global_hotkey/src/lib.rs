@@ -52,11 +52,6 @@ pub struct State {
 
 type StatePtr = Arc<State>;
 
-pub struct HotkeyToken {
-    state: StatePtr,
-    // something that on drop removes the entry
-}
-
 pub struct GlobalHotkeyRunner {
     thread: Option<std::thread::JoinHandle<()>>,
     running: std::sync::Arc<AtomicBool>,
@@ -84,6 +79,37 @@ impl Default for CountedState {
     }
 }
 
+struct RemovalHelper {
+    fun: Option<Box<dyn FnOnce()>>,
+}
+impl RemovalHelper {
+    pub fn new(fun: Box<dyn FnOnce()>) -> Self {
+        Self { fun: Some(fun) }
+    }
+}
+
+impl Drop for RemovalHelper {
+    fn drop(&mut self) {
+        if let Some(f) = self.fun.take() {
+            (f)()
+        }
+    }
+}
+
+pub struct HotkeyToken {
+    state: StatePtr,
+    // something that on drop removes the entry
+    remover: RemovalHelper,
+}
+impl HotkeyToken {
+    pub fn is_pressed(&self) -> bool {
+        self.state.is_pressed.load(Relaxed)
+    }
+    pub fn is_toggled(&self) -> bool {
+        self.state.is_toggled.load(Relaxed)
+    }
+}
+
 type TrackedStateMap = Arc<Mutex<HashMap<Hotkey, CountedState>>>;
 
 use std::sync::{Arc, Mutex};
@@ -103,19 +129,39 @@ impl GlobalHotkeyInterface {
         let running = std::sync::Arc::new(AtomicBool::new(true));
         let t_running = running.clone();
 
+        let key_map: TrackedStateMap = Default::default();
+
         let backend = Arc::new(Mutex::new(backend::BackendType::new()?));
         let backend_t = Arc::clone(&backend);
+        let key_map_t = Arc::clone(&key_map);
         let thread = Some(std::thread::spawn(move || {
             let backend = backend_t;
+            let key_map = key_map_t;
             while t_running.load(Relaxed) {
                 let locked = backend.lock().unwrap();
                 let events = (*locked).get_events();
-                // do something with events... dispatch them to the state map.
+                if events.is_err() {
+                    // shutting down?
+                    return;
+                }
+                let events = events.unwrap();
+
+                let locked = key_map.lock().unwrap();
+                for e in events {
+                    if let Some(count_state) = locked.get(&e.hotkey) {
+                        let down = e.state == KeyState::Down;
+                        count_state.state.is_pressed.store(down, Relaxed);
+                        if down {
+                            count_state.state.is_toggled.fetch_xor(true, Relaxed);
+                        }
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }));
 
         let runner = Arc::new(GlobalHotkeyRunner { thread, running });
-        let key_map = Default::default();
         Ok(GlobalHotkeyInterface {
             runner,
             backend,
@@ -138,7 +184,39 @@ impl GlobalHotkeyInterface {
             locked.register(key)?;
         }
 
-        Ok(HotkeyToken { state })
+        // Now, crate the removal token
+        let removal_fun = {
+            let backend = Arc::clone(&self.backend);
+            let map = Arc::clone(&self.key_map);
+            let key_t = key.clone();
+            move || {
+                let mut locked = map.lock().unwrap();
+                let should_remove = if let Some(v) = locked.get_mut(&key_t) {
+                    if v.count == 1 {
+                        // It was the last remaining entry!
+                        true
+                    } else {
+                        v.count -= 1;
+                        false
+                    }
+                } else {
+                    unreachable!("removal fun called for non existing key");
+                };
+                if should_remove {
+                    // println!("removing {key_t:?} from the map");
+                    locked.remove(&key_t);
+                    // and lets tell the backend about it.
+                    let locked = backend.lock().unwrap();
+                    locked
+                        .unregister(key)
+                        .expect("unregistering hotkey should always work");
+                }
+            }
+        };
+
+        let remover = RemovalHelper::new(Box::new(removal_fun));
+
+        Ok(HotkeyToken { state, remover })
     }
 }
 
