@@ -50,10 +50,11 @@ impl GlobalHotKeyBackend {
         self.manager.register(hotkey)?;
         Ok(())
     }
+
     pub fn unregister(&self, key: CrateHotkey) -> Result<(), HotkeyError> {
         let hotkey = global_hotkey::hotkey::HotKey::new(Some(key.modifiers), key.key);
         {
-            println!("Unregister for {key:?}");
+            // println!("Unregister for {key:?}");
             let mut locked = self.id_to_hotkey_map.lock().unwrap();
             locked.remove(&hotkey.id());
         }

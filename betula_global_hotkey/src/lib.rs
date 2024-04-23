@@ -1,13 +1,41 @@
+/*!
+    Betula nodes for global hotkeys.
+
+    Why is this so complicated? Well, because we need to be able to have
+    multiple nodes registering different hotkeys and their configuration
+    may result in registrations changing. But we need reference counting as
+    two nodes may register the same hotkey, and if a node is deleted its
+    desire to claim the hotkey needs to be conveyed to the hotkey manager.
+
+    So to do that, registration yields a [`HotkeyToken`], which is both an
+    RAII object as well as an interface to the current value of that hotkey.
+    When all tokens pointing at the same hotkey go out of scope, the
+    registration is cancelled.
+
+    To compound the complexity some more, the Windows side has its own
+    implementation that's different from [`global_hotkey`], reason is
+    two-fold:
+
+    1. This allows non-blocking keyboard shortcuts on windows, which
+       means it could passively detect keystrokes to computer games. I
+       had already created this
+       [functionality](https://github.com/iwanders/windows_input_hook) so I
+       could finally put that to use.
+    2. I couldn't get an event loop going in a CLI application, so using
+      [`global_hotkey`] was not an option.
+
+*/
 use betula_core::BetulaError;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
 pub mod nodes;
-pub use keyboard_types::{Code, Modifiers};
+pub use keyboard_types::{Code, KeyState, Modifiers};
 
 pub type HotkeyError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
+/// Description of a particular hotkey.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Hotkey {
     pub modifiers: Modifiers,
@@ -19,10 +47,10 @@ impl Hotkey {
         Self { modifiers, key }
     }
 }
-pub use keyboard_types::KeyState;
 
+/// Describes a hotkey event from the backend.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
-pub struct HotkeyEvent {
+struct HotkeyEvent {
     pub state: KeyState,
     pub hotkey: Hotkey,
 }
@@ -35,15 +63,12 @@ mod backend;
 #[cfg_attr(target_os = "windows", path = "windows.rs")]
 mod backend;
 
-// From the docs
-// On Windows a win32 event loop must be running on the thread. It doesn’t need to be the main thread but you have to create the global hotkey manager on the same thread as the event loop.
-
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
-// use std::sync::mpsc::Sender;
 
+/// Struct that holds the state for a particular hotkey.
 #[derive(Debug, Default)]
-pub struct State {
+struct State {
     /// Whether the key is currently depressed.
     pub is_pressed: AtomicBool,
     /// Boolean that's toggled when the key is depressed.
@@ -52,7 +77,7 @@ pub struct State {
 
 type StatePtr = Arc<State>;
 
-pub struct GlobalHotkeyRunner {
+struct GlobalHotkeyRunner {
     thread: Option<std::thread::JoinHandle<()>>,
     running: std::sync::Arc<AtomicBool>,
 }
@@ -66,6 +91,7 @@ impl Drop for GlobalHotkeyRunner {
     }
 }
 
+/// Reference counted state.
 struct CountedState {
     count: usize,
     state: StatePtr,
@@ -79,6 +105,7 @@ impl Default for CountedState {
     }
 }
 
+/// Raii object to call a lambda on deletion.
 struct RemovalHelper {
     fun: Option<Box<dyn FnOnce()>>,
 }
@@ -96,72 +123,95 @@ impl Drop for RemovalHelper {
     }
 }
 
+/// An interface to a particular hotkey.
 pub struct HotkeyToken {
     state: StatePtr,
+    hotkey: Hotkey,
     // something that on drop removes the entry
     _remover: RemovalHelper,
 }
 impl HotkeyToken {
+    /// Is the hotkey currently depressed?
     pub fn is_pressed(&self) -> bool {
         self.state.is_pressed.load(Relaxed)
     }
+    /// The hotkey toggle state, switches each keydown.
     pub fn is_toggled(&self) -> bool {
         self.state.is_toggled.load(Relaxed)
+    }
+    /// The hotkey this token is associated to.
+    pub fn hotkey(&self) -> &Hotkey {
+        &self.hotkey
     }
 }
 
 type TrackedStateMap = Arc<Mutex<HashMap<Hotkey, CountedState>>>;
 
+/// Internal enum for communication with the backend management thread.
 enum RegistrationTask {
     Register(Hotkey),
     Unregister(Hotkey),
 }
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+
+/// Interface to the global hotkey system.
 #[derive(Clone)]
 pub struct GlobalHotkeyInterface {
+    // Technically, backend isn't used.
     /// Pointer to the actual manager used by the runner.
     backend: Arc<Mutex<backend::BackendType>>,
-    // dead code allowed, it contains the execution thread.
+
+    /// Sender to the backend-management thread.
     sender: Sender<RegistrationTask>,
 
+    /// Map of reference counted hotkeys.
     key_map: TrackedStateMap,
 
+    /// Actual runner that manages the backend.
     #[allow(dead_code)]
     _runner: Arc<GlobalHotkeyRunner>,
 }
 
 impl GlobalHotkeyInterface {
+    /// Create a new instance of the interface and start internal threads.
     pub fn new() -> Result<GlobalHotkeyInterface, BetulaError> {
         let running = std::sync::Arc::new(AtomicBool::new(true));
-        let t_running = running.clone();
-
         let key_map: TrackedStateMap = Default::default();
 
+        let (sender, receiver) = std::sync::mpsc::channel::<RegistrationTask>();
         let backend = Arc::new(Mutex::new(backend::BackendType::new()?));
+
+        // Create the necessary state that's used by the runner.
         let backend_t = Arc::clone(&backend);
         let key_map_t = Arc::clone(&key_map);
-        let (sender, receiver) = std::sync::mpsc::channel::<RegistrationTask>();
+        let running_t = running.clone();
+
         let thread = Some(std::thread::spawn(move || {
             let backend = backend_t;
             let key_map = key_map_t;
-            while t_running.load(Relaxed) {
+            while running_t.load(Relaxed) {
                 let locked = backend.lock().unwrap();
+                // Handle instructions about registrations.
                 while let Ok(v) = receiver.try_recv() {
                     let r = match v {
                         RegistrationTask::Register(key) => locked.register(key),
                         RegistrationTask::Unregister(key) => locked.unregister(key),
                     };
                     if r.is_err() {
+                        // don't think this can ever happen?
                         panic!("error from register or unregister: {:?}", r.err());
                     }
                 }
+
+                // Obtain the events
                 let events = (*locked).get_events();
                 if events.is_err() {
                     return;
                 }
                 let events = events.unwrap();
 
+                // Lock the key map, process all the events and update state atomics.
                 let locked = key_map.lock().unwrap();
                 for e in events {
                     if let Some(count_state) = locked.get(&e.hotkey) {
@@ -185,6 +235,8 @@ impl GlobalHotkeyInterface {
         })
     }
 
+    // Can this function ever return Err?
+    /// Register a new hotkey and retrieve the token for it.
     pub fn register(&self, key: Hotkey) -> Result<HotkeyToken, HotkeyError> {
         // lock the map
         let (new_registration, state) = {
@@ -199,7 +251,7 @@ impl GlobalHotkeyInterface {
             self.sender.send(RegistrationTask::Register(key.clone()))?;
         }
 
-        // Now, crate the removal token
+        // Now, create the removal function.
         let removal_fun = {
             let map = Arc::clone(&self.key_map);
             let key_t = key.clone();
@@ -231,6 +283,7 @@ impl GlobalHotkeyInterface {
         Ok(HotkeyToken {
             state,
             _remover: remover,
+            hotkey: key,
         })
     }
 }
