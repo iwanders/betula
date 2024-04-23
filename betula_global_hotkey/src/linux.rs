@@ -1,14 +1,11 @@
-use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
-    GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
-};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use std::sync::atomic::AtomicBool;
 
 use crate::{Hotkey as CrateHotkey, HotkeyError, HotkeyEvent, KeyState};
 
 pub type BackendType = GlobalHotKeyBackend;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 pub struct GlobalHotKeyBackend {
     manager: GlobalHotKeyManager,
@@ -26,7 +23,7 @@ impl GlobalHotKeyBackend {
 
     pub fn get_events(&self) -> Result<Vec<HotkeyEvent>, HotkeyError> {
         let mut v = vec![];
-        let mut locked = self.id_to_hotkey_map.lock().unwrap();
+        let locked = self.id_to_hotkey_map.lock().unwrap();
         while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             // Translate the event
             if let Some(hk) = locked.get(&event.id) {
