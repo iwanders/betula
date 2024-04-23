@@ -1,5 +1,4 @@
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
-use std::sync::atomic::AtomicBool;
 
 use crate::{Hotkey as CrateHotkey, HotkeyError, HotkeyEvent, KeyState};
 
@@ -54,25 +53,11 @@ impl GlobalHotKeyBackend {
     pub fn unregister(&self, key: CrateHotkey) -> Result<(), HotkeyError> {
         let hotkey = global_hotkey::hotkey::HotKey::new(Some(key.modifiers), key.key);
         {
-            // println!("Unregister for {key:?}");
+            println!("Unregister for {key:?}");
             let mut locked = self.id_to_hotkey_map.lock().unwrap();
             locked.remove(&hotkey.id());
         }
         self.manager.unregister(hotkey)?;
         Ok(())
-    }
-}
-
-pub struct GlobalHotkeyRunner {
-    thread: Option<std::thread::JoinHandle<()>>,
-    running: std::sync::Arc<AtomicBool>,
-}
-
-impl Drop for GlobalHotkeyRunner {
-    fn drop(&mut self) {
-        self.running
-            .store(false, std::sync::atomic::Ordering::Relaxed);
-        let t = self.thread.take();
-        t.unwrap().join().expect("join should succeed");
     }
 }
