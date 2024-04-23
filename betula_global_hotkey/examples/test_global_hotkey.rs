@@ -23,7 +23,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             "Key {:?}: {}, {}",
             token.hotkey(),
             token.is_pressed(),
-            token.is_toggled()
+            token.depress_count()
         );
         println!();
     }

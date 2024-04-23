@@ -63,8 +63,8 @@ mod backend;
 #[cfg_attr(target_os = "windows", path = "windows.rs")]
 mod backend;
 
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 /// Struct that holds the state for a particular hotkey.
 #[derive(Debug, Default)]
@@ -72,7 +72,7 @@ struct State {
     /// Whether the key is currently depressed.
     pub is_pressed: AtomicBool,
     /// Boolean that's toggled when the key is depressed.
-    pub is_toggled: AtomicBool,
+    pub depress_count: AtomicUsize,
 }
 
 type StatePtr = Arc<State>;
@@ -135,9 +135,10 @@ impl HotkeyToken {
     pub fn is_pressed(&self) -> bool {
         self.state.is_pressed.load(Relaxed)
     }
-    /// The hotkey toggle state, switches each keydown.
-    pub fn is_toggled(&self) -> bool {
-        self.state.is_toggled.load(Relaxed)
+    /// The number of times the hotkey has been depressed, can be used to
+    /// create toggles or ensure no events are missed.
+    pub fn depress_count(&self) -> usize {
+        self.state.depress_count.load(Relaxed)
     }
     /// The hotkey this token is associated to.
     pub fn hotkey(&self) -> &Hotkey {
@@ -218,7 +219,7 @@ impl GlobalHotkeyInterface {
                         let down = e.state == KeyState::Down;
                         count_state.state.is_pressed.store(down, Relaxed);
                         if down {
-                            count_state.state.is_toggled.fetch_xor(true, Relaxed);
+                            count_state.state.depress_count.fetch_add(1, Relaxed);
                         }
                     }
                 }
