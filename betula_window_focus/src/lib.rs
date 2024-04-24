@@ -1,5 +1,5 @@
 pub type WindowFocusError = Box<dyn std::error::Error + Send + Sync + 'static>;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub mod nodes;
 
@@ -50,13 +50,12 @@ impl WindowFocus {
     }
 }
 
-
 /// Structure to represent a cursor position.
 ///
 /// Windows: 0,0 is top left of primary, top right is 1919,0, bottom right is 1919,1079. Left monitor (non primary) is
 /// -1920,0 top left and -1920,1079 bottom left.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CursorPosition{
+pub struct CursorPosition {
     pub x: i32,
     pub y: i32,
 }

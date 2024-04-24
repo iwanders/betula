@@ -1,25 +1,27 @@
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW,  PostThreadMessageA,
-    SetWindowsHookExA, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG,
-    WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    CallNextHookEx, GetMessageW, PostThreadMessageA, SetWindowsHookExA, UnhookWindowsHookEx, HHOOK,
+    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
+use crate::{Hotkey, HotkeyError, HotkeyEvent, KeyState};
 use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState;
-use windows::Win32::UI::Input::KeyboardAndMouse::{VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN, VK_SHIFT};
-use crate::{HotkeyError, Hotkey, HotkeyEvent, KeyState};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+};
 
-use std::sync::{Arc,Mutex, atomic::{AtomicU32, AtomicBool}};
 use std::cell::RefCell;
+use std::sync::{
+    atomic::{AtomicBool, AtomicU32},
+    Arc, Mutex,
+};
 
 pub type BackendType = InputhookBackend;
-
 
 // https://learn.microsoft.com/en-us/windows/win32/inputdev/about-keyboard-input#scan-codes
 
 // https://learn.microsoft.com/en-us/windows/win32/inputdev/about-keyboard-input
-
 
 /// Single global hook handler function, it uses the thread_local in InputHook to dispatch appropriately.
 ///
@@ -59,8 +61,7 @@ unsafe extern "system" fn hook_handler(code: i32, wparam: WPARAM, lparam: LPARAM
     let shift_down = is_key_down(VK_SHIFT.into());
     let meta_down = is_key_down(VK_RWIN.into()) || is_key_down(VK_LWIN.into());
 
-
-    let winkey = WindowsHotkey{
+    let winkey = WindowsHotkey {
         vk: virtual_key as u16,
         control_down,
         alt_down,
@@ -68,16 +69,14 @@ unsafe extern "system" fn hook_handler(code: i32, wparam: WPARAM, lparam: LPARAM
         meta_down,
     };
 
-    
-
     InputhookBackend::LOCAL_SENDER.with(|z| {
         let l = z.borrow_mut();
         if let Some((sender, map)) = l.as_ref() {
             let locked_map = map.lock().unwrap();
             if let Some(hotkey) = locked_map.get(&winkey) {
-                let _ = sender.send(HotkeyEvent{
+                let _ = sender.send(HotkeyEvent {
                     state,
-                    hotkey: *hotkey
+                    hotkey: *hotkey,
                 });
             }
         }
@@ -93,13 +92,9 @@ struct VirtualKey {
 
 impl From<VIRTUAL_KEY> for VirtualKey {
     fn from(v: VIRTUAL_KEY) -> Self {
-        Self {
-            code: v.0 as i32
-        }
+        Self { code: v.0 as i32 }
     }
 }
-
-
 
 unsafe fn is_key_down(vk: VirtualKey) -> bool {
     // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getkeystate#return-value
@@ -108,7 +103,7 @@ unsafe fn is_key_down(vk: VirtualKey) -> bool {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-struct WindowsHotkey{
+struct WindowsHotkey {
     pub vk: u16,
     pub alt_down: bool,
     pub meta_down: bool,
@@ -116,11 +111,12 @@ struct WindowsHotkey{
     pub shift_down: bool,
 }
 
-
 impl TryFrom<Hotkey> for WindowsHotkey {
     type Error = String;
     fn try_from(k: Hotkey) -> Result<Self, Self::Error> {
-        let vk = conversion::key_to_vk(&k.key).ok_or(format!("no vk for {}", k.key))?.0;
+        let vk = conversion::key_to_vk(&k.key)
+            .ok_or(format!("no vk for {}", k.key))?
+            .0;
         let alt_down = k.modifiers.contains(keyboard_types::Modifiers::ALT);
         let meta_down = k.modifiers.contains(keyboard_types::Modifiers::META);
         let control_down = k.modifiers.contains(keyboard_types::Modifiers::CONTROL);
@@ -136,7 +132,7 @@ impl TryFrom<Hotkey> for WindowsHotkey {
 }
 
 type HotkeyMap = Arc<Mutex<std::collections::HashMap<WindowsHotkey, Hotkey>>>;
-use std::sync::mpsc::{Sender, Receiver, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 pub struct InputhookBackend {
     //manager: GlobalHotKeyManager,
     id_to_hotkey_map: HotkeyMap,
@@ -159,7 +155,7 @@ impl InputhookBackend {
 
         let (sender, receiver) = channel::<HotkeyEvent>();
 
-        let id_to_hotkey_map : HotkeyMap = Default::default();
+        let id_to_hotkey_map: HotkeyMap = Default::default();
 
         let tid = thread_id.clone();
         let t_running = running.clone();
@@ -171,7 +167,6 @@ impl InputhookBackend {
                     let mut l = z.borrow_mut();
                     *l = Some((sender, t_id_to_hotkey_map));
                 });
-
 
                 // Store the thread id such that we can later exit this thread by sending a message.
                 let current_id = GetCurrentThreadId();
@@ -230,7 +225,6 @@ impl InputhookBackend {
     }
 }
 
-
 impl Drop for InputhookBackend {
     fn drop(&mut self) {
         // Set the boolean to stop running.
@@ -244,10 +238,13 @@ impl Drop for InputhookBackend {
         }
 
         // Finally, join the thread.
-        self.thread.take().unwrap().join().expect("join should succeed");
+        self.thread
+            .take()
+            .unwrap()
+            .join()
+            .expect("join should succeed");
     }
 }
-
 
 // conversion function is taken from https://github.com/tauri-apps/global-hotkey/blob/cd9051d725fe830f407cf75603c2e90443158ed6/src/platform_impl/windows/mod.rs
 mod conversion {
