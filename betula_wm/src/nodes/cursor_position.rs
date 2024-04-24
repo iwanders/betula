@@ -7,12 +7,13 @@ pub struct CursorPositionNodeConfig {
 }
 impl IsNodeConfig for CursorPositionNodeConfig {}
 
-use crate::CursorPositionRetriever;
+use crate::{CursorPosition, CursorPositionRetriever};
 
 #[derive(Debug, Default)]
 pub struct CursorPositionNode {
     pub config: CursorPositionNodeConfig,
     retriever: CursorPositionRetriever,
+    output: Output<CursorPosition>,
 }
 
 impl CursorPositionNode {
@@ -24,8 +25,20 @@ impl CursorPositionNode {
 impl Node for CursorPositionNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let pos = self.retriever.cursor_position()?;
-        println!("pos: {pos:?}");
-        Ok(ExecutionStatus::Failure)
+        self.output.set(pos)?;
+        Ok(ExecutionStatus::Success)
+    }
+
+    fn ports(&self) -> Result<Vec<Port>, NodeError> {
+        Ok(vec![Port::output::<CursorPosition>("cursor")])
+    }
+
+    fn setup_outputs(
+        &mut self,
+        interface: &mut dyn BlackboardOutputInterface,
+    ) -> Result<(), NodeError> {
+        self.output = interface.output::<CursorPosition>("cursor", CursorPosition::default())?;
+        Ok(())
     }
 
     fn get_config(&self) -> Result<Option<Box<dyn NodeConfig>>, NodeError> {

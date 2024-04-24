@@ -67,7 +67,7 @@ impl CursorPositionRetriever {
 /// Windows: 0,0 is top left of primary, top right is 1919,0, bottom right is 1919,1079. Left monitor (non primary) is
 /// -1920,0 top left and -1920,1079 bottom left.
 /// Linux: top left is 0,0, top right is 3839,0, bottom right is 3839,1070
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CursorPosition {
     pub x: i32,
     pub y: i32,
@@ -75,7 +75,7 @@ pub struct CursorPosition {
 
 pub fn main_test() {
     let mut window_focus = WindowFocusRetriever::new();
-    let mut cursor_position = CursorPositionRetriever::new();
+    let cursor_position = CursorPositionRetriever::new();
 
     loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -101,4 +101,5 @@ pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::CursorPositionNode, nodes::CursorPositionNodeConfig>(
         );
+    ui_support.add_value_default_named::<CursorPosition>("CursorPosition");
 }
