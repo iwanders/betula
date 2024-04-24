@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct CursorPositionNodeConfig {
-    pub matches: Vec<String>,
+    pub windows_offset: CursorPosition,
+    pub linux_offset: CursorPosition,
 }
 impl IsNodeConfig for CursorPositionNodeConfig {}
 
@@ -25,6 +26,19 @@ impl CursorPositionNode {
 impl Node for CursorPositionNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let pos = self.retriever.cursor_position()?;
+        const IS_WINDOWS: bool = cfg!(target_os = "windows");
+        let pos = if IS_WINDOWS {
+            CursorPosition {
+                x: pos.x + self.config.windows_offset.x,
+                y: pos.y + self.config.windows_offset.y,
+            }
+        } else {
+            CursorPosition {
+                x: pos.x + self.config.linux_offset.x,
+                y: pos.y + self.config.linux_offset.y,
+            }
+        };
+
         self.output.set(pos)?;
         Ok(ExecutionStatus::Success)
     }
@@ -75,9 +89,34 @@ pub mod ui_support {
             scale: f32,
         ) -> UiConfigResponse {
             let _ = ctx;
-            let mut ui_response = UiConfigResponse::UnChanged;
+            // let mut ui_response = UiConfigResponse::UnChanged;
+            let mut modified = false;
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("linux Δ: ");
+                    modified |= ui
+                        .add(egui::DragValue::new(&mut self.config.linux_offset.x))
+                        .changed();
+                    modified |= ui
+                        .add(egui::DragValue::new(&mut self.config.linux_offset.y))
+                        .changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("windows Δ: ");
+                    modified |= ui
+                        .add(egui::DragValue::new(&mut self.config.windows_offset.x))
+                        .changed();
+                    modified |= ui
+                        .add(egui::DragValue::new(&mut self.config.windows_offset.y))
+                        .changed();
+                });
+            });
 
-            ui_response
+            if modified {
+                UiConfigResponse::Changed
+            } else {
+                UiConfigResponse::UnChanged
+            }
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
             0..0
