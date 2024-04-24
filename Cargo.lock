@@ -552,7 +552,7 @@ dependencies = [
  "betula_enigo",
  "betula_global_hotkey",
  "betula_std",
- "betula_window_focus",
+ "betula_wm",
  "eframe",
  "egui",
 ]
@@ -607,7 +607,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "betula_window_focus"
+name = "betula_wm"
 version = "0.0.1"
 dependencies = [
  "betula_core",

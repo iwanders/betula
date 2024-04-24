@@ -1,5 +1,5 @@
 [package]
-name = "betula_window_focus"
+name = "betula_wm"
 version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"

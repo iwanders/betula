@@ -58,11 +58,11 @@ Betula nodes for [enigo](https://github.com/enigo-rs/enigo): `Cross platform inp
   - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
   - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
 
-## betula_window_focus
-Provides a node that checks if the window that has the current focus is the desired one, works on X11 and Windows.
+## betula_wm
+Pertains itself to information obtained from the window manager.
 
-#### Nodes:
   - `WindowFocusNode`: Returns `Success` if the regex matches the binary that created the window that has focus.
+  - `CursorPositionNode`: Provides the cursor position.
 
 
 
