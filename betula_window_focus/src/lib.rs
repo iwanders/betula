@@ -52,8 +52,11 @@ impl WindowFocus {
 
 /// Structure to represent a cursor position.
 ///
+/// For two 1080p monitors, side by side, right one being primary:
+///
 /// Windows: 0,0 is top left of primary, top right is 1919,0, bottom right is 1919,1079. Left monitor (non primary) is
 /// -1920,0 top left and -1920,1079 bottom left.
+/// Linux: top left is 0,0, top right is 3839,0, bottom right is 3839,1070
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CursorPosition {
     pub x: i32,

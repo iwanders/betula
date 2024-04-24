@@ -1,4 +1,4 @@
-use crate::WindowFocusError;
+use crate::{CursorPosition, WindowFocusError};
 pub type BackendType = X11FocusHandler;
 pub type CacheKey = std::ffi::c_ulong;
 
@@ -189,6 +189,45 @@ impl Handler {
         let window_id = self.get_window_id_with_focus()?;
         Ok(window_id)
     }
+
+    fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
+        unsafe {
+            let count = (self.instance.XScreenCount)(self.display);
+            if count < 1 {
+                return Err("found less than one screen".into());
+            }
+            let root_window = (self.instance.XRootWindow)(self.display, 0);
+            if root_window == 0 {
+                return Err("could not get root window".into());
+            }
+            let mut root_return: xlib::Window = 0;
+            let mut child_return: xlib::Window = 0;
+            let mut root_x_return: c_int = 0;
+            let mut root_y_return: c_int = 0;
+            let mut win_x_return: c_int = 0;
+            let mut win_y_return: c_int = 0;
+            let mut mask_return: c_uint = 0;
+            let res = (self.instance.XQueryPointer)(
+                self.display,
+                root_window,
+                &mut root_return,
+                &mut child_return,
+                &mut root_x_return,
+                &mut root_y_return,
+                &mut win_x_return,
+                &mut win_y_return,
+                &mut mask_return,
+            );
+            // We always retrieve the root, so root and win retrieval are identical.
+            if res > 0 {
+                return Ok(CursorPosition {
+                    x: win_x_return,
+                    y: win_y_return,
+                });
+            }
+        }
+        Err("buuu".into())
+    }
 }
 
 #[derive(Default)]
@@ -263,5 +302,17 @@ impl X11FocusHandler {
             return Ok((cache_key, self.process_name(pid)?));
         }
         Err("failed to obtain focussed process id".into())
+    }
+
+    pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
+        self.setup()?;
+        let locked = self
+            .handle
+            .lock()
+            .map_err(|_| format!("failed to lock mutex"))?;
+        if let Some(v) = locked.as_ref() {
+            return v.cursor_position();
+        }
+        Err("failed to retrieve cursor position".into())
     }
 }
