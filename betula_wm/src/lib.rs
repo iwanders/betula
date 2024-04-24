@@ -12,11 +12,11 @@ mod backend;
 mod backend;
 
 #[derive(Debug, Default)]
-struct WindowFocus {
+struct WindowFocusRetriever {
     backend: backend::BackendType,
     cache: Option<(backend::CacheKey, String)>,
 }
-impl WindowFocus {
+impl WindowFocusRetriever {
     pub fn new() -> Self {
         Self::default()
     }
@@ -44,6 +44,16 @@ impl WindowFocus {
         self.cache = Some(cacheable);
         Ok(name)
     }
+}
+
+#[derive(Debug, Default)]
+struct CursorPositionRetriever {
+    backend: backend::BackendType,
+}
+impl CursorPositionRetriever {
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
         self.backend.cursor_position()
@@ -64,20 +74,21 @@ pub struct CursorPosition {
 }
 
 pub fn main_test() {
-    let mut helper = WindowFocus::new();
+    let mut window_focus = WindowFocusRetriever::new();
+    let mut cursor_position = CursorPositionRetriever::new();
 
     loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
         {
-            let pid = helper.raw_process_id().unwrap();
-            let name = helper.raw_process_name(pid).unwrap();
+            let pid = window_focus.raw_process_id().unwrap();
+            let name = window_focus.raw_process_name(pid).unwrap();
             println!("{pid} -> {name}");
         }
-        if let Ok(n) = helper.process_name() {
+        if let Ok(n) = window_focus.process_name() {
             println!("name: {n}");
         }
-        if let Ok(p) = helper.cursor_position() {
-            println!("cursor possition: {p:?}");
+        if let Ok(p) = cursor_position.cursor_position() {
+            println!("cursor position: {p:?}");
         }
     }
 }
@@ -87,4 +98,7 @@ pub fn main_test() {
 pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::WindowFocusNode, nodes::WindowFocusNodeConfig>();
+    ui_support
+        .add_node_default_with_config::<nodes::CursorPositionNode, nodes::CursorPositionNodeConfig>(
+        );
 }

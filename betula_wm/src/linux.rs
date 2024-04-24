@@ -220,13 +220,14 @@ impl Handler {
             );
             // We always retrieve the root, so root and win retrieval are identical.
             if res > 0 {
-                return Ok(CursorPosition {
+                Ok(CursorPosition {
                     x: win_x_return,
                     y: win_y_return,
-                });
+                })
+            } else {
+                Err("failed to retriever cursor position".into())
             }
         }
-        Err("buuu".into())
     }
 }
 

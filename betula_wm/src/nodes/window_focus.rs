@@ -8,12 +8,12 @@ pub struct WindowFocusNodeConfig {
 }
 impl IsNodeConfig for WindowFocusNodeConfig {}
 
-use crate::WindowFocus;
+use crate::WindowFocusRetriever;
 
 #[derive(Debug, Default)]
 pub struct WindowFocusNode {
     pub config: WindowFocusNodeConfig,
-    focus: WindowFocus,
+    focus: WindowFocusRetriever,
     matches: Vec<Regex>,
 
     #[cfg(feature = "betula_egui")]
