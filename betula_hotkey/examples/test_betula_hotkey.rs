@@ -1,7 +1,7 @@
-use betula_hotkey::{Code, GlobalHotkeyInterface, Hotkey, Modifiers};
+use betula_hotkey::{Code, Hotkey, HotkeyInterface, Modifiers};
 
 pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let runner = GlobalHotkeyInterface::new()?;
+    let runner = HotkeyInterface::new()?;
 
     let sleep_interval = std::time::Duration::from_millis(100);
 

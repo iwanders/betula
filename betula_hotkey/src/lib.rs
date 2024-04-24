@@ -77,12 +77,12 @@ struct State {
 
 type StatePtr = Arc<State>;
 
-struct GlobalHotkeyRunner {
+struct HotkeyRunner {
     thread: Option<std::thread::JoinHandle<()>>,
     running: std::sync::Arc<AtomicBool>,
 }
 
-impl Drop for GlobalHotkeyRunner {
+impl Drop for HotkeyRunner {
     fn drop(&mut self) {
         self.running
             .store(false, std::sync::atomic::Ordering::Relaxed);
@@ -158,7 +158,7 @@ use std::sync::{Arc, Mutex};
 
 /// Interface to the global hotkey system.
 #[derive(Clone)]
-pub struct GlobalHotkeyInterface {
+pub struct HotkeyInterface {
     // Technically, backend isn't used.
     /// Pointer to the actual manager used by the runner.
     backend: Arc<Mutex<backend::BackendType>>,
@@ -171,12 +171,12 @@ pub struct GlobalHotkeyInterface {
 
     /// Actual runner that manages the backend.
     #[allow(dead_code)]
-    _runner: Arc<GlobalHotkeyRunner>,
+    _runner: Arc<HotkeyRunner>,
 }
 
-impl GlobalHotkeyInterface {
+impl HotkeyInterface {
     /// Create a new instance of the interface and start internal threads.
-    pub fn new() -> Result<GlobalHotkeyInterface, BetulaError> {
+    pub fn new() -> Result<HotkeyInterface, BetulaError> {
         let running = std::sync::Arc::new(AtomicBool::new(true));
         let key_map: TrackedStateMap = Default::default();
 
@@ -227,8 +227,8 @@ impl GlobalHotkeyInterface {
             }
         }));
 
-        let runner = Arc::new(GlobalHotkeyRunner { thread, running });
-        Ok(GlobalHotkeyInterface {
+        let runner = Arc::new(HotkeyRunner { thread, running });
+        Ok(HotkeyInterface {
             _runner: runner,
             backend,
             key_map,
@@ -289,12 +289,39 @@ impl GlobalHotkeyInterface {
     }
 }
 
-impl std::fmt::Debug for GlobalHotkeyInterface {
+impl std::fmt::Debug for HotkeyInterface {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(fmt, "GlobalHotkeyRunner<{:?}>", Arc::as_ptr(&self.backend))
+        write!(fmt, "HotkeyRunner<{:?}>", Arc::as_ptr(&self.backend))
+    }
+}
+impl std::cmp::PartialEq for HotkeyInterface {
+    fn eq(&self, other: &HotkeyInterface) -> bool {
+        Arc::as_ptr(&self._runner) == Arc::as_ptr(&other._runner)
+    }
+}
+
+#[derive(Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct HotkeyBlackboard {
+    #[serde(skip)]
+    pub interface: Option<HotkeyInterface>,
+}
+impl HotkeyBlackboard {
+    pub fn register(&self, key: Hotkey) -> Result<HotkeyToken, HotkeyError> {
+        let interface = self
+            .interface
+            .as_ref()
+            .ok_or(format!("no interface present in value"))?;
+        interface.register(key)
+    }
+}
+impl std::fmt::Debug for HotkeyBlackboard {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "Hotkey")
     }
 }
 
 /// Register global_hotkey nodes to the ui support.
 #[cfg(feature = "betula_egui")]
-pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {}
+pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
+    ui_support.add_value_default_named::<HotkeyBlackboard>("Hotkey");
+}
