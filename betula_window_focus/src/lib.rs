@@ -1,4 +1,5 @@
 pub type WindowFocusError = Box<dyn std::error::Error + Send + Sync + 'static>;
+use serde::{Serialize, Deserialize};
 
 pub mod nodes;
 
@@ -43,6 +44,21 @@ impl WindowFocus {
         self.cache = Some(cacheable);
         Ok(name)
     }
+
+    pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
+        self.backend.cursor_position()
+    }
+}
+
+
+/// Structure to represent a cursor position.
+///
+/// Windows: 0,0 is top left of primary, top right is 1919,0, bottom right is 1919,1079. Left monitor (non primary) is
+/// -1920,0 top left and -1920,1079 bottom left.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CursorPosition{
+    pub x: i32,
+    pub y: i32,
 }
 
 pub fn main_test() {
@@ -56,7 +72,10 @@ pub fn main_test() {
             println!("{pid} -> {name}");
         }
         if let Ok(n) = helper.process_name() {
-            println!("{n}");
+            println!("name: {n}");
+        }
+        if let Ok(p) = helper.cursor_position() {
+            println!("cursor possition: {p:?}");
         }
     }
 }

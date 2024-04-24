@@ -6,10 +6,10 @@ use windows::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_NATIVE,
         PROCESS_QUERY_LIMITED_INFORMATION,
     },
-    Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
+    Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId, GetCursorPos},
 };
 
-use crate::WindowFocusError;
+use crate::{WindowFocusError, CursorPosition};
 type DWORD = u32;
 
 pub type BackendType = WindowsFocusHandler;
@@ -52,6 +52,18 @@ impl WindowsFocusHandler {
             // Succeeded, null termination is guaranteed according to the docs, so we can string convert this.
             Ok(ptr.to_string()?)
         }
+    }
+
+
+    pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
+        let mut p : windows::Win32::Foundation::POINT = Default::default();
+        unsafe {
+            GetCursorPos(&mut p)?;
+        }
+        Ok(CursorPosition{
+            x: p.x,
+            y: p.y,
+        })
     }
 
     pub fn process_id(&self) -> Result<u32, WindowFocusError> {

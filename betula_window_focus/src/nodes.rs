@@ -16,6 +16,7 @@ pub struct WindowFocusNode {
     focus: WindowFocus,
     matches: Vec<Regex>,
 
+    #[cfg(feature = "betula_egui")]
     regex_editor: Option<(usize, String)>,
 }
 
