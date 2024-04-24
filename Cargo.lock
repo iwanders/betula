@@ -550,7 +550,7 @@ dependencies = [
  "betula_core",
  "betula_egui",
  "betula_enigo",
- "betula_global_hotkey",
+ "betula_hotkey",
  "betula_std",
  "betula_wm",
  "eframe",
@@ -585,7 +585,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "betula_global_hotkey"
+name = "betula_hotkey"
 version = "0.0.1"
 dependencies = [
  "betula_core",

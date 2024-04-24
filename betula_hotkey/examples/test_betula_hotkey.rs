@@ -1,4 +1,4 @@
-use betula_global_hotkey::{Code, GlobalHotkeyInterface, Hotkey, Modifiers};
+use betula_hotkey::{Code, GlobalHotkeyInterface, Hotkey, Modifiers};
 
 pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let runner = GlobalHotkeyInterface::new()?;
