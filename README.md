@@ -21,7 +21,9 @@ Main components:
 - Control protocol to manipulate a tree.
 - Server thread to allow running a tree in the background.
 
-## betula_egui
+## betula_editor
+A gui built on [egui](https://github.com/emilk/egui).
+
 - Uses the control protocol from `betula_common`.
 - `UiNode` trait that must be implemented for `Node`s to provide editor support.
 - `BetulaViewer`, backed by [egui-snarl](https://github.com/zakarumych/egui-snarl).

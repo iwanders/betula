@@ -4,7 +4,7 @@ resolver = "2"
 members = [
     "betula_core",
     "betula_common",
-    "betula_egui",
+    "betula_editor",
     "betula_enigo",
     "betula_hotkey",
     "betula_std",
@@ -23,7 +23,7 @@ members = [
 
 [workspace.dependencies]
 betula_core = { version = "0.0.1", path = "betula_core", default-features = false }
-betula_egui = { version = "0.0.1", path = "betula_egui", default-features = false }
+betula_editor = { version = "0.0.1", path = "betula_editor", default-features = false }
 betula_common = { version = "0.0.1", path = "betula_common", default-features = false }
 betula_enigo = { version = "0.0.1", path = "betula_enigo", default-features = false }
 betula_std = { version = "0.0.1", path = "betula_std", default-features = false }

@@ -10,7 +10,7 @@ default = []
 
 [dependencies]
 betula_core = { workspace = true, default-features = false }
-betula_egui = { workspace = true, default-features = false, optional=true}
+betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 enigo = {version = "0.2.0", features = ["serde"] }
 

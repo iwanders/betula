@@ -74,10 +74,10 @@ impl Node for ParallelNode {
     }
 }
 
-#[cfg(feature = "betula_egui")]
+#[cfg(feature = "betula_editor")]
 pub mod ui_support {
     use super::*;
-    use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+    use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
     impl UiNode for ParallelNode {
         fn ui_title(&self) -> String {

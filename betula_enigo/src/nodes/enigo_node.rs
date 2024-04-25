@@ -62,10 +62,10 @@ impl Node for EnigoNode {
     }
 }
 
-#[cfg(feature = "betula_egui")]
+#[cfg(feature = "betula_editor")]
 mod ui_support {
     use super::*;
-    use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+    use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
     use enigo::{Axis, Coordinate, Direction};
 
     fn direction_to_str(d: Direction) -> &'static str {

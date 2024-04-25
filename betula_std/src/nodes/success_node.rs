@@ -30,10 +30,10 @@ impl Node for SuccessNode {
     }
 }
 
-#[cfg(feature = "betula_egui")]
+#[cfg(feature = "betula_editor")]
 pub mod ui_support {
     use super::*;
-    use betula_egui::{UiNode, UiNodeCategory};
+    use betula_editor::{UiNode, UiNodeCategory};
 
     impl UiNode for SuccessNode {
         fn ui_title(&self) -> String {

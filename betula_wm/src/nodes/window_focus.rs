@@ -16,7 +16,7 @@ pub struct WindowFocusNode {
     focus: WindowFocusRetriever,
     matches: Vec<Regex>,
 
-    #[cfg(feature = "betula_egui")]
+    #[cfg(feature = "betula_editor")]
     regex_editor: Option<(usize, String)>,
 }
 
@@ -59,10 +59,10 @@ impl Node for WindowFocusNode {
     }
 }
 
-#[cfg(feature = "betula_egui")]
+#[cfg(feature = "betula_editor")]
 pub mod ui_support {
     use super::*;
-    use betula_egui::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+    use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
     impl UiNode for WindowFocusNode {
         fn ui_title(&self) -> String {

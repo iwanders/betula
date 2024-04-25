@@ -548,7 +548,7 @@ version = "0.0.1"
 dependencies = [
  "betula_common",
  "betula_core",
- "betula_egui",
+ "betula_editor",
  "betula_enigo",
  "betula_hotkey",
  "betula_std",
@@ -558,7 +558,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "betula_egui"
+name = "betula_editor"
 version = "0.0.1"
 dependencies = [
  "betula_common",
@@ -579,7 +579,7 @@ name = "betula_enigo"
 version = "0.0.1"
 dependencies = [
  "betula_core",
- "betula_egui",
+ "betula_editor",
  "enigo",
  "serde",
 ]
@@ -589,7 +589,7 @@ name = "betula_hotkey"
 version = "0.0.1"
 dependencies = [
  "betula_core",
- "betula_egui",
+ "betula_editor",
  "global-hotkey",
  "keyboard-types",
  "serde",
@@ -601,7 +601,7 @@ name = "betula_std"
 version = "0.0.1"
 dependencies = [
  "betula_core",
- "betula_egui",
+ "betula_editor",
  "serde",
  "uuid",
 ]
@@ -611,7 +611,7 @@ name = "betula_wm"
 version = "0.0.1"
 dependencies = [
  "betula_core",
- "betula_egui",
+ "betula_editor",
  "regex",
  "serde",
  "windows 0.56.0",

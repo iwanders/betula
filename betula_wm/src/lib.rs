@@ -94,8 +94,8 @@ pub fn main_test() {
 }
 
 /// Register enigo nodes to the ui support.
-#[cfg(feature = "betula_egui")]
-pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
+#[cfg(feature = "betula_editor")]
+pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::WindowFocusNode, nodes::WindowFocusNodeConfig>();
     ui_support

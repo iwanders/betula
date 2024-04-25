@@ -1,6 +1,6 @@
 use betula_common::{control::InProcessControl, create_server_thread};
 use betula_core::basic::{BasicBlackboard, BasicTree};
-use betula_egui::{editor::BetulaEditor, UiSupport};
+use betula_editor::{editor::BetulaEditor, UiSupport};
 
 // Factory function for the ui support.
 fn create_ui_support() -> UiSupport {
@@ -37,7 +37,7 @@ fn main() -> eframe::Result<()> {
             .with_min_inner_size([300.0, 220.0]),
         ..Default::default()
     };
-    native_options.viewport.icon = Some(std::sync::Arc::new(betula_egui::betula_icon()));
+    native_options.viewport.icon = Some(std::sync::Arc::new(betula_editor::betula_icon()));
 
     eframe::run_native(
         "Betula Interface",

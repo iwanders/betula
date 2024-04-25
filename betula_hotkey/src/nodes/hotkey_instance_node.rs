@@ -46,10 +46,10 @@ impl Node for HotkeyInstanceNode {
     }
 }
 
-#[cfg(feature = "betula_egui")]
+#[cfg(feature = "betula_editor")]
 mod ui_support {
     use super::*;
-    use betula_egui::{UiNode, UiNodeCategory};
+    use betula_editor::{UiNode, UiNodeCategory};
 
     impl UiNode for HotkeyInstanceNode {
         fn ui_title(&self) -> String {

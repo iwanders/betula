@@ -1,5 +1,5 @@
 [package]
-name = "betula_egui"
+name = "betula_editor"
 version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"
@@ -23,4 +23,4 @@ serde_json = { version = "1.0" }
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
-betula_std = { workspace = true, features=["betula_egui"] }
+betula_std = { workspace = true, features=["betula_editor"] }

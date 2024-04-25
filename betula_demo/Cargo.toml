@@ -7,10 +7,10 @@ license = "BSD-3-Clause"
 [dependencies]
 betula_common = { workspace = true }
 betula_core = { workspace = true }
-betula_egui = { workspace = true }
-betula_enigo = { workspace = true, features=["betula_egui"] }
-betula_wm = { workspace = true, features=["betula_egui"] }
-betula_std = { workspace = true, features=["betula_egui"] }
-betula_hotkey = { workspace = true, features=["betula_egui"] }
+betula_editor = { workspace = true }
+betula_enigo = { workspace = true, features=["betula_editor"] }
+betula_wm = { workspace = true, features=["betula_editor"] }
+betula_std = { workspace = true, features=["betula_editor"] }
+betula_hotkey = { workspace = true, features=["betula_editor"] }
 eframe = { version = "0.26", features = ["serde", "persistence"] }
 egui = { version = "0.26" }
