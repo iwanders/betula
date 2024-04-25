@@ -52,9 +52,8 @@ Decorators:
 
 
 ## betula_enigo
-Betula nodes for [enigo](https://github.com/enigo-rs/enigo): `Cross platform input simulation in Rust`.
+Betula nodes for [enigo](https://crates.io/crates/enigo): `Cross platform input simulation in Rust`.
 
-#### Nodes:
   - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
   - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
 
@@ -63,6 +62,14 @@ Pertains itself to information obtained from the window manager.
 
   - `WindowFocusNode`: Returns `Success` if the regex matches the binary that created the window that has focus.
   - `CursorPositionNode`: Provides the cursor position.
+
+## betula_hotkey
+Facilitates detecting hotkeys (without the editor being focussed).
+For x11, this relies on the [global_hotkey](https://crates.io/crates/global-hotkey) crate.
+On Windows, this uses a self-built low level hook, such that it can detect events without them being blocked.
+
+  - `HotkeyInstanceNode`: Provides an `Hotkey` instance for registering hotkeys.
+  - `HotkeyNode`: Returns `Success` if the hotkey is depressed or toggled.
 
 
 
