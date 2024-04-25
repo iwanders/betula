@@ -8,7 +8,7 @@ It is created with the goal of automating a computer game, but the library itsel
 
 # Crates
 
-Overview of the crates in this workspace. Crates with nodes provide the `UiNode` implementaiton if the `betula_egui` feature is enabled.
+Overview of the crates in this workspace. Crates with nodes provide the `UiNode` implementation if the `betula_editor` feature is enabled.
 
 ## betula_core
 - Holds the traits for `Node` and `Tree`.
@@ -68,7 +68,7 @@ Pertains itself to information obtained from the window manager.
 ## betula_hotkey
 Facilitates detecting hotkeys (without the editor being focussed).
 For x11, this relies on the [global_hotkey](https://crates.io/crates/global-hotkey) crate.
-On Windows, this uses a self-built low level hook, such that it can detect events without them being blocked.
+On Windows, this uses a self-built low level hook, such that it can detect events without blocking them.
 
   - `HotkeyInstanceNode`: Provides an `Hotkey` instance for registering hotkeys.
   - `HotkeyNode`: Returns `Success` if the hotkey is depressed or toggled.
