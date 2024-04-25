@@ -67,16 +67,77 @@ use betula_common::control::{
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-const RELATION_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0xb0);
-const BLACKBOARD_COLOR: Color32 = Color32::from_rgb(0xb0, 0xb0, 0xb0);
-const UNKNOWN_COLOR: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
-
 use uuid::Uuid;
 
 use egui_snarl::{
     ui::{PinInfo, SnarlViewer},
     InPin, InPinId, NodeId as SnarlNodeId, OutPin, OutPinId, Snarl,
 };
+
+const RELATION_COLOR: Color32 = Color32::from_rgb(0xb0, 0xb0, 0xb0);
+const BLACKBOARD_COLOR: Color32 = Color32::from_rgb(0x70, 0x70, 0x70);
+const UNKNOWN_COLOR: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
+
+fn color_with_status(
+    current: Color32,
+    status: Option<&Result<ExecutionStatus, String>>,
+    saturation_bump: f32,
+    value_bump: (f32, f32),
+) -> Option<Color32> {
+    let mut current_hsva = egui::ecolor::Hsva::from_srgba_premultiplied(current.to_array());
+    let hue_success = 100.0 / 360.0;
+    let hue_failure = 1.0;
+    let hue_running = 41.0 / 360.0;
+    let hue_error = 300.0 / 360.0;
+
+    if let Some(node_status) = status.as_ref() {
+        let hue = match node_status {
+            Ok(ExecutionStatus::Success) => hue_success,
+            Ok(ExecutionStatus::Failure) => hue_failure,
+            Ok(ExecutionStatus::Running) => hue_running,
+            Err(_e) => hue_error,
+        };
+        current_hsva.s = (current_hsva.s + saturation_bump).min(1.0);
+        if current_hsva.v < value_bump.0 {
+            current_hsva.v = (current_hsva.v + value_bump.1).min(1.0);
+        }
+        current_hsva.h = hue;
+        let [r, g, b, a] = current_hsva.to_srgba_premultiplied();
+        let new_color = Color32::from_rgba_premultiplied(r, g, b, a);
+        Some(new_color)
+    } else {
+        None
+    }
+}
+
+fn color_wire_status(
+    current: Color32,
+    status: Option<&Result<ExecutionStatus, String>>,
+) -> Option<Color32> {
+    let value_threshold = 0.0;
+    let value_increase = 0.0;
+    let satutarion_bump = 0.5;
+    color_with_status(
+        current,
+        status,
+        satutarion_bump,
+        (value_threshold, value_increase),
+    )
+}
+fn color_edge_status(
+    current: Color32,
+    status: Option<&Result<ExecutionStatus, String>>,
+) -> Option<Color32> {
+    let value_threshold = 0.5;
+    let value_increase = 0.5;
+    let satutarion_bump = 0.75;
+    color_with_status(
+        current,
+        status,
+        satutarion_bump,
+        (value_threshold, value_increase),
+    )
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerNode {
@@ -2100,17 +2161,19 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref mut node) => {
+                let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                    .unwrap_or(RELATION_COLOR);
                 if node.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
                         Some(
                             PinInfo::triangle()
-                                .with_fill(RELATION_COLOR)
+                                .with_fill(color)
                                 .vertical()
                                 // .wiring()
                                 .with_gamma(0.5),
                         )
                     } else {
-                        Some(PinInfo::triangle().with_fill(RELATION_COLOR).vertical())
+                        Some(PinInfo::triangle().with_fill(color).vertical())
                     }
                 } else {
                     None
@@ -2130,15 +2193,17 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
                 // let child_ports = node.vertical_outputs();
+                let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                    .unwrap_or(RELATION_COLOR);
                 if node.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
                         PinInfo::triangle()
-                            .with_fill(RELATION_COLOR)
+                            .with_fill(color)
                             .vertical()
                             // .wiring()
                             .with_gamma(0.5)
                     } else {
-                        PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                        PinInfo::triangle().with_fill(color).vertical()
                     }
                 } else {
                     if let Some(ui_node) = &node.ui_node {
@@ -2190,8 +2255,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
+                let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                    .unwrap_or(RELATION_COLOR);
                 if node.is_child_input(&pin.id) {
-                    Some(PinInfo::triangle().with_fill(RELATION_COLOR).vertical())
+                    Some(PinInfo::triangle().with_fill(color).vertical())
                 } else {
                     None
                 }
@@ -2210,7 +2277,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
                 if node.is_child_input(&pin.id) {
-                    PinInfo::triangle().with_fill(RELATION_COLOR).vertical()
+                    let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                        .unwrap_or(RELATION_COLOR);
+                    PinInfo::triangle().with_fill(color).vertical()
                 } else {
                     if let Some(ui_node) = &node.ui_node {
                         if let Some(input_port) = node.pin_to_input(&pin.id) {
@@ -2439,29 +2508,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
         match &snarl[id] {
             BetulaViewerNode::Node(ref node) => {
-                let mut current_hsva =
-                    egui::ecolor::Hsva::from_srgba_premultiplied(current.color.to_array());
-                let hue_success = 100.0 / 360.0;
-                let hue_failure = 1.0;
-                let hue_running = 41.0 / 360.0;
-                let hue_error = 300.0 / 360.0;
-                let satutarion_bump = 0.75;
-                let value_bump = 0.5;
-
-                if let Some(node_status) = node.node_status.as_ref() {
-                    let hue = match node_status {
-                        Ok(ExecutionStatus::Success) => hue_success,
-                        Ok(ExecutionStatus::Failure) => hue_failure,
-                        Ok(ExecutionStatus::Running) => hue_running,
-                        Err(_e) => hue_error,
-                    };
-                    current_hsva.s = (current_hsva.s + satutarion_bump).min(1.0);
-                    if current_hsva.v < 0.5 {
-                        current_hsva.v = (current_hsva.v + value_bump).min(1.0);
-                    }
-                    current_hsva.h = hue;
-                    let [r, g, b, a] = current_hsva.to_srgba_premultiplied();
-                    let new_color = Color32::from_rgba_premultiplied(r, g, b, a);
+                if let Some(new_color) = color_edge_status(current.color, node.node_status.as_ref())
+                {
                     Some(egui::Stroke::from((current.width + 0.5, new_color)))
                 } else {
                     None
