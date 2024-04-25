@@ -86,7 +86,7 @@ pub mod ui_support {
             &mut self,
             ctx: &dyn UiNodeContext,
             ui: &mut egui::Ui,
-            scale: f32,
+            _scale: f32,
         ) -> UiConfigResponse {
             let _ = ctx;
             // let mut ui_response = UiConfigResponse::UnChanged;
