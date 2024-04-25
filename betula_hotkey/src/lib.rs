@@ -122,8 +122,14 @@ impl Drop for RemovalHelper {
         }
     }
 }
+impl std::fmt::Debug for RemovalHelper {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "RemovalHelper<{}>", self.fun.is_some())
+    }
+}
 
 /// An interface to a particular hotkey.
+#[derive(Debug)]
 pub struct HotkeyToken {
     state: StatePtr,
     hotkey: Hotkey,
@@ -324,4 +330,6 @@ impl std::fmt::Debug for HotkeyBlackboard {
 #[cfg(feature = "betula_egui")]
 pub fn add_ui_support(ui_support: &mut betula_egui::UiSupport) {
     ui_support.add_value_default_named::<HotkeyBlackboard>("Hotkey");
+    ui_support.add_node_default::<nodes::HotkeyInstanceNode>();
+    ui_support.add_node_default_with_config::<nodes::HotkeyNode, nodes::HotkeyNodeConfig>();
 }
