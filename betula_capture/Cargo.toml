@@ -1,0 +1,16 @@
+[package]
+name = "betula_capture"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-3-Clause"
+
+
+[dependencies]
+betula_core = { workspace = true, default-features = false }
+betula_editor = { workspace = true, default-features = false, optional=true}
+serde =  { version = "1.0", features = ["derive"] }
+
+# One of these days I should split this out...
+screen_capture = { git = "https://github.com/iwanders/displaylight_rs", rev="c55935d9feb85b4e4f9efddfe879704afadb8e57" }
+
+
