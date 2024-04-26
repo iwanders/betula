@@ -326,7 +326,7 @@ impl std::fmt::Debug for HotkeyBlackboard {
     }
 }
 
-/// Register global_hotkey nodes to the ui support.
+/// Register hotkey nodes to the ui support.
 #[cfg(feature = "betula_editor")]
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_value_default_named::<HotkeyBlackboard>("Hotkey");

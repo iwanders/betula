@@ -93,7 +93,7 @@ pub fn main_test() {
     }
 }
 
-/// Register enigo nodes to the ui support.
+/// Register nodes to the ui support.
 #[cfg(feature = "betula_editor")]
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
