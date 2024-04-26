@@ -132,3 +132,95 @@ impl CaptureGrabber {
         Some(self.grabber.get_image())
     }
 }
+
+// And the stuff below is from landmark localizer
+
+/// Wrapper such that we can implement GenericImageView for the RGB buffer.
+pub struct CaptureAdaptor<'a> {
+    pub width: usize,
+    pub height: usize,
+    pub buffer: &'a [screen_capture::RGB],
+}
+impl<'a> CaptureAdaptor<'a> {
+    pub fn to_width_height_vec(&self) -> (u32, u32, Vec<u8>) {
+        (
+            self.width as u32,
+            self.height as u32,
+            self.buffer
+                .iter()
+                .flat_map(|rgb| {
+                    let mut res = image::Rgba::<u8>::from([0; 4]);
+                    res.0[0] = rgb.r;
+                    res.0[1] = rgb.g;
+                    res.0[2] = rgb.b;
+                    res.0[3] = 0;
+                    res.0
+                })
+                .collect(),
+        )
+    }
+    pub fn to_width_height_vec2(&self) -> (u32, u32, Vec<u8>) {
+        let mut data = Vec::<u8>::with_capacity(4 * self.width * self.height);
+        for y in 0..self.height {
+            let start = y * self.width;
+            for x in 0..self.width {
+                let p = start + x;
+                data.push(self.buffer[p].r);
+                data.push(self.buffer[p].g);
+                data.push(self.buffer[p].b);
+                data.push(0);
+            }
+        }
+        (self.width as u32, self.height as u32, data)
+    }
+
+    pub fn to_width_height_vec3(&self) -> (u32, u32, Vec<u8>) {
+        let start = self.buffer.as_ptr();
+        // This is provably safe.
+        let data = unsafe {
+            let len = self.buffer.len();
+            let ratio = std::mem::size_of::<screen_capture::RGB>() / std::mem::size_of::<u8>();
+            let byte_ptr = std::mem::transmute::<*const screen_capture::RGB, *const u8>(start);
+            let slice = std::slice::from_raw_parts(byte_ptr, len * ratio);
+            slice.to_vec()
+        };
+
+        (self.width as u32, self.height as u32, data)
+    }
+}
+impl<'a> image::GenericImageView for CaptureAdaptor<'a> {
+    type Pixel = image::Rgba<u8>;
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width as u32, self.height as u32)
+    }
+    fn width(&self) -> u32 {
+        self.width as u32
+    }
+    fn height(&self) -> u32 {
+        self.height as u32
+    }
+
+    fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
+        let rgb = self.buffer[y as usize * self.width + x as usize];
+        let mut res = image::Rgba::<u8>::from([0; 4]);
+        res.0[0] = rgb.r;
+        res.0[1] = rgb.g;
+        res.0[2] = rgb.b;
+        res.0[3] = 0;
+        res
+    }
+}
+
+pub trait CaptureAdapted {
+    fn as_adapted(&self) -> CaptureAdaptor;
+}
+
+impl CaptureAdapted for Box<dyn screen_capture::Image> {
+    fn as_adapted(&self) -> CaptureAdaptor {
+        CaptureAdaptor {
+            width: self.get_width() as usize,
+            height: self.get_height() as usize,
+            buffer: self.get_data().unwrap(),
+        }
+    }
+}

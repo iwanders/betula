@@ -41,7 +41,7 @@ impl Node for CaptureNode {
         &mut self,
         interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
-        self.output = interface.output::<CaptureImage>("image", Default::default())?;
+        // self.output = interface.output::<CaptureImage>("image", Default::default())?;
         Ok(())
     }
 

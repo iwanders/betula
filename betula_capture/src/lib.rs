@@ -2,7 +2,7 @@ pub type CaptureError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub mod nodes;
 
-pub(crate) mod capture;
+pub mod capture;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -11,7 +11,7 @@ use screen_capture::Image;
 #[derive(Clone, Serialize)]
 pub struct CaptureImage {
     #[serde(skip)]
-    pub image: std::sync::Arc<std::sync::Mutex<Box<dyn Image>>>,
+    pub image: std::sync::Arc<Box<dyn Image>>,
 }
 impl Default for CaptureImage {
     fn default() -> Self {
@@ -19,7 +19,7 @@ impl Default for CaptureImage {
         use screen_capture::raster_image::RasterImage;
         let dummy = RasterImage::filled(0, 0, screen_capture::RGB::black());
         CaptureImage {
-            image: std::sync::Arc::new(std::sync::Mutex::new(Box::new(dummy))),
+            image: std::sync::Arc::new(Box::new(dummy)),
         }
     }
 }
