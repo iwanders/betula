@@ -11,15 +11,14 @@ use screen_capture::Image;
 #[derive(Clone, Serialize)]
 pub struct CaptureImage {
     #[serde(skip)]
-    pub image: std::sync::Arc<Box<dyn Image>>,
+    pub image: std::sync::Arc<image::RgbaImage>,
 }
 impl Default for CaptureImage {
     fn default() -> Self {
         // superb hack here... we make an image that's 0x0 pixels.
-        use screen_capture::raster_image::RasterImage;
-        let dummy = RasterImage::filled(0, 0, screen_capture::RGB::black());
+        let dummy = image::RgbaImage::new(0, 0);
         CaptureImage {
-            image: std::sync::Arc::new(Box::new(dummy)),
+            image: std::sync::Arc::new(dummy),
         }
     }
 }
@@ -35,12 +34,7 @@ impl<'de> Deserialize<'de> for CaptureImage {
 
 impl std::fmt::Debug for CaptureImage {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            fmt,
-            "Image({}x{})",
-            self.image.get_width(),
-            self.image.get_height()
-        )
+        write!(fmt, "Image({}x{})", self.image.width(), self.image.height())
     }
 }
 
