@@ -11,6 +11,6 @@ betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
 # One of these days I should split this out...
-screen_capture = { git = "https://github.com/iwanders/displaylight_rs", rev="c55935d9feb85b4e4f9efddfe879704afadb8e57" }
+screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="334b25f145cdf1e7369fcaf5884ef81e91e1baf2" }
 
 image = { version ="0.25.1", default-features=false}

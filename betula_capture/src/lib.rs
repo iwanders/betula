@@ -2,11 +2,7 @@ pub type CaptureError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub mod nodes;
 
-pub mod capture;
-
 use serde::{Deserialize, Deserializer, Serialize};
-
-use screen_capture::Image;
 
 #[derive(Clone, Serialize)]
 pub struct CaptureImage {
@@ -46,4 +42,7 @@ impl PartialEq for CaptureImage {
 
 /// Register nodes to the ui support.
 #[cfg(feature = "betula_editor")]
-pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {}
+pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
+    ui_support.add_value_default_named::<CaptureImage>("Image");
+    ui_support.add_node_default_with_config::<nodes::CaptureNode, nodes::CaptureNodeConfig>();
+}

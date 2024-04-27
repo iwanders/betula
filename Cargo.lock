@@ -2753,9 +2753,11 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "screen_capture"
 version = "0.0.0"
-source = "git+https://github.com/iwanders/displaylight_rs?rev=c55935d9feb85b4e4f9efddfe879704afadb8e57#c55935d9feb85b4e4f9efddfe879704afadb8e57"
+source = "git+https://github.com/iwanders/screen_capture?rev=334b25f145cdf1e7369fcaf5884ef81e91e1baf2#334b25f145cdf1e7369fcaf5884ef81e91e1baf2"
 dependencies = [
+ "image 0.25.1",
  "libc",
+ "serde",
  "windows 0.29.0",
 ]
 

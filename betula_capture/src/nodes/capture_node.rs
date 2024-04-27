@@ -1,12 +1,11 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::capture::{get_config, CaptureGrabber, CaptureSpecification};
 use crate::CaptureImage;
+use screen_capture::config::{get_config, CaptureSpecification, ConfiguredCapture};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct CaptureNodeConfig {
-    force_copy: bool,
     specifications: Vec<CaptureSpecification>,
 }
 impl IsNodeConfig for CaptureNodeConfig {}
@@ -14,7 +13,7 @@ impl IsNodeConfig for CaptureNodeConfig {}
 #[derive(Default)]
 pub struct CaptureNode {
     output: Output<CaptureImage>,
-    capture: Option<CaptureGrabber>,
+    capture: Option<ConfiguredCapture>,
     pub config: CaptureNodeConfig,
 }
 impl std::fmt::Debug for CaptureNode {
@@ -96,10 +95,6 @@ mod ui_support {
                             ui_response = UiConfigResponse::Changed;
                         }
                     }
-                    let r = ui.checkbox(&mut self.config.force_copy, "Copy");
-                    if r.changed() {
-                        ui_response = UiConfigResponse::Changed;
-                    }
                 });
 
                 ui.vertical(|ui| {
@@ -114,7 +109,7 @@ mod ui_support {
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("action".to_owned()),
+                UiNodeCategory::Folder("provider".to_owned()),
                 UiNodeCategory::Name("capture".to_owned()),
             ]
         }
