@@ -52,6 +52,7 @@ For nodes:
         Ports are the remainder.
 */
 
+use crate::widgets;
 use crate::{UiConfigResponse, UiNode, UiNodeContext, UiSupport, UiValue};
 use egui::{Color32, Ui};
 
@@ -185,6 +186,10 @@ pub struct ViewerNode {
     /// Used for coloring the node border if enabled.
     #[serde(skip)]
     node_status: Option<Result<ExecutionStatus, String>>,
+
+    name_remote: Option<String>,
+    name_local: Option<String>,
+    name_editor: Option<String>,
 }
 
 impl ViewerNode {
@@ -197,6 +202,9 @@ impl ViewerNode {
             children_dirty: false,
             config_needs_send: false,
             node_status: None,
+            name_remote: None,
+            name_local: None,
+            name_editor: None,
         }
     }
 
@@ -849,24 +857,7 @@ impl ViewerBlackboard {
 
         ui.horizontal(|ui| {
             ui.label("Name:");
-            if let Some(ref mut editor_string) = &mut self.name_editor {
-                let edit_box = egui::TextEdit::singleline(editor_string)
-                    .desired_width(0.0)
-                    .clip_text(false);
-                let r = ui.add(edit_box);
-                if r.lost_focus() {
-                    if name != *editor_string {
-                        data.name_local = Some(editor_string.clone());
-                    }
-                    self.name_editor = None;
-                    ui.close_menu();
-                }
-            } else {
-                let r = ui.label(format!("{}", &name));
-                if r.clicked() {
-                    self.name_editor = Some(name.clone().into());
-                }
-            }
+            widgets::add_name_editor(ui, &name, &mut self.name_editor, &mut data.name_local);
         });
 
         ui.horizontal(|ui| {
@@ -1455,9 +1446,13 @@ impl BetulaViewer {
     ) -> Result<(), BetulaError> {
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
         for node in node_ids {
-            if let BetulaViewerNode::Node(node) = &snarl[node] {
+            if let BetulaViewerNode::Node(ref mut node) = &mut snarl[node] {
                 if !node.children_is_up_to_date() {
                     let cmd = InteractionCommand::set_children(node.id, node.desired_children());
+                    self.client.send_command(cmd)?;
+                }
+                if let Some(new_name) = node.name_local.take() {
+                    let cmd = InteractionCommand::set_node_name(node.id, new_name);
                     self.client.send_command(cmd)?;
                 }
             }
@@ -1639,6 +1634,7 @@ impl BetulaViewer {
         if viewer_node.ui_node.is_none() {
             viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
         }
+        viewer_node.name_remote = v.name;
 
         // Update the configuration if we have one.
         let ui_node = viewer_node.ui_node.as_mut().unwrap();
@@ -1965,7 +1961,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             BetulaViewerNode::Node(node) => {
                 // Grab the type support for this node.
                 if let Some(ui_node) = &node.ui_node {
-                    ui_node.ui_title()
+                    if let Some(name) = &node.name_remote {
+                        format!("{name}", ui_node.ui_title())
+                    } else {
+                        ui_node.ui_title()
+                    }
                 } else {
                     "Pending...".to_owned()
                 }
@@ -2437,6 +2437,16 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                     ui.close_menu();
                 }
+                let name = node.name_remote.as_deref().unwrap_or("unnamed");
+                ui.horizontal(|ui| {
+                    ui.label("Name:");
+                    widgets::add_name_editor(
+                        ui,
+                        &name,
+                        &mut node.name_editor,
+                        &mut node.name_local,
+                    );
+                });
             }
             BetulaViewerNode::Blackboard(ref mut bb) => {
                 bb.ui_node_menu(ui);

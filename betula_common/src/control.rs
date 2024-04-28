@@ -117,6 +117,9 @@ pub enum InteractionCommand {
     /// Set a node's children.
     SetChildren(SetChildren),
 
+    /// Name a node.
+    SetNodeName(NodeId, String),
+
     /// Add a blackboard
     AddBlackboard(BlackboardId),
 
@@ -175,6 +178,11 @@ impl InteractionCommand {
     pub fn remove_node(id: NodeId) -> Self {
         InteractionCommand::RemoveNode(id)
     }
+
+    pub fn set_node_name(id: NodeId, name: String) -> Self {
+        InteractionCommand::SetNodeName(id, name)
+    }
+
     pub fn connect_port(port_connection: PortConnection) -> Self {
         Self::port_disconnect_connect(&vec![], &vec![port_connection])
     }
@@ -234,6 +242,7 @@ impl InteractionCommand {
         node_id: NodeId,
         tree: &mut dyn Tree,
     ) -> Result<NodeInformation, BetulaError> {
+        let name = tree.node_name(node_id)?;
         let node = tree
             .node_mut(node_id)
             .ok_or(format!("cannot find {node_id:?}"))?;
@@ -250,6 +259,7 @@ impl InteractionCommand {
             node_type,
             config,
             children,
+            name,
         })
     }
 
@@ -314,6 +324,20 @@ impl InteractionCommand {
                     command: self.clone(),
                     error: None,
                 })])
+            }
+            InteractionCommand::SetNodeName(node_id, name) => {
+                tree.set_node_name(*node_id, Some(&name))?;
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::NodeInformation(Self::node_information(
+                        tree_support,
+                        *node_id,
+                        tree,
+                    )?),
+                ])
             }
             InteractionCommand::AddBlackboard(v) => {
                 let blackboard = tree_support
@@ -454,7 +478,7 @@ impl InteractionCommand {
                 })])
             }
             InteractionCommand::SetBlackboardName(blackboard_id, name) => {
-                tree.set_blackboard_name(*blackboard_id, &name)?;
+                tree.set_blackboard_name(*blackboard_id, Some(&name))?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
                         command: self.clone(),
@@ -508,6 +532,7 @@ pub struct ExecutionResult {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInformation {
     pub id: NodeId,
+    pub name: Option<String>,
     pub node_type: NodeType,
     pub config: Option<SerializedConfig>,
     pub children: Vec<NodeId>,

@@ -30,6 +30,7 @@ use std::collections::HashSet;
 struct BasicTreeNode {
     node: RefCell<Box<dyn Node>>,
     children: Vec<NodeId>,
+    name: Option<String>,
 }
 #[derive(Debug)]
 struct BasicBlackboardEntry {
@@ -334,6 +335,7 @@ impl Tree for BasicTree {
             BasicTreeNode {
                 node: node.into(),
                 children: vec![],
+                name: None,
             },
         );
         Ok(id)
@@ -504,23 +506,39 @@ impl Tree for BasicTree {
     fn set_blackboard_name(
         &mut self,
         blackboard_id: BlackboardId,
-        name: &str,
+        name: Option<&str>,
     ) -> Result<(), BetulaError> {
         let blackboard = self
             .blackboards
             .get_mut(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
-        blackboard.name = Some(name.to_owned());
+        blackboard.name = name.map(|v| v.to_owned());
         Ok(())
     }
 
-    /// Get the name of a blackboard.
     fn blackboard_name(&self, blackboard_id: BlackboardId) -> Result<Option<String>, BetulaError> {
         let blackboard = self
             .blackboards
             .get(&blackboard_id)
             .ok_or_else(|| format!("blackboard {blackboard_id:?} does not exist").to_string())?;
         Ok(blackboard.name.clone())
+    }
+
+    fn set_node_name(&mut self, id: NodeId, name: Option<&str>) -> Result<(), BetulaError> {
+        let node = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| format!("node {id:?} does not exist").to_string())?;
+        node.name = name.map(|v| v.to_owned());
+        Ok(())
+    }
+
+    fn node_name(&self, id: NodeId) -> Result<Option<String>, BetulaError> {
+        let node = self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| format!("node {id:?} does not exist").to_string())?;
+        Ok(node.name.clone())
     }
 }
 

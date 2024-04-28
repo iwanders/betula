@@ -54,6 +54,8 @@ mod v1 {
         pub node_type: String,
         pub config: Option<SerializableHolder>,
         pub children: Vec<NodeId>,
+        #[serde(default)]
+        pub name: Option<String>,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -223,6 +225,7 @@ impl TreeSupport {
 
         for id in tree.nodes() {
             let tree_node = tree.node_ref(id).ok_or(format!("could not get {id:?}"))?;
+            let name = tree.node_name(id)?;
             let tree_node = tree_node.borrow();
             let config = tree_node.get_config()?;
             let node_type = tree_node.node_type();
@@ -247,6 +250,7 @@ impl TreeSupport {
                 node_type: node_type.into(),
                 config,
                 children,
+                name,
             };
             nodes.push(this_node);
         }
@@ -326,7 +330,8 @@ impl TreeSupport {
                             new_node.set_config(&*new_config)?;
                         }
                     }
-                    new_nodes.push((node.id, new_node));
+                    let name = node.name.clone();
+                    new_nodes.push((node.id, new_node, name));
                     relations.push((node.id, node.children.clone()));
                 }
                 // deserialize the blackboards.
@@ -352,8 +357,9 @@ impl TreeSupport {
                 }
 
                 // Serialization is all done, now add the nodes to the tree.
-                for (node_id, node) in new_nodes {
+                for (node_id, node, name) in new_nodes {
                     tree.add_node_boxed(node_id, node)?;
+                    tree.set_node_name(node_id, name.as_deref())?;
                 }
 
                 // Create the connections.
@@ -372,7 +378,7 @@ impl TreeSupport {
                     }
                     tree.add_blackboard_boxed(id, bb)?;
                     if let Some(name) = blackboard.name {
-                        tree.set_blackboard_name(id, &name)?;
+                        tree.set_blackboard_name(id, Some(&name))?;
                     }
                     for connection in blackboard.connections {
                         tree.connect_port(&connection)?;

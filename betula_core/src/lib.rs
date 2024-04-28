@@ -308,6 +308,12 @@ pub trait Tree: std::fmt::Debug + AsAny {
     /// Execute a particular node, starting at the provided node.
     fn execute(&self, id: NodeId) -> Result<ExecutionStatus, NodeError>;
 
+    /// Set the name of a node.
+    fn set_node_name(&mut self, id: NodeId, name: Option<&str>) -> Result<(), BetulaError>;
+
+    /// Get the name of a node.
+    fn node_name(&self, name: NodeId) -> Result<Option<String>, BetulaError>;
+
     /// Get a list of the blackboard ids.
     fn blackboards(&self) -> Vec<BlackboardId>;
 
@@ -334,7 +340,7 @@ pub trait Tree: std::fmt::Debug + AsAny {
     fn set_blackboard_name(
         &mut self,
         blackboard_id: BlackboardId,
-        name: &str,
+        name: Option<&str>,
     ) -> Result<(), BetulaError>;
 
     /// Get the name of a blackboard.

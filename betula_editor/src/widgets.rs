@@ -201,6 +201,32 @@ impl SVGPaths {
     }
 }
 
+pub fn add_name_editor(
+    ui: &mut egui::Ui,
+    current: &str,
+    edit: &mut Option<String>,
+    dest: &mut Option<String>,
+) {
+    if let Some(ref mut editor_string) = edit {
+        let edit_box = egui::TextEdit::singleline(editor_string)
+            .desired_width(0.0)
+            .clip_text(false);
+        let r = ui.add(edit_box);
+        if r.lost_focus() {
+            if current != *editor_string {
+                *dest = Some(editor_string.clone());
+            }
+            *edit = None;
+            ui.close_menu();
+        }
+    } else {
+        let r = ui.label(format!("{}", &current));
+        if r.clicked() {
+            *edit = Some(current.to_owned());
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -37,7 +37,6 @@ impl Node for CaptureNode {
         match c.capture() {
             Ok(img) => {
                 let img_rgb = img.to_rgba();
-                println!("Img width ehgth {} {} ", img_rgb.width(), img_rgb.height());
                 let img = Image::new(img_rgb);
                 self.output.set(img)?;
                 Ok(ExecutionStatus::Success)
