@@ -161,10 +161,13 @@ pub struct NodeData {
     /// that is set to the node, it is set to false again.
     config_needs_send: bool,
 
+    /// The name of this node according to the remote side.
     name_remote: Option<String>,
-    name_local: Option<String>,
-    name_editor: Option<String>,
 
+    /// If populated, the name to be sent to the remote side.
+    name_local: Option<String>,
+
+    /// Whether or not this node should be removed.
     should_remove: bool,
 }
 
@@ -213,6 +216,7 @@ pub struct ViewerNode {
     #[serde(skip)]
     children_dirty: bool,
 
+    /// Temporary variable to store the name as it is edited.
     name_editor: Option<String>,
 }
 
@@ -1694,7 +1698,6 @@ impl BetulaViewer {
         let viewer_node = self.get_node_mut(v.id, snarl)?;
         if let Some(node) = self.nodes.get(&v.id) {
             let mut data = node.borrow_mut();
-            // TODO: Move update here.
             if let Some(ref config) = v.config {
                 let config = self
                     .ui_support
@@ -1713,7 +1716,6 @@ impl BetulaViewer {
                 config_needs_send: false,
                 should_remove: false,
                 ui_node: self.ui_support.create_ui_node(&v.node_type)?,
-                name_editor: None,
                 name_local: None,
                 name_remote: None,
             }));
