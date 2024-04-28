@@ -484,10 +484,12 @@ impl BlackboardData {
         // self.ui_values = values;
         for (port, value) in port_values {
             if let Some(existing) = self.ui_values.get_mut(&port) {
+                println!("value: {value:?}");
                 // Deserialize the value.
                 let deserialized = ui_support
                     .tree_support_ref()
                     .value_deserialize(value.clone())?;
+                println!("deser: {deserialized:?}");
                 if let Err(_) = existing.set_value(deserialized) {
                     // Well, update failed, probably a type change, blow away the old value.
                     *existing = ui_support.create_ui_value(value)?;

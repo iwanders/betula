@@ -37,8 +37,17 @@ impl<'de> Deserialize<'de> for Image {
     where
         D: Deserializer<'de>,
     {
-        let _ = deserializer;
-        Ok(Image::default())
+        #[derive(Deserialize)]
+        pub struct DummyImage {
+            width: u32,
+            height: u32,
+        }
+        let t = DummyImage::deserialize(deserializer)?;
+        Ok(Image {
+            width: t.width,
+            height: t.height,
+            image: image::RgbaImage::new(0, 0).into(),
+        })
     }
 }
 
@@ -50,7 +59,7 @@ impl std::fmt::Debug for Image {
 
 impl PartialEq for Image {
     fn eq(&self, other: &Image) -> bool {
-        false
+        self.image.as_ptr() == other.image.as_ptr()
     }
 }
 
