@@ -160,6 +160,12 @@ pub struct NodeData {
     /// sent to the server. After the server sends back a configuration and
     /// that is set to the node, it is set to false again.
     config_needs_send: bool,
+
+    name_remote: Option<String>,
+    name_local: Option<String>,
+    name_editor: Option<String>,
+
+    should_remove: bool,
 }
 
 impl NodeData {
@@ -207,8 +213,6 @@ pub struct ViewerNode {
     #[serde(skip)]
     children_dirty: bool,
 
-    name_remote: Option<String>,
-    name_local: Option<String>,
     name_editor: Option<String>,
 }
 
@@ -220,8 +224,6 @@ impl ViewerNode {
             children_local: vec![],
             children_remote: vec![],
             children_dirty: false,
-            name_remote: None,
-            name_local: None,
             name_editor: None,
         }
     }
@@ -259,7 +261,7 @@ impl ViewerNode {
     }
     pub fn total_inputs(&self) -> usize {
         if self.data.is_none() {
-            return 1;
+            return 0;
         }
         let input_count = self.input_port_count();
         input_count + 1 // +1 for parent.
@@ -398,6 +400,32 @@ impl ViewerNode {
         let port_index = self.pin_to_input(our_pin)?;
         let port = self.ui_node()?.ui_input_port(port_index)?;
         Some(port.into_node_port(self.id))
+    }
+
+    pub fn ui_node_menu(&mut self, ui: &mut Ui) {
+        if self.data.is_none() {
+            return;
+        }
+        let mut data = self.data.as_ref().unwrap().borrow_mut();
+        let name = data.name_remote.clone().unwrap_or("unnamed".to_owned());
+        ui.horizontal(|ui| {
+            ui.label("Name:");
+            widgets::add_name_editor(ui, &name, &mut self.name_editor, &mut data.name_local);
+        });
+
+        let is_disconnected = self.children_remote.is_empty();
+        let delete_button = egui::Button::new("Delete");
+        let tooltip_ui = |ui: &mut egui::Ui| {
+            ui.label("Can only delete node if there are no children remaining.");
+        };
+        if ui
+            .add_enabled(is_disconnected, delete_button)
+            .on_disabled_hover_ui(tooltip_ui)
+            .clicked()
+        {
+            data.should_remove = true;
+            ui.close_menu();
+        }
     }
 }
 
@@ -1466,14 +1494,23 @@ impl BetulaViewer {
                     let cmd = InteractionCommand::set_children(node.id, node.desired_children());
                     self.client.send_command(cmd)?;
                 }
-                if let Some(new_name) = node.name_local.take() {
-                    let new_name = if new_name.is_empty() {
-                        None
-                    } else {
-                        Some(new_name)
-                    };
-                    let cmd = InteractionCommand::set_node_name(node.id, new_name);
-                    self.client.send_command(cmd)?;
+            }
+        }
+
+        for node in self.nodes.values() {
+            let mut data = node.borrow_mut();
+            if let Some(new_name) = data.name_local.take() {
+                let new_name = if new_name.is_empty() {
+                    None
+                } else {
+                    Some(new_name)
+                };
+                let cmd = InteractionCommand::set_node_name(data.id, new_name);
+                self.client.send_command(cmd)?;
+            }
+            if data.should_remove {
+                if let Err(v) = self.send_remove_node(data.id) {
+                    println!("Failed to send node removal {v:?}");
                 }
             }
         }
@@ -1667,14 +1704,18 @@ impl BetulaViewer {
                 // needs_clear_config = true;
                 data.clear_config_needs_send();
             }
-            viewer_node.name_remote = v.name;
+            data.name_remote = v.name;
         } else {
             // new node
             let rc = Rc::new(RefCell::new(NodeData {
                 id: v.id,
                 node_status: None,
                 config_needs_send: false,
+                should_remove: false,
                 ui_node: self.ui_support.create_ui_node(&v.node_type)?,
+                name_editor: None,
+                name_local: None,
+                name_remote: None,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.nodes.insert(v.id, cloned_rc);
@@ -1993,11 +2034,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match node {
             BetulaViewerNode::Node(node) => {
                 // Grab the type support for this node.
-                if let Some(ui_node) = node.ui_node() {
-                    if let Some(name) = &node.name_remote {
-                        format!("{name} {}", ui_node.ui_title())
+                if let Some(data) = node.data() {
+                    if let Some(name) = &data.name_remote {
+                        format!("{name} {}", data.ui_node.ui_title())
                     } else {
-                        ui_node.ui_title()
+                        data.ui_node.ui_title()
                     }
                 } else {
                     "Pending...".to_owned()
@@ -2441,6 +2482,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
+                if node.data.is_none() {
+                    return;
+                }
                 let node_id = node.id;
 
                 ui.horizontal(|ui| {
@@ -2462,32 +2506,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 });
 
-                let name = node.name_remote.as_deref().unwrap_or("unnamed");
-                ui.horizontal(|ui| {
-                    ui.label("Name:");
-                    widgets::add_name_editor(
-                        ui,
-                        &name,
-                        &mut node.name_editor,
-                        &mut node.name_local,
-                    );
-                });
-
-                let is_disconnected = node.children_remote.is_empty();
-                let delete_button = egui::Button::new("Delete");
-                let tooltip_ui = |ui: &mut egui::Ui| {
-                    ui.label("Can only delete node if there are no children remaining.");
-                };
-                if ui
-                    .add_enabled(is_disconnected, delete_button)
-                    .on_disabled_hover_ui(tooltip_ui)
-                    .clicked()
-                {
-                    if let Err(v) = self.send_remove_node(node_id) {
-                        println!("Failed to send node removal {v:?}");
-                    }
-                    ui.close_menu();
-                }
+                // let mut data = node.data_mut().unwrap();
+                node.ui_node_menu(ui);
             }
             BetulaViewerNode::Blackboard(ref mut bb) => {
                 bb.ui_node_menu(ui);
