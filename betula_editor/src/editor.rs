@@ -208,6 +208,7 @@ impl BetulaEditor {
                 self.client.send_command(viewer_cmd)?;
             }
             if let Some(backend_event) = backend_event_received {
+                println!("event: {backend_event:?}");
                 use betula_common::control::InteractionEvent;
                 use betula_common::control::InteractionEvent::{CommandResult, TreeConfig};
                 let c = match backend_event {

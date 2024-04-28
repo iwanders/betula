@@ -1,5 +1,5 @@
 [package]
-name = "betula_capture"
+name = "betula_image"
 version = "0.0.1"
 edition = "2021"
 license = "BSD-3-Clause"
@@ -10,7 +10,6 @@ betula_core = { workspace = true, default-features = false }
 betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
-# One of these days I should split this out...
-screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="334b25f145cdf1e7369fcaf5884ef81e91e1baf2" }
+screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="e76693c629bb68a61185ec33dbb449b17aace561" }
 
 image = { version ="0.25.1", default-features=false}

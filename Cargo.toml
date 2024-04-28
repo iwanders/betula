@@ -10,6 +10,7 @@ members = [
     "betula_std",
     "betula_demo",
     "betula_wm",
+    "betula_image",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html
@@ -23,7 +24,7 @@ members = [
 
 [workspace.dependencies]
 betula_core = { version = "0.0.1", path = "betula_core", default-features = false }
-betula_capture = { version = "0.0.1", path = "betula_capture", default-features = false }
+betula_image = { version = "0.0.1", path = "betula_image", default-features = false }
 betula_editor = { version = "0.0.1", path = "betula_editor", default-features = false }
 betula_common = { version = "0.0.1", path = "betula_common", default-features = false }
 betula_enigo = { version = "0.0.1", path = "betula_enigo", default-features = false }

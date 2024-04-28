@@ -522,17 +522,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
-name = "betula_capture"
-version = "0.0.1"
-dependencies = [
- "betula_core",
- "betula_editor",
- "image 0.25.1",
- "screen_capture",
- "serde",
-]
-
-[[package]]
 name = "betula_common"
 version = "0.0.1"
 dependencies = [
@@ -557,12 +546,12 @@ dependencies = [
 name = "betula_demo"
 version = "0.0.1"
 dependencies = [
- "betula_capture",
  "betula_common",
  "betula_core",
  "betula_editor",
  "betula_enigo",
  "betula_hotkey",
+ "betula_image",
  "betula_std",
  "betula_wm",
  "eframe",
@@ -606,6 +595,17 @@ dependencies = [
  "keyboard-types",
  "serde",
  "windows 0.56.0",
+]
+
+[[package]]
+name = "betula_image"
+version = "0.0.1"
+dependencies = [
+ "betula_core",
+ "betula_editor",
+ "image 0.25.1",
+ "screen_capture",
+ "serde",
 ]
 
 [[package]]
@@ -2753,7 +2753,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "screen_capture"
 version = "0.0.0"
-source = "git+https://github.com/iwanders/screen_capture?rev=334b25f145cdf1e7369fcaf5884ef81e91e1baf2#334b25f145cdf1e7369fcaf5884ef81e91e1baf2"
+source = "git+https://github.com/iwanders/screen_capture?rev=e76693c629bb68a61185ec33dbb449b17aace561#e76693c629bb68a61185ec33dbb449b17aace561"
 dependencies = [
  "image 0.25.1",
  "libc",

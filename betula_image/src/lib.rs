@@ -4,38 +4,52 @@ pub mod nodes;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+use std::sync::Arc;
 #[derive(Clone, Serialize)]
-pub struct CaptureImage {
+pub struct Image {
+    width: u32,
+    height: u32,
     #[serde(skip)]
-    pub image: std::sync::Arc<image::RgbaImage>,
+    pub image: Arc<image::RgbaImage>,
 }
-impl Default for CaptureImage {
-    fn default() -> Self {
-        // superb hack here... we make an image that's 0x0 pixels.
-        let dummy = image::RgbaImage::new(0, 0);
-        CaptureImage {
-            image: std::sync::Arc::new(dummy),
+
+impl Image {
+    pub fn new<T: Into<Arc<image::RgbaImage>>>(image: T) -> Self {
+        let image: Arc<image::RgbaImage> = image.into();
+        Self {
+            width: image.width(),
+            height: image.height(),
+            image,
         }
     }
 }
 
-impl<'de> Deserialize<'de> for CaptureImage {
-    fn deserialize<D>(deserializer: D) -> Result<CaptureImage, D::Error>
+impl Default for Image {
+    fn default() -> Self {
+        // superb hack here... we make an image that's 0x0 pixels.
+        let dummy = image::RgbaImage::new(0, 0);
+        Self::new(dummy)
+    }
+}
+
+impl<'de> Deserialize<'de> for Image {
+    fn deserialize<D>(deserializer: D) -> Result<Image, D::Error>
     where
         D: Deserializer<'de>,
     {
-        Ok(CaptureImage::default())
+        let _ = deserializer;
+        Ok(Image::default())
     }
 }
 
-impl std::fmt::Debug for CaptureImage {
+impl std::fmt::Debug for Image {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(fmt, "Image({}x{})", self.image.width(), self.image.height())
+        write!(fmt, "Image({}x{})", self.width, self.height)
     }
 }
 
-impl PartialEq for CaptureImage {
-    fn eq(&self, _: &CaptureImage) -> bool {
+impl PartialEq for Image {
+    fn eq(&self, other: &Image) -> bool {
         false
     }
 }
@@ -43,6 +57,6 @@ impl PartialEq for CaptureImage {
 /// Register nodes to the ui support.
 #[cfg(feature = "betula_editor")]
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
-    ui_support.add_value_default_named::<CaptureImage>("Image");
+    ui_support.add_value_default_named::<Image>("Image");
     ui_support.add_node_default_with_config::<nodes::CaptureNode, nodes::CaptureNodeConfig>();
 }
