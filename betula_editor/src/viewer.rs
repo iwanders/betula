@@ -145,6 +145,11 @@ type NodeDataRc = Rc<RefCell<NodeData>>;
 #[derive(Debug)]
 pub struct NodeData {
     id: BetulaNodeId,
+
+    /// The previous node execution status.
+    ///
+    /// Used for coloring the node border if enabled.
+    node_status: Option<Result<ExecutionStatus, String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -191,12 +196,6 @@ pub struct ViewerNode {
     #[serde(skip)]
     config_needs_send: bool,
 
-    /// The previous node execution status.
-    ///
-    /// Used for coloring the node border if enabled.
-    #[serde(skip)]
-    node_status: Option<Result<ExecutionStatus, String>>,
-
     name_remote: Option<String>,
     name_local: Option<String>,
     name_editor: Option<String>,
@@ -212,7 +211,6 @@ impl ViewerNode {
             children_remote: vec![],
             children_dirty: false,
             config_needs_send: false,
-            node_status: None,
             name_remote: None,
             name_local: None,
             name_editor: None,
@@ -235,6 +233,9 @@ impl ViewerNode {
     }
 
     pub fn total_outputs(&self) -> usize {
+        if self.data.is_none() {
+            return 0;
+        }
         let output_count = self.output_port_count();
         output_count + self.children_local.len()
     }
@@ -246,6 +247,9 @@ impl ViewerNode {
             .unwrap_or(0)
     }
     pub fn total_inputs(&self) -> usize {
+        if self.data.is_none() {
+            return 0;
+        }
         let input_count = self.input_port_count();
         input_count + 1 // +1 for parent.
     }
@@ -1294,6 +1298,17 @@ impl BetulaViewer {
         }
     }
 
+    fn get_node_data_mut<'a>(
+        &'a self,
+        node_id: BetulaNodeId,
+    ) -> Result<RefMut<'_, NodeData>, BetulaError> {
+        if let Some(node) = self.nodes.get(&node_id) {
+            Ok(node.borrow_mut())
+        } else {
+            Err(format!("node {node_id:?} cannot be found").into())
+        }
+    }
+
     fn get_node_ref<'a>(
         &self,
         node_id: BetulaNodeId,
@@ -1634,7 +1649,9 @@ impl BetulaViewer {
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
         for node in node_ids {
             if let BetulaViewerNode::Node(node) = &mut snarl[node] {
-                node.node_status = None;
+                if let Some(ref mut v) = node.data_mut() {
+                    v.node_status = None;
+                }
             }
         }
     }
@@ -1645,7 +1662,7 @@ impl BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         for e in results {
-            if let Ok(v) = self.get_node_mut(e.node, snarl) {
+            if let Ok(ref mut v) = self.get_node_data_mut(e.node) {
                 v.node_status = Some(e.status.clone());
             }
         }
@@ -1665,15 +1682,19 @@ impl BetulaViewer {
         v: betula_common::control::NodeInformation,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
+        let viewer_node = self.get_node_mut(v.id, snarl)?;
         if let Some(node) = self.nodes.get(&v.id) {
             // TODO: Move update here.
         } else {
             // new node
-            let rc = Rc::new(RefCell::new(NodeData { id: v.id }));
+            let rc = Rc::new(RefCell::new(NodeData {
+                id: v.id,
+                node_status: None,
+            }));
             let cloned_rc = Rc::clone(&rc);
             self.nodes.insert(v.id, cloned_rc);
+            viewer_node.data = Some(rc);
         }
-        let viewer_node = self.get_node_mut(v.id, snarl)?;
         if viewer_node.ui_node.is_none() {
             viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
         }
@@ -2206,7 +2227,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref mut node) => {
-                let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                let data = node.data()?;
+                let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
                 if node.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
@@ -2237,8 +2259,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> PinInfo {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
-                // let child_ports = node.vertical_outputs();
-                let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                let data = node.data().unwrap();
+                let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
                 if node.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
@@ -2300,7 +2322,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
-                let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                let data = node.data()?;
+                let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
                 if node.is_child_input(&pin.id) {
                     Some(PinInfo::triangle().with_fill(color).vertical())
@@ -2322,7 +2345,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
                 if node.is_child_input(&pin.id) {
-                    let color = color_wire_status(RELATION_COLOR, node.node_status.as_ref())
+                    let data = node.data().unwrap();
+                    let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                         .unwrap_or(RELATION_COLOR);
                     PinInfo::triangle().with_fill(color).vertical()
                 } else {
@@ -2554,9 +2578,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         // let w = 15.0;
         let r = ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
         match &mut snarl[node] {
-            BetulaViewerNode::Node(ref mut node) => {
-                if let Some(Err(e)) = &node.node_status {
-                    r.on_hover_text(e);
+            BetulaViewerNode::Node(ref node) => {
+                if let Some(data) = node.data() {
+                    if let Some(Err(e)) = &data.node_status {
+                        r.on_hover_text(e);
+                    }
                 }
             }
             _ => {}
@@ -2577,8 +2603,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
         match &snarl[id] {
             BetulaViewerNode::Node(ref node) => {
-                if let Some(new_color) = color_edge_status(current.color, node.node_status.as_ref())
-                {
+                let data = node.data()?;
+                let node_status = data.node_status.as_ref();
+                if let Some(new_color) = color_edge_status(current.color, node_status) {
                     Some(egui::Stroke::from((current.width + 0.5, new_color)))
                 } else {
                     None
