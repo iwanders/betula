@@ -140,10 +140,20 @@ fn color_edge_status(
     )
 }
 
+type NodeDataRc = Rc<RefCell<NodeData>>;
+
+#[derive(Debug)]
+pub struct NodeData {
+    id: BetulaNodeId,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ViewerNode {
     /// The node id for this element.
     id: BetulaNodeId,
+
+    #[serde(skip)]
+    data: Option<NodeDataRc>,
 
     /// The actual ui node handling.
     #[serde(skip)]
@@ -197,6 +207,7 @@ impl ViewerNode {
         Self {
             id,
             ui_node: None,
+            data: None,
             children_local: vec![],
             children_remote: vec![],
             children_dirty: false,
@@ -206,6 +217,14 @@ impl ViewerNode {
             name_local: None,
             name_editor: None,
         }
+    }
+
+    pub fn data(&self) -> Option<Ref<'_, NodeData>> {
+        self.data.as_ref().map(|z| z.borrow())
+    }
+
+    pub fn data_mut(&self) -> Option<RefMut<'_, NodeData>> {
+        self.data.as_ref().map(|z| z.borrow_mut())
     }
 
     pub fn output_port_count(&self) -> usize {
@@ -991,6 +1010,9 @@ pub struct BetulaViewer {
     /// Node map to go from SnarlNodeId to BetulaNodeIs
     snarl_map: HashMap<SnarlNodeId, BetulaNodeId>,
 
+    /// A map of all the nodes.
+    nodes: HashMap<BetulaNodeId, NodeDataRc>,
+
     /// Ui support to create new nodes.
     ui_support: UiSupport,
 
@@ -1024,6 +1046,7 @@ impl BetulaViewer {
             tree_roots_remote: Default::default(),
             node_map: Default::default(),
             snarl_map: Default::default(),
+            nodes: Default::default(),
             blackboards: Default::default(),
             blackboard_map: Default::default(),
             blackboard_snarl_map: Default::default(),
@@ -1035,6 +1058,7 @@ impl BetulaViewer {
         self.tree_roots_local = Default::default();
         self.tree_roots_remote = Default::default();
         self.node_map = Default::default();
+        self.nodes = Default::default();
         self.snarl_map = Default::default();
         self.blackboards = Default::default();
         self.blackboard_map = Default::default();
@@ -1210,6 +1234,7 @@ impl BetulaViewer {
             .remove(&node_id)
             .ok_or::<BetulaError>(format!("could not find {node_id:?}").into())?;
         self.snarl_map.remove(&snarl_id);
+        self.nodes.remove(&node_id);
         self.root_remove(node_id);
         Ok(snarl_id)
     }
@@ -1640,6 +1665,14 @@ impl BetulaViewer {
         v: betula_common::control::NodeInformation,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
+        if let Some(node) = self.nodes.get(&v.id) {
+            // TODO: Move update here.
+        } else {
+            // new node
+            let rc = Rc::new(RefCell::new(NodeData { id: v.id }));
+            let cloned_rc = Rc::clone(&rc);
+            self.nodes.insert(v.id, cloned_rc);
+        }
         let viewer_node = self.get_node_mut(v.id, snarl)?;
         if viewer_node.ui_node.is_none() {
             viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
