@@ -236,6 +236,10 @@ impl NodeData {
         self.children_dirty = false;
     }
 
+    pub fn mark_dirty(&mut self) {
+        self.children_dirty = true;
+    }
+
     pub fn children_is_up_to_date(&self) -> bool {
         let ours = self.children_local.iter().flatten();
         let theirs = self.children_remote.iter();
@@ -302,11 +306,16 @@ pub struct ViewerNode {
     /// The node id for this element.
     id: BetulaNodeId,
 
+    /// The actual node data behind this viewer node.
     #[serde(skip)]
     data: Option<NodeDataRc>,
 
     /// Temporary variable to store the name as it is edited.
     name_editor: Option<String>,
+
+    /// True if this viewer node should be removed.
+    #[serde(skip)]
+    should_remove_node: bool,
 }
 
 impl ViewerNode {
@@ -315,6 +324,7 @@ impl ViewerNode {
             id,
             data: None,
             name_editor: None,
+            should_remove_node: false,
         }
     }
 
@@ -407,6 +417,13 @@ impl ViewerNode {
             ui.label("Name:");
             widgets::add_name_editor(ui, &name, &mut self.name_editor, &mut data.name_local);
         });
+
+        // Button to hide this node.
+        if ui.button("Hide").clicked() {
+            self.should_remove_node = true;
+            data.mark_dirty();
+            ui.close_menu();
+        }
 
         let is_disconnected = data.children_remote.is_empty();
         let delete_button = egui::Button::new("Delete");
@@ -1104,6 +1121,16 @@ impl BetulaViewer {
         self.blackboard_snarl_map.remove(&snarl_id);
     }
 
+    pub fn add_node_mapping(&mut self, node_id: BetulaNodeId, snarl_id: SnarlNodeId) {
+        self.node_map.insert(node_id, snarl_id);
+        self.snarl_map.insert(snarl_id, node_id);
+    }
+
+    pub fn remove_node_mapping(&mut self, node_id: BetulaNodeId, snarl_id: SnarlNodeId) {
+        self.node_map.entry(node_id);
+        self.snarl_map.remove(&snarl_id);
+    }
+
     pub fn set_tree_state(
         &mut self,
         tree_state: betula_common::control::TreeState,
@@ -1498,6 +1525,7 @@ impl BetulaViewer {
                 if let Err(v) = self.send_remove_node(data.id) {
                     println!("Failed to send node removal {v:?}");
                 }
+                data.should_remove = false;
             }
         }
 
@@ -1542,6 +1570,7 @@ impl BetulaViewer {
     ) -> Result<(), BetulaError> {
         // Check for dirty nodes, and update the snarl state.
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
+        let mut nodes_to_remove = vec![];
         for node in node_ids {
             let mut disconnections = vec![];
             let mut connections = vec![];
@@ -1553,8 +1582,13 @@ impl BetulaViewer {
                     if data.is_dirty() {
                         let mut to_disconnect = self.child_connections(snarl_id, snarl)?;
                         disconnections.append(&mut to_disconnect);
-                        let mut to_connect = self.child_connections_desired(node.id, snarl)?;
-                        connections.append(&mut to_connect);
+
+                        if node.should_remove_node {
+                            nodes_to_remove.push((node.id, snarl_id));
+                        } else {
+                            let mut to_connect = self.child_connections_desired(node.id, snarl)?;
+                            connections.append(&mut to_connect);
+                        }
                     }
                 }
             }
@@ -1569,6 +1603,10 @@ impl BetulaViewer {
                     data.set_clean();
                     data.update_children_local();
                 }
+            }
+            for (node_id, snarl_id) in &nodes_to_remove {
+                self.remove_node_mapping(*node_id, *snarl_id);
+                snarl.remove_node(*snarl_id);
             }
         }
         Ok(())
@@ -1902,7 +1940,7 @@ impl BetulaViewer {
     }
 
     /// Spawn a new node and send that the the server.
-    pub fn ui_create_node(
+    pub fn ui_add_node(
         &mut self,
         id: BetulaNodeId,
         pos: egui::Pos2,
@@ -1911,10 +1949,21 @@ impl BetulaViewer {
     ) -> BetulaNodeId {
         let cmd = InteractionCommand::add_node(id, node_type);
         if let Ok(_) = self.client.send_command(cmd) {
-            let snarl_id = snarl.insert_node(pos, BetulaViewerNode::Node(ViewerNode::new(id)));
-            self.add_id_mapping(id, snarl_id);
+            self.ui_create_node(id, pos, snarl, None);
         }
         id
+    }
+    pub fn ui_create_node(
+        &mut self,
+        id: BetulaNodeId,
+        pos: egui::Pos2,
+        snarl: &mut Snarl<BetulaViewerNode>,
+        data: Option<NodeDataRc>,
+    ) {
+        let mut viewer_node = ViewerNode::new(id);
+        viewer_node.data = data;
+        let snarl_id = snarl.insert_node(pos, BetulaViewerNode::Node(viewer_node));
+        self.add_node_mapping(id, snarl_id);
     }
 
     pub fn ui_create_blackboard(
@@ -2108,6 +2157,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             match &mut snarl[from.node] {
                 BetulaViewerNode::Node(n) => {
                     if let Ok(child_id) = self.get_betula_id(&to.node) {
+                        println!("connecting {from:?} to {child_id:?}");
                         n.data_mut().unwrap().child_connect(&from, child_id);
                     }
                 }
@@ -2428,7 +2478,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
 
         if let Some(node_type) = node_recurser(node_categories, ui) {
-            self.ui_create_node(BetulaNodeId(Uuid::new_v4()), pos, node_type, snarl);
+            self.ui_add_node(BetulaNodeId(Uuid::new_v4()), pos, node_type, snarl);
         }
 
         ui.label("Blackboard");
@@ -2456,6 +2506,30 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             if ui.button(name).clicked() {
                 self.ui_create_blackboard_node(id, pos, snarl, Some(data_rc));
                 ui.close_menu();
+            }
+        }
+
+        let respawn_nodes = true;
+        if respawn_nodes {
+            let mut id_names = vec![];
+            {
+                for node_data in self.nodes.values() {
+                    let data_rc = Rc::clone(node_data);
+                    let data = node_data.borrow();
+                    let id = data.id;
+                    let name = data
+                        .name_remote
+                        .as_ref()
+                        .map(|z| z.clone())
+                        .unwrap_or("zzz".to_owned());
+                    id_names.push((id, name, data_rc));
+                }
+            }
+            for (id, name, data_rc) in id_names {
+                if ui.button(name).clicked() {
+                    self.ui_create_node(id, pos, snarl, Some(data_rc));
+                    ui.close_menu();
+                }
             }
         }
     }
@@ -2700,19 +2774,19 @@ mod test {
                     assert!(tree.nodes().len() == 0);
                     Ok(())
                 }))?;
-            viewer.ui_create_node(
+            viewer.ui_add_node(
                 delay1,
                 egui::pos2(0.0, 0.0),
                 betula_std::nodes::DelayNode::static_type(),
                 &mut snarl,
             );
-            viewer.ui_create_node(
+            viewer.ui_add_node(
                 delay2,
                 egui::pos2(0.0, 0.0),
                 betula_std::nodes::DelayNode::static_type(),
                 &mut snarl,
             );
-            viewer.ui_create_node(
+            viewer.ui_add_node(
                 delay3,
                 egui::pos2(0.0, 0.0),
                 betula_std::nodes::DelayNode::static_type(),
@@ -2776,7 +2850,7 @@ mod test {
                     assert!(tree.nodes().len() == 0);
                     Ok(())
                 }))?;
-            viewer.ui_create_node(
+            viewer.ui_add_node(
                 time1,
                 egui::pos2(0.0, 0.0),
                 betula_std::nodes::TimeNode::static_type(),
@@ -2799,7 +2873,7 @@ mod test {
             viewer.send_remove_node(time1).expect("send should succeed");
             service_for_ms(&mut viewer, &mut snarl, 50)?;
 
-            viewer.ui_create_node(
+            viewer.ui_add_node(
                 time2,
                 egui::pos2(0.0, 0.0),
                 betula_std::nodes::TimeNode::static_type(),
