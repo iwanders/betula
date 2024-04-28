@@ -1478,10 +1478,7 @@ impl BetulaViewer {
     }
 
     /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
-    fn send_changes_to_server(
-        &mut self,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) -> Result<(), BetulaError> {
+    fn send_changes_to_server(&mut self) -> Result<(), BetulaError> {
         for node in self.nodes.values() {
             let mut data = node.borrow_mut();
             if !data.children_is_up_to_date() {
@@ -1622,29 +1619,22 @@ impl BetulaViewer {
         Ok(())
     }
 
-    fn send_configs_to_server(
-        &mut self,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) -> Result<(), BetulaError> {
-        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
-        for node in node_ids {
-            if let BetulaViewerNode::Node(node) = &snarl[node] {
-                if let Some(data) = node.data() {
-                    if data.config_needs_send() {
-                        let ui_node = &data.ui_node;
-                        if let Some(config) = ui_node.get_config()? {
-                            // Serialize the configuration.
-                            let config = self
-                                .ui_support
-                                .tree_support_ref()
-                                .config_serialize(ui_node.node_type(), &*config)?;
-                            // Now send it off!
-                            let cmd = InteractionCommand::set_config(node.id, config);
-                            self.client.send_command(cmd)?;
-                        } else {
-                            unreachable!("node reported dirty config but no config returned");
-                        }
-                    }
+    fn send_configs_to_server(&mut self) -> Result<(), BetulaError> {
+        for data in self.nodes.values() {
+            let data = data.borrow();
+            if data.config_needs_send() {
+                let ui_node = &data.ui_node;
+                if let Some(config) = ui_node.get_config()? {
+                    // Serialize the configuration.
+                    let config = self
+                        .ui_support
+                        .tree_support_ref()
+                        .config_serialize(ui_node.node_type(), &*config)?;
+                    // Now send it off!
+                    let cmd = InteractionCommand::set_config(data.id, config);
+                    self.client.send_command(cmd)?;
+                } else {
+                    unreachable!("node reported dirty config but no config returned");
                 }
             }
         }
@@ -1823,7 +1813,7 @@ impl BetulaViewer {
         use betula_common::control::InteractionEvent;
 
         // First, send changes to the server if necessary.
-        self.send_changes_to_server(snarl)?;
+        self.send_changes_to_server()?;
 
         // Process any dirty nodes and update the snarl state.
         self.update_snarl_dirty_nodes(snarl)?;
@@ -1832,7 +1822,7 @@ impl BetulaViewer {
         self.update_snarl_dirty_blackboards(snarl)?;
 
         // Check if any configurations need to be sent to the server.
-        self.send_configs_to_server(snarl)?;
+        self.send_configs_to_server()?;
 
         // Handle any incoming events.
         loop {
