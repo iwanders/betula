@@ -163,9 +163,6 @@ pub struct ViewerNode {
     #[serde(skip)]
     data: Option<NodeDataRc>,
 
-    /// The actual ui node handling.
-    #[serde(skip)]
-    ui_node: Option<Box<dyn UiNode>>,
     /// Local version of the children.
     ///
     /// Basically the vector of children, empty optionals are empty pins.
@@ -207,7 +204,6 @@ impl ViewerNode {
     pub fn new(id: BetulaNodeId) -> Self {
         Self {
             id,
-            ui_node: None,
             data: None,
             children_local: vec![],
             children_remote: vec![],
@@ -236,10 +232,7 @@ impl ViewerNode {
     }
 
     pub fn output_port_count(&self) -> usize {
-        self.ui_node
-            .as_ref()
-            .map(|n| n.ui_output_port_count())
-            .unwrap_or(0)
+        self.ui_node().unwrap().ui_output_port_count()
     }
 
     pub fn total_outputs(&self) -> usize {
@@ -251,10 +244,7 @@ impl ViewerNode {
     }
 
     pub fn input_port_count(&self) -> usize {
-        self.ui_node
-            .as_ref()
-            .map(|n| n.ui_input_port_count())
-            .unwrap_or(0)
+        self.ui_node().unwrap().ui_input_port_count()
     }
     pub fn total_inputs(&self) -> usize {
         if self.data.is_none() {
@@ -275,13 +265,12 @@ impl ViewerNode {
     /// Update the local children list with the bounds and possible new pins.
     #[track_caller]
     fn update_children_local(&mut self) {
+        if self.data.is_none() {
+            return;
+        }
         // println!("Running update local");
         // TODO This function could do with a test...
-        let allowed = self
-            .ui_node
-            .as_ref()
-            .map(|n| n.ui_child_range())
-            .unwrap_or(0..0);
+        let allowed = self.ui_node().unwrap().ui_child_range();
 
         if self.children_local.len() < allowed.end {
             if self.children_local.is_empty() {
@@ -303,11 +292,7 @@ impl ViewerNode {
 
     /// Map a pin to a child index.
     fn pin_to_child(&self, outpin: &OutPinId) -> Option<usize> {
-        let output_count = self
-            .ui_node
-            .as_ref()
-            .map(|n| n.ui_output_port_count())
-            .unwrap_or(0);
+        let output_count = self.ui_node()?.ui_output_port_count();
         if outpin.output < output_count {
             None
         } else {
@@ -324,11 +309,7 @@ impl ViewerNode {
     }
 
     fn pin_to_output(&self, output: &OutPinId) -> Option<usize> {
-        let output_count = self
-            .ui_node
-            .as_ref()
-            .map(|n| n.ui_output_port_count())
-            .unwrap_or(0);
+        let output_count = self.ui_node()?.ui_output_port_count();
         // Ports are first, children are remainder.
         if output.output < output_count {
             Some(output.output)
@@ -338,17 +319,10 @@ impl ViewerNode {
     }
 
     pub fn output_port_to_pin(&self, name: &PortName) -> Option<usize> {
-        self.ui_node
-            .as_ref()
-            .map(|z| z.ui_port_output(name))
-            .flatten()
+        self.ui_node()?.ui_port_output(name)
     }
     pub fn input_port_to_pin(&self, name: &PortName) -> Option<usize> {
-        self.ui_node
-            .as_ref()
-            .map(|z| z.ui_port_input(name))
-            .flatten()
-            .map(|z| z + 1)
+        Some(self.ui_node()?.ui_port_input(name)? + 1)
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -417,20 +391,12 @@ impl ViewerNode {
 
     pub fn node_output_port(&self, our_pin: &OutPinId) -> Option<NodePort> {
         let port_index = self.pin_to_output(our_pin)?;
-        let port = self
-            .ui_node
-            .as_ref()
-            .map(|z| z.ui_output_port(port_index))
-            .flatten()?;
+        let port = self.ui_node()?.ui_output_port(port_index)?;
         Some(port.into_node_port(self.id))
     }
     pub fn node_input_port(&self, our_pin: &InPinId) -> Option<NodePort> {
         let port_index = self.pin_to_input(our_pin)?;
-        let port = self
-            .ui_node
-            .as_ref()
-            .map(|z| z.ui_input_port(port_index))
-            .flatten()?;
+        let port = self.ui_node()?.ui_input_port(port_index)?;
         Some(port.into_node_port(self.id))
     }
 }
@@ -1444,8 +1410,7 @@ impl BetulaViewer {
     ) -> Result<Vec<(OutPinId, InPinId)>, BetulaError> {
         let viewer_node = self.get_node_ref(node_id, snarl)?;
         let ui_node = viewer_node
-            .ui_node
-            .as_ref()
+            .ui_node()
             .ok_or(format!("node is only placeholder"))?;
         let port_output_count = ui_node.ui_output_port_count();
         let children = viewer_node.children_local();
@@ -1635,7 +1600,7 @@ impl BetulaViewer {
         for node in node_ids {
             if let BetulaViewerNode::Node(node) = &snarl[node] {
                 if node.config_needs_send() {
-                    if let Some(ui_node) = &node.ui_node {
+                    if let Some(ui_node) = node.ui_node() {
                         if let Some(config) = ui_node.get_config()? {
                             // Serialize the configuration.
                             let config = self
@@ -1706,23 +1671,26 @@ impl BetulaViewer {
             self.nodes.insert(v.id, cloned_rc);
             viewer_node.data = Some(rc);
         }
-        if viewer_node.ui_node.is_none() {
-            viewer_node.ui_node = Some(self.ui_support.create_ui_node(&v.node_type)?);
-        }
+
         viewer_node.name_remote = v.name;
-
-        // Update the configuration if we have one.
-        let ui_node = viewer_node.ui_node.as_mut().unwrap();
-        // Oh, and set the config if we got one
-        if let Some(config) = v.config {
-            let config = self
-                .ui_support
-                .tree_support_ref()
-                .config_deserialize(config)?;
-            ui_node.set_config(&*config)?;
-            viewer_node.clear_config_needs_send();
+        let mut needs_send = false;
+        {
+            // Update the configuration if we have one.
+            // let mut ui_node = viewer_node.ui_node_mut().unwrap();
+            let mut data = viewer_node.data_mut().unwrap();
+            // Oh, and set the config if we got one
+            if let Some(config) = v.config {
+                let config = self
+                    .ui_support
+                    .tree_support_ref()
+                    .config_deserialize(config)?;
+                data.ui_node.set_config(&*config)?;
+                needs_send = true;
+            }
         }
 
+        let viewer_node = self.get_node_mut(v.id, snarl)?;
+        viewer_node.clear_config_needs_send();
         viewer_node.update_children_remote(&v.children);
         // Pins may have changed, so we must update the snarl state.
         // Todo: just this node instead of all of them.
@@ -2035,7 +2003,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match node {
             BetulaViewerNode::Node(node) => {
                 // Grab the type support for this node.
-                if let Some(ui_node) = &node.ui_node {
+                if let Some(ui_node) = node.ui_node() {
                     if let Some(name) = &node.name_remote {
                         format!("{name} {}", ui_node.ui_title())
                     } else {
@@ -2284,7 +2252,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                         PinInfo::triangle().with_fill(color).vertical()
                     }
                 } else {
-                    if let Some(ui_node) = &node.ui_node {
+                    if let Some(ui_node) = node.ui_node() {
                         if let Some(input_port) = node.pin_to_output(&pin.id) {
                             if let Some(port) = ui_node.ui_output_port(input_port) {
                                 // get the pretty ui name...
@@ -2361,7 +2329,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                         .unwrap_or(RELATION_COLOR);
                     PinInfo::triangle().with_fill(color).vertical()
                 } else {
-                    if let Some(ui_node) = &node.ui_node {
+                    if let Some(ui_node) = node.ui_node() {
                         if let Some(input_port) = node.pin_to_input(&pin.id) {
                             if let Some(port) = ui_node.ui_input_port(input_port) {
                                 let display_name =
@@ -2561,14 +2529,13 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_context = SimpleNodeContext::new(node);
-                let r = node
-                    .ui_node
-                    .as_mut()
-                    .map(|e| e.ui_config(&node_context, ui, scale));
-                if let Some(response) = r {
-                    if response == UiConfigResponse::Changed {
-                        node.set_config_needs_send()
-                    }
+                let mut needs_send = false;
+                if let Some(mut ui_node) = node.ui_node_mut() {
+                    let response = ui_node.ui_config(&node_context, ui, scale);
+                    needs_send |= response == UiConfigResponse::Changed;
+                }
+                if needs_send {
+                    node.set_config_needs_send()
                 }
             }
             BetulaViewerNode::Blackboard(_) => {}
