@@ -140,6 +140,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                             for e in events {
                                 server.send_event(e)?;
                             }
+                            continue; // continue to prevent the execute section from also running.
                         }
                     }
                     let r = command.execute(&tree_support, &mut tree);
