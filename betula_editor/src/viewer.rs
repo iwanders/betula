@@ -169,6 +169,27 @@ pub struct NodeData {
 
     /// Whether or not this node should be removed.
     should_remove: bool,
+
+    /// Local version of the children.
+    ///
+    /// Basically the vector of children, empty optionals are empty pins.
+    children_local: Vec<Option<BetulaNodeId>>,
+
+    /// Remote version of children.
+    ///
+    /// If this differs from the flattened version of children, the node is
+    /// considered not up to date and the server is sent an setChildren
+    /// instruction.
+    children_remote: Vec<BetulaNodeId>,
+
+    /// Denotes whether the node child connections are currently dirty.
+    ///
+    /// A node is marked dirty if a connect or disconnect has occured that
+    /// is not yet represented in the actual snarl state. This is necessary
+    /// because the viewer may make many connects / disconnects in a single
+    /// cycle, this makes it easier to track the changes happening to the
+    /// snarl state.
+    children_dirty: bool,
 }
 
 impl NodeData {
@@ -182,112 +203,13 @@ impl NodeData {
     pub fn config_needs_send(&self) -> bool {
         self.config_needs_send
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ViewerNode {
-    /// The node id for this element.
-    id: BetulaNodeId,
-
-    #[serde(skip)]
-    data: Option<NodeDataRc>,
-
-    /// Local version of the children.
-    ///
-    /// Basically the vector of children, empty optionals are empty pins.
-    #[serde(skip)]
-    children_local: Vec<Option<BetulaNodeId>>,
-
-    /// Remote version of children.
-    ///
-    /// If this differs from the flattened version of children, the node is
-    /// considered not up to date and the server is sent an setChildren
-    /// instruction.
-    #[serde(skip)]
-    children_remote: Vec<BetulaNodeId>,
-
-    /// Denotes whether the node child connections are currently dirty.
-    ///
-    /// A node is marked dirty if a connect or disconnect has occured that
-    /// is not yet represented in the actual snarl state. This is necessary
-    /// because the viewer may make many connects / disconnects in a single
-    /// cycle, this makes it easier to track the changes happening to the
-    /// snarl state.
-    #[serde(skip)]
-    children_dirty: bool,
-
-    /// Temporary variable to store the name as it is edited.
-    name_editor: Option<String>,
-}
-
-impl ViewerNode {
-    pub fn new(id: BetulaNodeId) -> Self {
-        Self {
-            id,
-            data: None,
-            children_local: vec![],
-            children_remote: vec![],
-            children_dirty: false,
-            name_editor: None,
-        }
-    }
-
-    pub fn data(&self) -> Option<Ref<'_, NodeData>> {
-        self.data.as_ref().map(|z| z.borrow())
-    }
-
-    pub fn data_mut(&self) -> Option<RefMut<'_, NodeData>> {
-        self.data.as_ref().map(|z| z.borrow_mut())
-    }
-
-    pub fn ui_node(&self) -> Option<Ref<'_, Box<dyn UiNode>>> {
-        self.data().map(|v| Ref::map(v, |z: &NodeData| &z.ui_node))
-    }
-    pub fn ui_node_mut(&self) -> Option<RefMut<'_, Box<dyn UiNode>>> {
-        self.data_mut()
-            .map(|v| RefMut::map(v, |z: &mut NodeData| &mut z.ui_node))
-    }
-
-    pub fn output_port_count(&self) -> usize {
-        self.ui_node().unwrap().ui_output_port_count()
-    }
-
-    pub fn total_outputs(&self) -> usize {
-        if self.data.is_none() {
-            return 0;
-        }
-        let output_count = self.output_port_count();
-        output_count + self.children_local.len()
-    }
-
-    pub fn input_port_count(&self) -> usize {
-        self.ui_node().unwrap().ui_input_port_count()
-    }
-    pub fn total_inputs(&self) -> usize {
-        if self.data.is_none() {
-            return 0;
-        }
-        let input_count = self.input_port_count();
-        input_count + 1 // +1 for parent.
-    }
-
-    pub fn is_child_output(&self, outpin: &OutPinId) -> bool {
-        self.pin_to_child(outpin).is_some()
-    }
-
-    pub fn is_child_input(&self, inpin: &InPinId) -> bool {
-        inpin.input == 0
-    }
 
     /// Update the local children list with the bounds and possible new pins.
     #[track_caller]
     fn update_children_local(&mut self) {
-        if self.data.is_none() {
-            return;
-        }
         // println!("Running update local");
         // TODO This function could do with a test...
-        let allowed = self.ui_node().unwrap().ui_child_range();
+        let allowed = self.ui_node.ui_child_range();
 
         if self.children_local.len() < allowed.end {
             if self.children_local.is_empty() {
@@ -305,41 +227,6 @@ impl ViewerNode {
                 self.children_local.pop();
             }
         }
-    }
-
-    /// Map a pin to a child index.
-    fn pin_to_child(&self, outpin: &OutPinId) -> Option<usize> {
-        let output_count = self.ui_node()?.ui_output_port_count();
-        if outpin.output < output_count {
-            None
-        } else {
-            Some(outpin.output - output_count)
-        }
-    }
-
-    fn pin_to_input(&self, input: &InPinId) -> Option<usize> {
-        if input.input >= 1 {
-            Some(input.input - 1)
-        } else {
-            None
-        }
-    }
-
-    fn pin_to_output(&self, output: &OutPinId) -> Option<usize> {
-        let output_count = self.ui_node()?.ui_output_port_count();
-        // Ports are first, children are remainder.
-        if output.output < output_count {
-            Some(output.output)
-        } else {
-            None
-        }
-    }
-
-    pub fn output_port_to_pin(&self, name: &PortName) -> Option<usize> {
-        self.ui_node()?.ui_port_output(name)
-    }
-    pub fn input_port_to_pin(&self, name: &PortName) -> Option<usize> {
-        Some(self.ui_node()?.ui_port_input(name)? + 1)
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -395,6 +282,110 @@ impl ViewerNode {
         self.children_dirty = true;
     }
 
+    /// Map a pin to a child index.
+    fn pin_to_child(&self, outpin: &OutPinId) -> Option<usize> {
+        let output_count = self.ui_node.ui_output_port_count();
+        if outpin.output < output_count {
+            None
+        } else {
+            Some(outpin.output - output_count)
+        }
+    }
+
+    pub fn is_child_output(&self, outpin: &OutPinId) -> bool {
+        self.pin_to_child(outpin).is_some()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ViewerNode {
+    /// The node id for this element.
+    id: BetulaNodeId,
+
+    #[serde(skip)]
+    data: Option<NodeDataRc>,
+
+    /// Temporary variable to store the name as it is edited.
+    name_editor: Option<String>,
+}
+
+impl ViewerNode {
+    pub fn new(id: BetulaNodeId) -> Self {
+        Self {
+            id,
+            data: None,
+            name_editor: None,
+        }
+    }
+
+    pub fn data(&self) -> Option<Ref<'_, NodeData>> {
+        self.data.as_ref().map(|z| z.borrow())
+    }
+
+    pub fn data_mut(&self) -> Option<RefMut<'_, NodeData>> {
+        self.data.as_ref().map(|z| z.borrow_mut())
+    }
+
+    pub fn ui_node(&self) -> Option<Ref<'_, Box<dyn UiNode>>> {
+        self.data().map(|v| Ref::map(v, |z: &NodeData| &z.ui_node))
+    }
+    pub fn ui_node_mut(&self) -> Option<RefMut<'_, Box<dyn UiNode>>> {
+        self.data_mut()
+            .map(|v| RefMut::map(v, |z: &mut NodeData| &mut z.ui_node))
+    }
+
+    pub fn output_port_count(&self) -> usize {
+        self.ui_node().unwrap().ui_output_port_count()
+    }
+
+    pub fn total_outputs(&self) -> usize {
+        if self.data.is_none() {
+            return 0;
+        }
+        let output_count = self.output_port_count();
+        output_count + self.data().unwrap().children_local.len()
+    }
+
+    pub fn input_port_count(&self) -> usize {
+        self.ui_node().unwrap().ui_input_port_count()
+    }
+    pub fn total_inputs(&self) -> usize {
+        if self.data.is_none() {
+            return 0;
+        }
+        let input_count = self.input_port_count();
+        input_count + 1 // +1 for parent.
+    }
+
+    pub fn is_child_input(&self, inpin: &InPinId) -> bool {
+        inpin.input == 0
+    }
+
+    fn pin_to_input(&self, input: &InPinId) -> Option<usize> {
+        if input.input >= 1 {
+            Some(input.input - 1)
+        } else {
+            None
+        }
+    }
+
+    fn pin_to_output(&self, output: &OutPinId) -> Option<usize> {
+        let output_count = self.ui_node()?.ui_output_port_count();
+        // Ports are first, children are remainder.
+        if output.output < output_count {
+            Some(output.output)
+        } else {
+            None
+        }
+    }
+
+    pub fn output_port_to_pin(&self, name: &PortName) -> Option<usize> {
+        self.ui_node()?.ui_port_output(name)
+    }
+    pub fn input_port_to_pin(&self, name: &PortName) -> Option<usize> {
+        Some(self.ui_node()?.ui_port_input(name)? + 1)
+    }
+
     pub fn node_output_port(&self, our_pin: &OutPinId) -> Option<NodePort> {
         let port_index = self.pin_to_output(our_pin)?;
         let port = self.ui_node()?.ui_output_port(port_index)?;
@@ -417,7 +408,7 @@ impl ViewerNode {
             widgets::add_name_editor(ui, &name, &mut self.name_editor, &mut data.name_local);
         });
 
-        let is_disconnected = self.children_remote.is_empty();
+        let is_disconnected = data.children_remote.is_empty();
         let delete_button = egui::Button::new("Delete");
         let tooltip_ui = |ui: &mut egui::Ui| {
             ui.label("Can only delete node if there are no children remaining.");
@@ -440,7 +431,7 @@ struct SimpleNodeContext {
 impl SimpleNodeContext {
     pub fn new(node: &ViewerNode) -> Self {
         Self {
-            children_count: node.desired_children().len(),
+            children_count: node.data().map(|v| v.desired_children().len()).unwrap_or(0),
         }
     }
 }
@@ -1445,7 +1436,7 @@ impl BetulaViewer {
             .ui_node()
             .ok_or(format!("node is only placeholder"))?;
         let port_output_count = ui_node.ui_output_port_count();
-        let children = viewer_node.children_local();
+        let children = viewer_node.data().unwrap().children_local();
         let snarl_parent = self.get_node_snarl_id(node_id)?;
 
         let mut v = vec![];
@@ -1491,18 +1482,12 @@ impl BetulaViewer {
         &mut self,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
-        let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
-        for node in node_ids {
-            if let BetulaViewerNode::Node(ref mut node) = &mut snarl[node] {
-                if !node.children_is_up_to_date() {
-                    let cmd = InteractionCommand::set_children(node.id, node.desired_children());
-                    self.client.send_command(cmd)?;
-                }
-            }
-        }
-
         for node in self.nodes.values() {
             let mut data = node.borrow_mut();
+            if !data.children_is_up_to_date() {
+                let cmd = InteractionCommand::set_children(data.id, data.desired_children());
+                self.client.send_command(cmd)?;
+            }
             if let Some(new_name) = data.name_local.take() {
                 let new_name = if new_name.is_empty() {
                     None
@@ -1567,11 +1552,13 @@ impl BetulaViewer {
             if let BetulaViewerNode::Node(node) = &snarl[node] {
                 // Now, we need to do snarly things.
                 // Lets just disconnect all connections, then reconnect the ones we care about.
-                if node.is_dirty() {
-                    let mut to_disconnect = self.child_connections(snarl_id, snarl)?;
-                    disconnections.append(&mut to_disconnect);
-                    let mut to_connect = self.child_connections_desired(node.id, snarl)?;
-                    connections.append(&mut to_connect);
+                if let Some(data) = node.data() {
+                    if data.is_dirty() {
+                        let mut to_disconnect = self.child_connections(snarl_id, snarl)?;
+                        disconnections.append(&mut to_disconnect);
+                        let mut to_connect = self.child_connections_desired(node.id, snarl)?;
+                        connections.append(&mut to_connect);
+                    }
                 }
             }
             for (from, to) in disconnections {
@@ -1581,8 +1568,10 @@ impl BetulaViewer {
                 snarl.connect(from, to);
             }
             if let BetulaViewerNode::Node(node) = &mut snarl[node] {
-                node.set_clean();
-                node.update_children_local();
+                if let Some(ref mut data) = node.data_mut() {
+                    data.set_clean();
+                    data.update_children_local();
+                }
             }
         }
         Ok(())
@@ -1718,13 +1707,19 @@ impl BetulaViewer {
                 ui_node: self.ui_support.create_ui_node(&v.node_type)?,
                 name_local: None,
                 name_remote: None,
+                children_local: vec![],
+                children_remote: vec![],
+                children_dirty: false,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.nodes.insert(v.id, cloned_rc);
             viewer_node.data = Some(rc);
         }
+        viewer_node
+            .data_mut()
+            .unwrap()
+            .update_children_remote(&v.children);
 
-        viewer_node.update_children_remote(&v.children);
         // Pins may have changed, so we must update the snarl state.
         // Todo: just this node instead of all of them.
         self.update_snarl_dirty_nodes(snarl)?;
@@ -2110,7 +2105,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 // remote_to_disconnect
                 match &mut snarl[to_disconnect.node] {
                     BetulaViewerNode::Node(n) => {
-                        n.child_disconnect(&remote_to_disconnect);
+                        n.data_mut()
+                            .unwrap()
+                            .child_disconnect(&remote_to_disconnect);
                     }
                     _ => unreachable!(),
                 }
@@ -2121,7 +2118,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             match &mut snarl[from.node] {
                 BetulaViewerNode::Node(n) => {
                     if let Ok(child_id) = self.get_betula_id(&to.node) {
-                        n.child_connect(&from, child_id);
+                        n.data_mut().unwrap().child_connect(&from, child_id);
                     }
                 }
                 _ => unreachable!(),
@@ -2173,7 +2170,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
         if let Some(to_disconnect) = child_to_disconnect {
             if let BetulaViewerNode::Node(ref mut node) = &mut snarl[to_disconnect.node] {
-                node.child_disconnect(&to_disconnect);
+                node.data_mut().unwrap().child_disconnect(&to_disconnect);
             }
         }
         if let Some((id, port_connection)) = port_to_disconnect {
@@ -2199,7 +2196,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
         if let Some(to_disconnect) = to_disconnect {
             if let BetulaViewerNode::Node(ref mut node) = &mut snarl[to_disconnect.node] {
-                node.child_disconnect(&to_disconnect);
+                node.data_mut().unwrap().child_disconnect(&to_disconnect);
             }
         }
     }
@@ -2242,7 +2239,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 let data = node.data().expect("can only draw outputs with data");
                 let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
-                if node.is_child_output(&pin.id) {
+                if data.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
                         Some(
                             PinInfo::triangle()
@@ -2274,7 +2271,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 let data = node.data().expect("can only draw outputs with data");
                 let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
-                if node.is_child_output(&pin.id) {
+                if data.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
                         PinInfo::triangle()
                             .with_fill(color)
