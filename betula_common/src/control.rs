@@ -118,7 +118,7 @@ pub enum InteractionCommand {
     SetChildren(SetChildren),
 
     /// Name a node.
-    SetNodeName(NodeId, String),
+    SetNodeName(NodeId, Option<String>),
 
     /// Add a blackboard
     AddBlackboard(BlackboardId),
@@ -127,7 +127,7 @@ pub enum InteractionCommand {
     RemoveBlackboard(BlackboardId),
 
     /// Name a blackboard.
-    SetBlackboardName(BlackboardId, String),
+    SetBlackboardName(BlackboardId, Option<String>),
 
     /// Set a node's configuration.
     SetConfig(SetConfigCommand),
@@ -179,7 +179,7 @@ impl InteractionCommand {
         InteractionCommand::RemoveNode(id)
     }
 
-    pub fn set_node_name(id: NodeId, name: String) -> Self {
+    pub fn set_node_name(id: NodeId, name: Option<String>) -> Self {
         InteractionCommand::SetNodeName(id, name)
     }
 
@@ -219,7 +219,7 @@ impl InteractionCommand {
         InteractionCommand::SetConfig(SetConfigCommand { id, config })
     }
 
-    pub fn set_blackboard_name(id: BlackboardId, name: String) -> Self {
+    pub fn set_blackboard_name(id: BlackboardId, name: Option<String>) -> Self {
         InteractionCommand::SetBlackboardName(id, name)
     }
 
@@ -326,7 +326,7 @@ impl InteractionCommand {
                 })])
             }
             InteractionCommand::SetNodeName(node_id, name) => {
-                tree.set_node_name(*node_id, Some(&name))?;
+                tree.set_node_name(*node_id, name.as_deref())?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
                         command: self.clone(),
@@ -478,7 +478,7 @@ impl InteractionCommand {
                 })])
             }
             InteractionCommand::SetBlackboardName(blackboard_id, name) => {
-                tree.set_blackboard_name(*blackboard_id, Some(&name))?;
+                tree.set_blackboard_name(*blackboard_id, name.as_deref())?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
                         command: self.clone(),

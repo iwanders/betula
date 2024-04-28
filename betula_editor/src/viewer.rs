@@ -1452,6 +1452,11 @@ impl BetulaViewer {
                     self.client.send_command(cmd)?;
                 }
                 if let Some(new_name) = node.name_local.take() {
+                    let new_name = if new_name.is_empty() {
+                        None
+                    } else {
+                        Some(new_name)
+                    };
                     let cmd = InteractionCommand::set_node_name(node.id, new_name);
                     self.client.send_command(cmd)?;
                 }
@@ -1468,6 +1473,11 @@ impl BetulaViewer {
                 self.client.send_command(cmd)?;
             }
             if let Some(new_name) = blackboard.name_local.take() {
+                let new_name = if new_name.is_empty() {
+                    None
+                } else {
+                    Some(new_name)
+                };
                 let cmd = InteractionCommand::set_blackboard_name(blackboard.id, new_name);
                 self.client.send_command(cmd)?;
             }
