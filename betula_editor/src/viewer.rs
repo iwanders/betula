@@ -150,6 +150,9 @@ pub struct NodeData {
     ///
     /// Used for coloring the node border if enabled.
     node_status: Option<Result<ExecutionStatus, String>>,
+
+    /// The actual ui node handling.
+    ui_node: Box<dyn UiNode>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -163,7 +166,6 @@ pub struct ViewerNode {
     /// The actual ui node handling.
     #[serde(skip)]
     ui_node: Option<Box<dyn UiNode>>,
-
     /// Local version of the children.
     ///
     /// Basically the vector of children, empty optionals are empty pins.
@@ -223,6 +225,14 @@ impl ViewerNode {
 
     pub fn data_mut(&self) -> Option<RefMut<'_, NodeData>> {
         self.data.as_ref().map(|z| z.borrow_mut())
+    }
+
+    pub fn ui_node(&self) -> Option<Ref<'_, Box<dyn UiNode>>> {
+        self.data().map(|v| Ref::map(v, |z: &NodeData| &z.ui_node))
+    }
+    pub fn ui_node_mut(&self) -> Option<RefMut<'_, Box<dyn UiNode>>> {
+        self.data_mut()
+            .map(|v| RefMut::map(v, |z: &mut NodeData| &mut z.ui_node))
     }
 
     pub fn output_port_count(&self) -> usize {
@@ -1690,6 +1700,7 @@ impl BetulaViewer {
             let rc = Rc::new(RefCell::new(NodeData {
                 id: v.id,
                 node_status: None,
+                ui_node: self.ui_support.create_ui_node(&v.node_type)?,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.nodes.insert(v.id, cloned_rc);
