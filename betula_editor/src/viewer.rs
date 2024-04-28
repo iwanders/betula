@@ -1962,7 +1962,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 // Grab the type support for this node.
                 if let Some(ui_node) = &node.ui_node {
                     if let Some(name) = &node.name_remote {
-                        format!("{name}", ui_node.ui_title())
+                        format!("{name} {}", ui_node.ui_title())
                     } else {
                         ui_node.ui_title()
                     }
