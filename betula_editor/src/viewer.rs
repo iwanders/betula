@@ -299,6 +299,14 @@ impl NodeData {
     pub fn is_child_output(&self, outpin: &OutPinId) -> bool {
         self.pin_to_child(outpin).is_some()
     }
+
+    pub fn name(&self) -> String {
+        if let Some(name) = self.name_remote.as_ref() {
+            format!("{name} {}", self.ui_node.ui_title())
+        } else {
+            self.ui_node.ui_title()
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1054,6 +1062,12 @@ pub struct BetulaViewer {
 }
 
 impl BetulaViewer {
+    fn snarl_remove_node(snarl: &mut Snarl<BetulaViewerNode>, snarl_id: SnarlNodeId) {
+        if snarl.get_node(snarl_id).is_some() {
+            snarl.remove_node(snarl_id);
+        }
+    }
+
     pub fn client(&self) -> &dyn TreeClient {
         &*self.client
     }
@@ -1127,7 +1141,7 @@ impl BetulaViewer {
     }
 
     pub fn remove_node_mapping(&mut self, node_id: BetulaNodeId, snarl_id: SnarlNodeId) {
-        self.node_map.entry(node_id);
+        self.node_map.remove(&node_id);
         self.snarl_map.remove(&snarl_id);
     }
 
@@ -1606,7 +1620,7 @@ impl BetulaViewer {
             }
             for (node_id, snarl_id) in &nodes_to_remove {
                 self.remove_node_mapping(*node_id, *snarl_id);
-                snarl.remove_node(*snarl_id);
+                Self::snarl_remove_node(snarl, *snarl_id);
             }
         }
         Ok(())
@@ -1961,6 +1975,9 @@ impl BetulaViewer {
         data: Option<NodeDataRc>,
     ) {
         let mut viewer_node = ViewerNode::new(id);
+        if let Some(data) = data.as_ref() {
+            data.borrow_mut().mark_dirty();
+        }
         viewer_node.data = data;
         let snarl_id = snarl.insert_node(pos, BetulaViewerNode::Node(viewer_node));
         self.add_node_mapping(id, snarl_id);
@@ -2070,15 +2087,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match node {
             BetulaViewerNode::Node(node) => {
                 // Grab the type support for this node.
-                if let Some(data) = node.data() {
-                    if let Some(name) = &data.name_remote {
-                        format!("{name} {}", data.ui_node.ui_title())
-                    } else {
-                        data.ui_node.ui_title()
-                    }
-                } else {
-                    "Pending...".to_owned()
-                }
+                node.data()
+                    .map(|v| v.name())
+                    .unwrap_or("Pending..".to_owned())
             }
             BetulaViewerNode::Blackboard(bb) => {
                 // Grab the type support for this node.
@@ -2513,23 +2524,26 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         if respawn_nodes {
             let mut id_names = vec![];
             {
-                for node_data in self.nodes.values() {
+                for (node_key, node_data) in self.nodes.iter() {
+                    if self.node_map.contains_key(node_key) {
+                        continue; // node already exists, not allowing a second.
+                    }
                     let data_rc = Rc::clone(node_data);
                     let data = node_data.borrow();
                     let id = data.id;
-                    let name = data
-                        .name_remote
-                        .as_ref()
-                        .map(|z| z.clone())
-                        .unwrap_or("zzz".to_owned());
+                    let name = data.name();
                     id_names.push((id, name, data_rc));
                 }
             }
-            for (id, name, data_rc) in id_names {
-                if ui.button(name).clicked() {
-                    self.ui_create_node(id, pos, snarl, Some(data_rc));
-                    ui.close_menu();
-                }
+            if !id_names.is_empty() {
+                ui.menu_button("Unhide Nodes", |ui| {
+                    for (id, name, data_rc) in id_names {
+                        if ui.button(name).clicked() {
+                            self.ui_create_node(id, pos, snarl, Some(data_rc));
+                            ui.close_menu();
+                        }
+                    }
+                });
             }
         }
     }
