@@ -15,8 +15,8 @@ tree don't really make sense.
 
 On blackboards:
 * Blackboards are key-value stores.
-* Nodes may consume data, these are inputs.
-* Nodes may provide data, these are outputs.
+* Nodes may consume data, these are input ports to the node.
+* Nodes may provide data, these are output ports from the node.
 * Name remaps happen at the input side. Such that one output
   can still be uniquely referred to, but write to one blackboard under
   different names.
