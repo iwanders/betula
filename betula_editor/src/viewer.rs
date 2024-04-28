@@ -2415,28 +2415,26 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_id = node.id;
-                if ui.button("Execute").clicked() {
-                    if let Err(v) = self.send_run_node(node_id) {
-                        println!("Failed to send run node {v:?}");
+
+                ui.horizontal(|ui| {
+                    if ui.button("Execute").clicked() {
+                        if let Err(v) = self.send_run_node(node_id) {
+                            println!("Failed to send run node {v:?}");
+                        }
+                        // ui.close_menu();
                     }
-                    // ui.close_menu();
-                }
-                if ui.button("Remove").clicked() {
-                    if let Err(v) = self.send_remove_node(node_id) {
-                        println!("Failed to send node removal {v:?}");
+                    let mut is_root = self.tree_roots_local.contains(&node_id);
+                    let r = ui.checkbox(&mut is_root, "Root");
+                    if r.changed() {
+                        if is_root {
+                            self.root_add(node_id);
+                        } else {
+                            self.root_remove(node_id);
+                        }
+                        ui.close_menu();
                     }
-                    ui.close_menu();
-                }
-                let mut is_root = self.tree_roots_local.contains(&node_id);
-                let r = ui.checkbox(&mut is_root, "Root");
-                if r.changed() {
-                    if is_root {
-                        self.root_add(node_id);
-                    } else {
-                        self.root_remove(node_id);
-                    }
-                    ui.close_menu();
-                }
+                });
+
                 let name = node.name_remote.as_deref().unwrap_or("unnamed");
                 ui.horizontal(|ui| {
                     ui.label("Name:");
@@ -2447,6 +2445,22 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                         &mut node.name_local,
                     );
                 });
+
+                let is_disconnected = node.children_remote.is_empty();
+                let delete_button = egui::Button::new("Delete");
+                let tooltip_ui = |ui: &mut egui::Ui| {
+                    ui.label("Can only delete node if there are no children remaining.");
+                };
+                if ui
+                    .add_enabled(is_disconnected, delete_button)
+                    .on_disabled_hover_ui(tooltip_ui)
+                    .clicked()
+                {
+                    if let Err(v) = self.send_remove_node(node_id) {
+                        println!("Failed to send node removal {v:?}");
+                    }
+                    ui.close_menu();
+                }
             }
             BetulaViewerNode::Blackboard(ref mut bb) => {
                 bb.ui_node_menu(ui);
