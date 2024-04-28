@@ -1659,7 +1659,18 @@ impl BetulaViewer {
     ) -> Result<(), BetulaError> {
         let viewer_node = self.get_node_mut(v.id, snarl)?;
         if let Some(node) = self.nodes.get(&v.id) {
+            let mut data = node.borrow_mut();
             // TODO: Move update here.
+            if let Some(ref config) = v.config {
+                let config = self
+                    .ui_support
+                    .tree_support_ref()
+                    .config_deserialize(config.clone())?;
+                data.ui_node.set_config(&*config)?;
+                // needs_clear_config = true;
+                viewer_node.clear_config_needs_send();
+                viewer_node.update_children_remote(&v.children);
+            }
         } else {
             // new node
             let rc = Rc::new(RefCell::new(NodeData {
@@ -1673,25 +1684,7 @@ impl BetulaViewer {
         }
 
         viewer_node.name_remote = v.name;
-        let mut needs_send = false;
-        {
-            // Update the configuration if we have one.
-            // let mut ui_node = viewer_node.ui_node_mut().unwrap();
-            let mut data = viewer_node.data_mut().unwrap();
-            // Oh, and set the config if we got one
-            if let Some(config) = v.config {
-                let config = self
-                    .ui_support
-                    .tree_support_ref()
-                    .config_deserialize(config)?;
-                data.ui_node.set_config(&*config)?;
-                needs_send = true;
-            }
-        }
 
-        let viewer_node = self.get_node_mut(v.id, snarl)?;
-        viewer_node.clear_config_needs_send();
-        viewer_node.update_children_remote(&v.children);
         // Pins may have changed, so we must update the snarl state.
         // Todo: just this node instead of all of them.
         self.update_snarl_dirty_nodes(snarl)?;
