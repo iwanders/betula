@@ -153,6 +153,26 @@ pub struct NodeData {
 
     /// The actual ui node handling.
     ui_node: Box<dyn UiNode>,
+
+    /// Denotes whether the configuration needs to be send to the server.
+    ///
+    /// If the ui_config returns Changed, this is set the true, it is then
+    /// sent to the server. After the server sends back a configuration and
+    /// that is set to the node, it is set to false again.
+    config_needs_send: bool,
+}
+
+impl NodeData {
+    pub fn clear_config_needs_send(&mut self) {
+        self.config_needs_send = false;
+    }
+
+    pub fn set_config_needs_send(&mut self) {
+        self.config_needs_send = true;
+    }
+    pub fn config_needs_send(&self) -> bool {
+        self.config_needs_send
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -187,14 +207,6 @@ pub struct ViewerNode {
     #[serde(skip)]
     children_dirty: bool,
 
-    /// Denotes whether the configuration needs to be send to the server.
-    ///
-    /// If the ui_config returns Changed, this is set the true, it is then
-    /// sent to the server. After the server sends back a configuration and
-    /// that is set to the node, it is set to false again.
-    #[serde(skip)]
-    config_needs_send: bool,
-
     name_remote: Option<String>,
     name_local: Option<String>,
     name_editor: Option<String>,
@@ -208,7 +220,6 @@ impl ViewerNode {
             children_local: vec![],
             children_remote: vec![],
             children_dirty: false,
-            config_needs_send: false,
             name_remote: None,
             name_local: None,
             name_editor: None,
@@ -248,7 +259,7 @@ impl ViewerNode {
     }
     pub fn total_inputs(&self) -> usize {
         if self.data.is_none() {
-            return 0;
+            return 1;
         }
         let input_count = self.input_port_count();
         input_count + 1 // +1 for parent.
@@ -330,17 +341,6 @@ impl ViewerNode {
     }
     pub fn set_clean(&mut self) {
         self.children_dirty = false;
-    }
-
-    pub fn clear_config_needs_send(&mut self) {
-        self.config_needs_send = false;
-    }
-
-    pub fn set_config_needs_send(&mut self) {
-        self.config_needs_send = true;
-    }
-    pub fn config_needs_send(&self) -> bool {
-        self.config_needs_send
     }
 
     pub fn children_is_up_to_date(&self) -> bool {
@@ -1599,8 +1599,9 @@ impl BetulaViewer {
         let node_ids = snarl.node_ids().map(|(a, _b)| a).collect::<Vec<_>>();
         for node in node_ids {
             if let BetulaViewerNode::Node(node) = &snarl[node] {
-                if node.config_needs_send() {
-                    if let Some(ui_node) = node.ui_node() {
+                if let Some(data) = node.data() {
+                    if data.config_needs_send() {
+                        let ui_node = &data.ui_node;
                         if let Some(config) = ui_node.get_config()? {
                             // Serialize the configuration.
                             let config = self
@@ -1631,11 +1632,7 @@ impl BetulaViewer {
         }
     }
 
-    pub fn set_execution_results(
-        &mut self,
-        results: &[NodeStatus],
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) {
+    pub fn set_execution_results(&mut self, results: &[NodeStatus]) {
         for e in results {
             if let Ok(ref mut v) = self.get_node_data_mut(e.node) {
                 v.node_status = Some(e.status.clone());
@@ -1668,14 +1665,15 @@ impl BetulaViewer {
                     .config_deserialize(config.clone())?;
                 data.ui_node.set_config(&*config)?;
                 // needs_clear_config = true;
-                viewer_node.clear_config_needs_send();
-                viewer_node.update_children_remote(&v.children);
+                data.clear_config_needs_send();
             }
+            viewer_node.name_remote = v.name;
         } else {
             // new node
             let rc = Rc::new(RefCell::new(NodeData {
                 id: v.id,
                 node_status: None,
+                config_needs_send: false,
                 ui_node: self.ui_support.create_ui_node(&v.node_type)?,
             }));
             let cloned_rc = Rc::clone(&rc);
@@ -1683,8 +1681,7 @@ impl BetulaViewer {
             viewer_node.data = Some(rc);
         }
 
-        viewer_node.name_remote = v.name;
-
+        viewer_node.update_children_remote(&v.children);
         // Pins may have changed, so we must update the snarl state.
         // Todo: just this node instead of all of them.
         self.update_snarl_dirty_nodes(snarl)?;
@@ -1865,7 +1862,7 @@ impl BetulaViewer {
                     }
                     InteractionEvent::ExecutionResult(results) => {
                         self.clear_execution_results(snarl);
-                        self.set_execution_results(&results.node_status, snarl);
+                        self.set_execution_results(&results.node_status);
                     } // unhandled => panic!("unhandled event: {unhandled:?}"),
                 }
             } else {
@@ -2199,7 +2196,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref mut node) => {
-                let data = node.data()?;
+                let data = node.data().expect("can only draw outputs with data");
                 let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
                 if node.is_child_output(&pin.id) {
@@ -2231,7 +2228,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> PinInfo {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
-                let data = node.data().unwrap();
+                let data = node.data().expect("can only draw outputs with data");
                 let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
                 if node.is_child_output(&pin.id) {
@@ -2294,7 +2291,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<PinInfo> {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
-                let data = node.data()?;
+                let data = node.data().expect("can only draw inputs with data");
                 let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                     .unwrap_or(RELATION_COLOR);
                 if node.is_child_input(&pin.id) {
@@ -2317,7 +2314,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match snarl[pin.id.node] {
             BetulaViewerNode::Node(ref node) => {
                 if node.is_child_input(&pin.id) {
-                    let data = node.data().unwrap();
+                    let data = node.data().expect("can only draw inputs with data");
                     let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                         .unwrap_or(RELATION_COLOR);
                     PinInfo::triangle().with_fill(color).vertical()
@@ -2369,15 +2366,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         ui.label("Node");
-        /*
-        for node_type in self.ui_support.node_types() {
-            let name = self.ui_support.display_name(&node_type);
-            if ui.button(name).clicked() {
-                self.ui_create_node(BetulaNodeId(Uuid::new_v4()), pos, node_type, snarl);
-                ui.close_menu();
-            }
-        }
-        */
         let node_categories = self.ui_support.node_categories();
         use crate::ui::{UiCategoryTree, UiNodeCategory};
         fn node_recurser(category: &UiCategoryTree, ui: &mut Ui) -> Option<NodeType> {
@@ -2522,13 +2510,11 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_context = SimpleNodeContext::new(node);
-                let mut needs_send = false;
-                if let Some(mut ui_node) = node.ui_node_mut() {
-                    let response = ui_node.ui_config(&node_context, ui, scale);
-                    needs_send |= response == UiConfigResponse::Changed;
-                }
-                if needs_send {
-                    node.set_config_needs_send()
+                if let Some(mut data) = node.data_mut() {
+                    let response = data.ui_node.ui_config(&node_context, ui, scale);
+                    if response == UiConfigResponse::Changed {
+                        data.set_config_needs_send();
+                    }
                 }
             }
             BetulaViewerNode::Blackboard(_) => {}
