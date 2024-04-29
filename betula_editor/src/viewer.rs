@@ -561,12 +561,10 @@ impl BlackboardData {
         // self.ui_values = values;
         for (port, value) in port_values {
             if let Some(existing) = self.ui_values.get_mut(&port) {
-                println!("value: {value:?}");
                 // Deserialize the value.
                 let deserialized = ui_support
                     .tree_support_ref()
                     .value_deserialize(value.clone())?;
-                println!("deser: {deserialized:?}");
                 if let Err(_) = existing.set_value(deserialized) {
                     // Well, update failed, probably a type change, blow away the old value.
                     *existing = ui_support.create_ui_value(value)?;
@@ -1765,21 +1763,9 @@ impl BetulaViewer {
         v: betula_common::control::NodeInformation,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
-        let viewer_node = self.get_node_mut(v.id, snarl)?;
-        if let Some(node) = self.nodes.get(&v.id) {
-            let mut data = node.borrow_mut();
-            if let Some(ref config) = v.config {
-                let config = self
-                    .ui_support
-                    .tree_support_ref()
-                    .config_deserialize(config.clone())?;
-                data.ui_node.set_config(&*config)?;
-                // needs_clear_config = true;
-                data.clear_config_needs_send();
-            }
-            data.name_remote = v.name;
-        } else {
+        if !self.nodes.contains_key(&v.id) {
             // new node
+            let viewer_node = self.get_node_mut(v.id, snarl)?;
             let rc = Rc::new(RefCell::new(NodeData {
                 id: v.id,
                 node_status: None,
@@ -1796,10 +1782,20 @@ impl BetulaViewer {
             self.nodes.insert(v.id, cloned_rc);
             viewer_node.data = Some(rc);
         }
-        viewer_node
-            .data_mut()
-            .unwrap()
-            .update_children_remote(&v.children);
+
+        {
+            let mut data = self.nodes.get(&v.id).unwrap().borrow_mut();
+            if let Some(ref config) = v.config {
+                let config = self
+                    .ui_support
+                    .tree_support_ref()
+                    .config_deserialize(config.clone())?;
+                data.ui_node.set_config(&*config)?;
+                data.clear_config_needs_send();
+            }
+            data.name_remote = v.name;
+            data.update_children_remote(&v.children);
+        }
 
         // Pins may have changed, so we must update the snarl state.
         // Todo: just this node instead of all of them.
