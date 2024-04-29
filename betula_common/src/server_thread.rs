@@ -194,14 +194,14 @@ mod tests {
         tree.set_children(root, &vec![f1, s1])?;
         let (this_node, all_nodes) = execute_tracked(&*tree, root)?;
         println!("All nodes: {all_nodes:#?}");
-        assert_eq!(this_node, ExecutionStatus::Success);
+        assert_eq!(this_node.ok(), Some(ExecutionStatus::Success));
         assert_eq!(all_nodes.len(), 3);
         assert_eq!(all_nodes[0].node, f1_id);
-        assert_eq!(all_nodes[0].status, ExecutionStatus::Failure);
+        assert_eq!(all_nodes[0].status, Ok(ExecutionStatus::Failure));
         assert_eq!(all_nodes[1].node, s1_id);
-        assert_eq!(all_nodes[1].status, ExecutionStatus::Success);
+        assert_eq!(all_nodes[1].status, Ok(ExecutionStatus::Success));
         assert_eq!(all_nodes[2].node, root_id);
-        assert_eq!(all_nodes[2].status, ExecutionStatus::Success);
+        assert_eq!(all_nodes[2].status, Ok(ExecutionStatus::Success));
         Ok(())
     }
 }

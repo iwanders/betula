@@ -2062,20 +2062,24 @@ impl BetulaViewer {
         position: usize,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
-        let viewer_node = self.get_node_mut(parent, snarl)?;
-        let ui_node = viewer_node.ui_node.as_mut().unwrap();
-        let port_output_count = ui_node.ui_output_port_count();
-        let output_port = port_output_count + position;
-        let from_snarl_id = self.get_node_snarl_id(parent)?;
-        let to_snarl_id = self.get_node_snarl_id(child)?;
-        let from = snarl.out_pin(egui_snarl::OutPinId {
-            node: from_snarl_id,
-            output: output_port,
-        });
-        let to = snarl.in_pin(egui_snarl::InPinId {
-            node: to_snarl_id,
-            input: 0,
-        });
+        let (from, to) = {
+            // let viewer_node = self.get_node_mut(parent, snarl)?;
+            let data = self.nodes.get(&parent).unwrap().borrow_mut();
+            let ui_node = &data.ui_node;
+            let port_output_count = ui_node.ui_output_port_count();
+            let output_port = port_output_count + position;
+            let from_snarl_id = self.get_node_snarl_id(parent)?;
+            let to_snarl_id = self.get_node_snarl_id(child)?;
+            let from = snarl.out_pin(egui_snarl::OutPinId {
+                node: from_snarl_id,
+                output: output_port,
+            });
+            let to = snarl.in_pin(egui_snarl::InPinId {
+                node: to_snarl_id,
+                input: 0,
+            });
+            (from, to)
+        };
         self.connect(&from, &to, snarl);
         Ok(())
     }
@@ -2088,9 +2092,10 @@ impl BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> Result<(), BetulaError> {
         let viewer_node = self.get_node_mut(node_port.node(), snarl)?;
-        let ui_node = viewer_node.ui_node.as_mut().unwrap();
+        // let data = self.nodes.get(&node_port.node()).unwrap().borrow_mut();
+        // let ui_node = &data.ui_node;
         // println!("viewer_node: {viewer_node:?}");
-        println!("ui_node: {ui_node:?}");
+        // println!("ui_node: {ui_node:?}");
         if node_port.direction() == PortDirection::Input {
             // let input_pin = viewer_node.input_port_to_pin(&node_port.name()).ok_or("failed")?;
             todo!();

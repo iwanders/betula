@@ -619,7 +619,8 @@ mod test {
         let input_ports = tree.node_ports(delay_node)?;
         tree.connect_port_to_blackboard(&input_ports[0], bb)?;
 
-        tree.set_blackboard_name(bb, "ThisOneIsGreenWithLines")?;
+        tree.set_blackboard_name(bb, Some("ThisOneIsGreenWithLines"))?;
+        tree.set_node_name(delay_node, Some("LongDelayNode"))?;
 
         let obj = TreeSerializer::new(&tree_support, &*tree);
         let config_json = serde_json::to_string(&obj)?;
