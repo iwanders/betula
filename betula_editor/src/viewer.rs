@@ -246,6 +246,28 @@ impl NodeData {
         ours.eq(theirs)
     }
 
+    pub fn child_contains(&self, node_id: BetulaNodeId) -> bool {
+        self.children_remote.contains(&node_id) || self.children_local.contains(&Some(node_id))
+    }
+
+    pub fn remove_child(&mut self, node_id: BetulaNodeId) {
+        let before = self.children_remote.len() + self.children_local.len();
+        self.children_remote = self
+            .children_remote
+            .drain(..)
+            .filter(|v| *v != node_id)
+            .collect();
+        self.children_local = self
+            .children_local
+            .drain(..)
+            .filter(|v| *v != Some(node_id))
+            .collect();
+        let after = self.children_remote.len() + self.children_local.len();
+        if before != after {
+            self.mark_dirty();
+        }
+    }
+
     /// Disconnect a particular child based on the provided output pin.
     #[track_caller]
     pub fn child_disconnect(&mut self, outpin: &OutPinId) {
@@ -1277,7 +1299,8 @@ impl BetulaViewer {
             .node_map
             .remove(&node_id)
             .ok_or::<BetulaError>(format!("could not find {node_id:?}").into())?;
-        self.snarl_map.remove(&snarl_id);
+        self.remove_relations(node_id);
+        self.remove_node_mapping(node_id, snarl_id);
         self.nodes.remove(&node_id);
         self.root_remove(node_id);
         Ok(snarl_id)
@@ -1575,6 +1598,22 @@ impl BetulaViewer {
         }
 
         Ok(())
+    }
+
+    fn mark_related_dirty(&mut self, node: BetulaNodeId) {
+        for data in self.nodes.values() {
+            let mut data = data.borrow_mut();
+            if data.id == node || data.child_contains(node) {
+                data.mark_dirty();
+            }
+        }
+    }
+
+    fn remove_relations(&mut self, node_id: BetulaNodeId) {
+        for data in self.nodes.values() {
+            let mut data = data.borrow_mut();
+            data.remove_child(node_id)
+        }
     }
 
     /// Update the snarl state based on the current connections and desired connections.
@@ -1975,8 +2014,11 @@ impl BetulaViewer {
         data: Option<NodeDataRc>,
     ) {
         let mut viewer_node = ViewerNode::new(id);
-        if let Some(data) = data.as_ref() {
-            data.borrow_mut().mark_dirty();
+
+        // If we have data, we need to mark this node dirty, but also
+        // all the parents it could have.
+        if data.is_some() {
+            self.mark_related_dirty(id);
         }
         viewer_node.data = data;
         let snarl_id = snarl.insert_node(pos, BetulaViewerNode::Node(viewer_node));
