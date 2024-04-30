@@ -2,7 +2,7 @@ use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::Image;
-use screen_capture::config::{CaptureConfig, CaptureSpecification, ConfiguredCapture};
+use screen_capture::{CaptureConfig, CaptureSpecification, ThreadedCapturer};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct CaptureNodeConfig {
@@ -13,7 +13,7 @@ impl IsNodeConfig for CaptureNodeConfig {}
 #[derive(Default)]
 pub struct CaptureNode {
     output: Output<Image>,
-    capture: Option<ConfiguredCapture>,
+    capture: Option<ThreadedCapturer>,
     config: CaptureNodeConfig,
 }
 impl std::fmt::Debug for CaptureNode {
@@ -32,13 +32,10 @@ impl Node for CaptureNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let c = self
             .capture
-            .get_or_insert_with(|| ConfiguredCapture::new(self.config.capture.clone()));
-
-        match c.capture() {
+            .get_or_insert_with(|| ThreadedCapturer::new(self.config.capture.clone()));
+        match c.latest_image() {
             Ok(img) => {
-                let img_rgb = img.to_rgba();
-                let img = Image::new(img_rgb);
-                self.output.set(img)?;
+                self.output.set(Image::new(img))?;
                 Ok(ExecutionStatus::Success)
             }
             Err(()) => Ok(ExecutionStatus::Failure),
@@ -97,6 +94,15 @@ mod ui_support {
 
             let mut modified = false;
             ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Rate (hz)");
+                    let r = ui.add(
+                        egui::DragValue::new(&mut self.config.capture.rate)
+                            .update_while_editing(false),
+                    );
+                    modified |= r.changed();
+                });
+
                 ui.horizontal(|ui| {
                     if ui.add(egui::Button::new("➕")).clicked() {
                         self.config
