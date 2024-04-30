@@ -13,6 +13,7 @@ impl IsNodeConfig for CaptureNodeConfig {}
 #[derive(Default)]
 pub struct CaptureNode {
     output: Output<Image>,
+    output_time: Output<f64>,
     capture: Option<ThreadedCapturer>,
     config: CaptureNodeConfig,
 }
@@ -33,9 +34,14 @@ impl Node for CaptureNode {
         let c = self
             .capture
             .get_or_insert_with(|| ThreadedCapturer::new(self.config.capture.clone()));
-        match c.latest_image() {
+        let (result, t) = c.latest();
+        match result {
             Ok(img) => {
+                use std::time::UNIX_EPOCH;
                 self.output.set(Image::new(img))?;
+                let _ = self
+                    .output_time
+                    .set(t.duration_since(UNIX_EPOCH)?.as_secs_f64());
                 Ok(ExecutionStatus::Success)
             }
             Err(()) => Ok(ExecutionStatus::Failure),
@@ -43,13 +49,17 @@ impl Node for CaptureNode {
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
-        Ok(vec![Port::output::<Image>("image")])
+        Ok(vec![
+            Port::output::<Image>("image"),
+            Port::output::<f64>("capture_time"),
+        ])
     }
     fn setup_outputs(
         &mut self,
         interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
         self.output = interface.output::<Image>("image", Default::default())?;
+        self.output_time = interface.output::<f64>("capture_time", Default::default())?;
         Ok(())
     }
 
