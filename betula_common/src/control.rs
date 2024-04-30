@@ -153,6 +153,15 @@ pub enum InteractionCommand {
     /// Load a tree configuration into the tree.
     LoadTreeConfig(TreeConfig),
 
+    /// Reset the nodes in the tree.
+    ResetNodes,
+
+    /// Reset the nodes in the tree.
+    ResetNode(NodeId),
+
+    /// Set the directory used by the tree.
+    SetDirectory(Option<String>),
+
     /// Call the function on the tree, this _obviously_ only works for the
     /// inter process situation, but it is helpful for unit tests.
     #[serde(skip)]
@@ -181,6 +190,24 @@ impl InteractionCommand {
 
     pub fn set_node_name(id: NodeId, name: Option<String>) -> Self {
         InteractionCommand::SetNodeName(id, name)
+    }
+
+    pub fn reset_nodes() -> Self {
+        InteractionCommand::ResetNodes
+    }
+
+    pub fn reset_node(id: NodeId) -> Self {
+        InteractionCommand::ResetNode(id)
+    }
+    pub fn set_directory(path: Option<&std::path::Path>) -> Self {
+        let path = path.map(|v| {
+            v.canonicalize()
+                .expect(&format!("path {path:?} could not be made canonical"))
+                .into_os_string()
+                .into_string()
+                .expect(&format!("path {path:?} could not be made made into string"))
+        });
+        InteractionCommand::SetDirectory(path)
     }
 
     pub fn connect_port(port_connection: PortConnection) -> Self {
@@ -477,6 +504,20 @@ impl InteractionCommand {
                     error: None,
                 })])
             }
+            InteractionCommand::ResetNodes => {
+                tree.reset_nodes();
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
+            }
+            InteractionCommand::ResetNode(id) => {
+                tree.reset_node(*id)?;
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
+            }
             InteractionCommand::SetBlackboardName(blackboard_id, name) => {
                 tree.set_blackboard_name(*blackboard_id, name.as_deref())?;
                 Ok(vec![
@@ -490,6 +531,15 @@ impl InteractionCommand {
                         tree,
                     )?),
                 ])
+            }
+            InteractionCommand::SetDirectory(dir) => {
+                let dir = dir.as_ref().map(|s| std::path::PathBuf::from(&s));
+                let dir = dir.as_ref().map(|v| v.as_path());
+                tree.set_directory(dir);
+                Ok(vec![InteractionEvent::CommandResult(CommandResult {
+                    command: self.clone(),
+                    error: None,
+                })])
             }
             InteractionCommand::TreeCall(f) => {
                 (*f).call(tree)?;

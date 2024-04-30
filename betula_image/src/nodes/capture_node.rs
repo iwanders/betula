@@ -86,6 +86,10 @@ impl Node for CaptureNode {
         }
         r
     }
+
+    fn reset(&mut self) {
+        self.capture = None;
+    }
 }
 
 #[cfg(feature = "betula_editor")]

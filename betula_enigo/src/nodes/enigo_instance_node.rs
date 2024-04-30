@@ -43,6 +43,10 @@ impl Node for EnigoInstanceNode {
     fn node_type(&self) -> NodeType {
         Self::static_type()
     }
+
+    fn reset(&mut self) {
+        self.instance = None;
+    }
 }
 
 #[cfg(feature = "betula_editor")]

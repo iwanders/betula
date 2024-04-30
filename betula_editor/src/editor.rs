@@ -122,6 +122,10 @@ impl BetulaEditor {
         let cmd = InteractionCommand::run_specific(&self.viewer.tree_roots());
         self.client.send_command(cmd)
     }
+    fn send_reset_nodes(&self) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::reset_nodes();
+        self.client.send_command(cmd)
+    }
 
     fn save_tree_config(&mut self, tree: TreeConfig) -> Result<(), BetulaError> {
         let task = rfd::AsyncFileDialog::new()
@@ -308,6 +312,12 @@ impl BetulaEditor {
                     }
                 }
                 // 📥
+                ui.separator();
+                if ui.button("reset nodes").clicked() {
+                    if let Err(e) = self.send_reset_nodes() {
+                        println!("Error servicing: {e:?}");
+                    }
+                }
                 ui.separator();
 
                 let mut node_color_status = self.viewer.color_node_status();

@@ -268,6 +268,24 @@ pub trait Node: std::fmt::Debug + AsAny {
     fn static_type() -> NodeType
     where
         Self: Sized;
+
+    /// Set the directory this node should use.
+    ///
+    /// Some nodes inevitably need assets that need to be loaded from the disk.
+    /// The directory from which they load these assets isn't part of the configuration
+    /// but instead is more governed to from where the tree is loaded or what the working directory
+    /// is. This directory is considered volatile. The configuration however, may specify which file
+    /// to load from the directory.
+    fn set_directory(&mut self, directory: Option<&std::path::Path>) {
+        let _ = directory;
+    }
+
+    /// Reset this node to its initial conditions.
+    ///
+    /// The node should reset its internal state as if it was just created. It does NOT reset its
+    /// configuration. So this can be done to ensure that configuration / setup that may happen on
+    /// the first run is done again.
+    fn reset(&mut self) {}
 }
 
 /// Node ids are represented as UUIDs.
@@ -292,12 +310,31 @@ pub trait Tree: std::fmt::Debug + AsAny {
 
     /// Return a reference to a node.
     fn node_ref(&self, id: NodeId) -> Option<&std::cell::RefCell<Box<dyn Node>>>;
+
     /// Return a mutable reference to a node.
     fn node_mut(&mut self, id: NodeId) -> Option<&mut dyn Node>;
+
     /// Removes a node and any relations associated to it.
     fn remove_node(&mut self, id: NodeId) -> Result<Box<dyn Node>, BetulaError>;
+
     /// Add a node to the tree.
     fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, BetulaError>;
+
+    /// Reset a specific node.
+    fn reset_node(&mut self, id: NodeId) -> Result<(), BetulaError> {
+        let node = self
+            .node_mut(id)
+            .ok_or(format!("node {id:?} could not be found"))?;
+        node.reset();
+        Ok(())
+    }
+
+    /// Reset all nodes in the tree.
+    fn reset_nodes(&mut self) {
+        for node in self.nodes() {
+            let _ = self.reset_node(node);
+        }
+    }
 
     /// Obtain a list of the children of a particular node.
     fn children(&self, id: NodeId) -> Result<Vec<NodeId>, BetulaError>;
@@ -313,6 +350,11 @@ pub trait Tree: std::fmt::Debug + AsAny {
 
     /// Get the name of a node.
     fn node_name(&self, name: NodeId) -> Result<Option<String>, BetulaError>;
+
+    /// Set the directory for all nodes in the tree.
+    ///
+    /// New nodes added to the tree should have their [`Node::set_directory`] called appropriately.
+    fn set_directory(&mut self, directory: Option<&std::path::Path>);
 
     /// Get a list of the blackboard ids.
     fn blackboards(&self) -> Vec<BlackboardId>;

@@ -190,6 +190,11 @@ pub struct NodeData {
     /// cycle, this makes it easier to track the changes happening to the
     /// snarl state.
     children_dirty: bool,
+
+    /// Whether or not this node should be reset.
+    ///
+    /// This sends the ResetNode command to the tree.
+    should_reset: bool,
 }
 
 impl NodeData {
@@ -452,6 +457,12 @@ impl ViewerNode {
         if ui.button("Hide").clicked() {
             self.should_remove_node = true;
             data.mark_dirty();
+            ui.close_menu();
+        }
+
+        // Button to hide this node.
+        if ui.button("Reset").clicked() {
+            data.should_reset = true;
             ui.close_menu();
         }
 
@@ -1538,6 +1549,10 @@ impl BetulaViewer {
         let cmd = InteractionCommand::run_specific(&[node_id]);
         self.client.send_command(cmd)
     }
+    fn send_reset_node(&self, node_id: BetulaNodeId) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::reset_node(node_id);
+        self.client.send_command(cmd)
+    }
 
     /// Iterate through the nodes, check if their remote and local is in sync, if not send updates to server.
     fn send_changes_to_server(&mut self) -> Result<(), BetulaError> {
@@ -1561,6 +1576,12 @@ impl BetulaViewer {
                     println!("Failed to send node removal {v:?}");
                 }
                 data.should_remove = false;
+            }
+            if data.should_reset {
+                if let Err(v) = self.send_reset_node(data.id) {
+                    println!("Failed to send node reset {v:?}");
+                }
+                data.should_reset = false;
             }
         }
 
@@ -1771,6 +1792,7 @@ impl BetulaViewer {
                 node_status: None,
                 config_needs_send: false,
                 should_remove: false,
+                should_reset: false,
                 ui_node: self.ui_support.create_ui_node(&v.node_type)?,
                 name_local: None,
                 name_remote: None,

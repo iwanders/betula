@@ -43,6 +43,7 @@ pub struct BasicTree {
     nodes: HashMap<NodeId, BasicTreeNode>,
     blackboards: HashMap<BlackboardId, BasicBlackboardEntry>,
     tree_roots: Vec<NodeId>,
+    directory: Option<std::path::PathBuf>,
 }
 
 impl BasicTree {
@@ -51,6 +52,7 @@ impl BasicTree {
             nodes: Default::default(),
             blackboards: Default::default(),
             tree_roots: Default::default(),
+            directory: Default::default(),
         }
     }
 
@@ -330,6 +332,8 @@ impl Tree for BasicTree {
     }
 
     fn add_node_boxed(&mut self, id: NodeId, node: Box<dyn Node>) -> Result<NodeId, BetulaError> {
+        let mut node = node;
+        node.set_directory(self.directory.as_deref());
         self.nodes.insert(
             id,
             BasicTreeNode {
@@ -338,6 +342,7 @@ impl Tree for BasicTree {
                 name: None,
             },
         );
+
         Ok(id)
     }
 
@@ -539,6 +544,13 @@ impl Tree for BasicTree {
             .get(&id)
             .ok_or_else(|| format!("node {id:?} does not exist").to_string())?;
         Ok(node.name.clone())
+    }
+
+    fn set_directory(&mut self, directory: Option<&std::path::Path>) {
+        self.directory = directory.map(|v| v.to_owned());
+        for (_k, v) in self.nodes.iter_mut() {
+            v.node.get_mut().set_directory(self.directory.as_deref());
+        }
     }
 }
 
