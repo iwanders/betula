@@ -69,4 +69,5 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_value_default_named::<Image>("Image");
     ui_support
         .add_node_default_with_config::<nodes::ImageCaptureNode, nodes::ImageCaptureNodeConfig>();
+    ui_support.add_node_default_with_config::<nodes::ImageMatchNode, nodes::ImageMatchNodeConfig>();
 }

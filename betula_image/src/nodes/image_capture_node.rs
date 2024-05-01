@@ -221,7 +221,7 @@ mod ui_support {
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
                 UiNodeCategory::Folder("provider".to_owned()),
-                UiNodeCategory::Name("capture".to_owned()),
+                UiNodeCategory::Name("image_capture".to_owned()),
             ]
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
