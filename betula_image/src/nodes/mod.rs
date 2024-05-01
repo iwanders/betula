@@ -1,3 +1,3 @@
-mod capture_node;
-pub use capture_node::CaptureNode;
-pub use capture_node::CaptureNodeConfig;
+mod image_capture_node;
+pub use image_capture_node::ImageCaptureNode;
+pub use image_capture_node::ImageCaptureNodeConfig;

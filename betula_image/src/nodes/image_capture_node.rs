@@ -5,32 +5,32 @@ use crate::Image;
 use screen_capture::{CaptureConfig, CaptureSpecification, ThreadedCapturer};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct CaptureNodeConfig {
+pub struct ImageCaptureNodeConfig {
     capture: CaptureConfig,
 }
-impl IsNodeConfig for CaptureNodeConfig {}
+impl IsNodeConfig for ImageCaptureNodeConfig {}
 
 #[derive(Default)]
-pub struct CaptureNode {
+pub struct ImageCaptureNode {
     output: Output<Image>,
     output_time: Output<f64>,
     output_duration: Output<f64>,
     capture: Option<ThreadedCapturer>,
-    config: CaptureNodeConfig,
+    config: ImageCaptureNodeConfig,
 }
-impl std::fmt::Debug for CaptureNode {
+impl std::fmt::Debug for ImageCaptureNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(fmt, "CaptureNode")
+        write!(fmt, "ImageCaptureNode")
     }
 }
 
-impl CaptureNode {
+impl ImageCaptureNode {
     pub fn new() -> Self {
-        CaptureNode::default()
+        ImageCaptureNode::default()
     }
 }
 
-impl Node for CaptureNode {
+impl Node for ImageCaptureNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let c = self
             .capture
@@ -68,7 +68,7 @@ impl Node for CaptureNode {
     }
 
     fn static_type() -> NodeType {
-        "capture_node".into()
+        "image_capture".into()
     }
 
     fn node_type(&self) -> NodeType {
@@ -97,7 +97,7 @@ mod ui_support {
     use super::*;
     use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
-    impl UiNode for CaptureNode {
+    impl UiNode for ImageCaptureNode {
         fn ui_title(&self) -> String {
             "capture 📷 ".to_owned()
         }
