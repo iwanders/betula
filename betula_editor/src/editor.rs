@@ -8,6 +8,7 @@ use betula_common::{
 use betula_core::BetulaError;
 use egui_snarl::{ui::SnarlStyle, Snarl};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -61,11 +62,17 @@ impl Default for RunState {
     }
 }
 
+struct PathConfig {
+    path: PathBuf,
+    config: EditorConfig,
+}
+
 pub struct BetulaEditor {
     snarl: Snarl<BetulaViewerNode>,
     style: SnarlStyle,
     viewer: BetulaViewer,
-    tree_config_channel: (Sender<EditorConfig>, Receiver<EditorConfig>),
+    tree_config_load_channel: (Sender<PathConfig>, Receiver<PathConfig>),
+    tree_config_save_channel: (Sender<PathBuf>, Receiver<PathBuf>),
 
     /// Client to interact with the server.
     client: Box<dyn TreeClient>,
@@ -75,6 +82,12 @@ pub struct BetulaEditor {
     pending_snarl: Option<Snarl<BetulaViewerNode>>,
 
     run_state: RunState,
+
+    /// Path of the current project, it's dirname is used as directory.
+    path: Option<PathBuf>,
+
+    /// The next configuration is stored to this path.
+    save_path: Option<PathBuf>,
 }
 
 impl BetulaEditor {
@@ -94,10 +107,13 @@ impl BetulaEditor {
             snarl,
             pending_snarl: None,
             style,
-            tree_config_channel: channel(),
+            tree_config_load_channel: channel(),
+            tree_config_save_channel: channel(),
             client,
             viewer_server: Box::new(viewer_server),
             run_state: Default::default(),
+            path: None,
+            save_path: None,
         }
     }
     pub fn client(&self) -> &dyn TreeClient {
@@ -127,12 +143,14 @@ impl BetulaEditor {
         self.client.send_command(cmd)
     }
 
-    fn save_tree_config(&mut self, tree: TreeConfig) -> Result<(), BetulaError> {
-        let task = rfd::AsyncFileDialog::new()
-            .set_file_name("tree.json")
-            .add_filter("json", &["json"])
-            .save_file();
+    fn send_set_directory(&self, path: Option<&std::path::Path>) -> Result<(), BetulaError> {
+        let cmd = InteractionCommand::set_directory(path);
+        println!("cmd: {cmd:?}");
+        self.client.send_command(cmd)
+    }
 
+    fn save_tree_config(&mut self, tree: TreeConfig) -> Result<(), BetulaError> {
+        // Two options, one is we have a save_path, otherwise it is a request for a prompt.
         let editor = EditorState {
             snarl_state: serde_json::to_value(&self.snarl)?,
             run_state: self.run_state.save(),
@@ -142,16 +160,35 @@ impl BetulaEditor {
         let editor_config = serde_json::to_string_pretty(&editor_config)?;
 
         let contents = editor_config;
-        execute(async move {
-            let file = task.await;
-            if let Some(file) = file {
-                let r = file.write(contents.as_bytes()).await;
-                if let Err(e) = r {
-                    println!("Failed to save {e:?}");
-                }
+        if let Some(destination) = self.save_path.take() {
+            if let Err(e) = std::fs::write(destination.clone(), contents.as_bytes()) {
+                println!("Failed to write to {destination:?}, error: {e:?}");
             }
-        });
+        } else {
+            let send_channel = self.tree_config_save_channel.0.clone();
+            let task = rfd::AsyncFileDialog::new()
+                .set_file_name("tree.json")
+                .add_filter("json", &["json"])
+                .save_file();
+            execute(async move {
+                let file = task.await;
+                if let Some(file) = file {
+                    let _ = send_channel.send(file.path().to_owned());
+                    let r = file.write(contents.as_bytes()).await;
+                    if let Err(e) = r {
+                        println!("Failed to save {e:?}");
+                    }
+                }
+            });
+        }
         Ok(())
+    }
+    fn save_to_path(&mut self) {
+        // Okay, this is a bit hairy... we just set a path for the next config to be stored to this path...
+        if let Err(e) = self.request_tree_config() {
+            println!("Failed to request tree config: {e:?}");
+        }
+        self.save_path = self.path.clone();
     }
 
     fn load_editor_config(content: &[u8]) -> Result<EditorConfig, BetulaError> {
@@ -159,7 +196,7 @@ impl BetulaEditor {
         Ok(config)
     }
     fn load_editor_config_dialog(&self) {
-        let sender = self.tree_config_channel.0.clone();
+        let sender = self.tree_config_load_channel.0.clone();
         let task = rfd::AsyncFileDialog::new()
             .set_title("Open a tree")
             .pick_file();
@@ -169,7 +206,9 @@ impl BetulaEditor {
                 let text = file.read().await;
                 let config = Self::load_editor_config(&text);
                 if let Ok(config) = config {
-                    let _ = sender.send(config);
+                    let path = file.path().to_owned();
+                    let pathconfig = PathConfig { config, path };
+                    let _ = sender.send(pathconfig);
                 } else {
                     println!("Failed to load config: {config:?}");
                 }
@@ -188,15 +227,29 @@ impl BetulaEditor {
     fn service(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
         let _ = ctx;
 
-        if let Ok(config) = self.tree_config_channel.1.try_recv() {
+        if let Ok(path_config) = self.tree_config_load_channel.1.try_recv() {
+            // This is the new active path
+            let dir_path = path_config.path.clone();
+            self.path = Some(path_config.path);
+
             // Pause the execution!
-            self.run_state = config.editor.run_state;
+            self.run_state = path_config.config.editor.run_state;
             self.run_state.roots = false;
             self.viewer
-                .set_color_node_status(config.editor.color_node_status);
+                .set_color_node_status(path_config.config.editor.color_node_status);
             self.send_run_settings()?;
-            self.pending_snarl = Some(self.load_editor_state(config.editor)?);
-            self.send_tree_config(config.tree)?;
+            self.pending_snarl = Some(self.load_editor_state(path_config.config.editor)?);
+            self.send_tree_config(path_config.config.tree)?;
+
+            // Also call set directory for this new directory.
+            let dir = dir_path.parent();
+            self.send_set_directory(dir)?;
+        }
+        if let Ok(new_path) = self.tree_config_save_channel.1.try_recv() {
+            // Save as happened, set the new path and use it as the new directory.
+            self.path = Some(new_path.clone());
+            let dir = new_path.parent();
+            self.send_set_directory(dir)?;
         }
 
         loop {
@@ -218,7 +271,9 @@ impl BetulaEditor {
                 let c = match backend_event {
                     CommandResult(ref c) => match c.command {
                         InteractionCommand::RequestTreeConfig => {
-                            println!("failed to get tree config");
+                            if let Some(e) = &c.error {
+                                println!("failed to get tree config: {e:?}");
+                            }
                             None
                         }
                         InteractionCommand::RunSettings(ref e) => {
@@ -270,7 +325,15 @@ impl BetulaEditor {
                             ui.close_menu();
                         }
 
-                        if ui.button("💾 Save as").clicked() {
+                        if ui
+                            .add_enabled(self.path.is_some(), egui::Button::new("💾 Save"))
+                            .clicked()
+                        {
+                            self.save_to_path();
+                        }
+
+                        if ui.button("💾 Save as...").clicked() {
+                            self.save_path = None;
                             let r = self.request_tree_config();
                             if let Err(e) = r {
                                 println!("Failed to request config: {e:?}");
@@ -311,7 +374,6 @@ impl BetulaEditor {
                         println!("Error servicing: {e:?}");
                     }
                 }
-                // 📥
                 ui.separator();
                 if ui.button("reset nodes").clicked() {
                     if let Err(e) = self.send_reset_nodes() {
@@ -327,8 +389,17 @@ impl BetulaEditor {
                         self.viewer.clear_execution_results(&mut self.snarl);
                     }
                 }
-
                 ui.separator();
+                if let Some(path) = &self.path {
+                    ui.label(format!("path: {:?}", path));
+                    if ui.button("💾").clicked() {
+                        self.save_to_path();
+                    }
+                } else {
+                    ui.label("no path");
+                }
+                ui.separator();
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_dark_light_mode_switch(ui);
                 });
