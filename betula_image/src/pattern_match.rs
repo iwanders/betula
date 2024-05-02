@@ -1,5 +1,8 @@
 use image::{Pixel, Rgba, RgbaImage};
 
+use serde::{Deserialize, Serialize};
+
+/// A pixel row in an image to compare against.
 #[derive(Clone, Debug)]
 struct Segment {
     /// The position of this row in the image.
@@ -8,6 +11,9 @@ struct Segment {
     row: RgbaImage,
 }
 
+/// A pattern that can be compared against an image.
+///
+/// This compars individual rows.
 #[derive(Clone, Debug)]
 pub struct Pattern {
     dimensions: (u32, u32),
@@ -15,7 +21,7 @@ pub struct Pattern {
 }
 
 impl Pattern {
-    pub fn open<P>(path: P) -> Result<Pattern, crate::PatternError>
+    pub fn from_path<P>(path: P) -> Result<Pattern, crate::PatternError>
     where
         P: AsRef<std::path::Path>,
     {
@@ -50,7 +56,7 @@ impl Pattern {
                 }
                 if !opaque || (end_of_row - 1 == x) {
                     if let Some(position) = position.take() {
-                        println!("r: {r:?}");
+                        // println!("r: {r:?}");
                         let row = RgbaImage::from_vec(r.len() as u32 / 4, 1, r).unwrap();
                         r = vec![];
                         segments.push(Segment { position, row });
@@ -68,6 +74,7 @@ impl Pattern {
         }
     }
 
+    #[cfg(test)]
     fn from_segments(width: u32, height: u32, segments: &[Segment]) -> Self {
         Self {
             dimensions: (width, height),
@@ -100,21 +107,100 @@ impl Pattern {
             if start.is_none() || end.is_none() {
                 panic!("start {start:?} or end {end:?} index wasn't valid");
             }
-            println!("end; {end:?}");
+            // println!("end; {end:?}");
             // let (start, end) = (start.unwrap() + layout.channels as usize, end.unwrap() + layout.channels as usize);
             let (start, end) = (start.unwrap(), end.unwrap() + layout.channels as usize);
             let image_slice = &data[start..end];
             let segment_slice = segment.row.as_raw().as_slice();
-            println!("image_slice: {image_slice:?} {}", image_slice.len());
-            println!("segment_slice: {segment_slice:?}, {}", segment_slice.len());
+            // println!("image_slice: {image_slice:?} {}", image_slice.len());
+            // println!("segment_slice: {segment_slice:?}, {}", segment_slice.len());
             if image_slice != segment_slice {
-                println!("No match");
+                // println!("No match");
                 return false;
             }
         }
 
         true
     }
+}
+
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
+pub struct PatternName(pub String);
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PatternInfo {
+    /// Display string in the ui.
+    pub name: PatternName,
+
+    /// Optional description to elaborate.
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PatternMetadata {
+    pub name: Option<PatternName>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternEntry {
+    pub info: PatternInfo,
+    pub path: std::path::PathBuf,
+}
+
+impl PatternEntry {
+    pub fn load_pattern(&self) -> Result<Pattern, crate::PatternError> {
+        Ok(Pattern::from_path(&self.path)?)
+    }
+}
+
+pub fn load_patterns_directory(
+    path: &std::path::Path,
+) -> Result<Vec<PatternEntry>, crate::PatternError> {
+    use std::collections::HashSet;
+
+    let paths = std::fs::read_dir(path)?
+        .map(|v| v.ok())
+        .flatten()
+        .collect::<Vec<_>>();
+
+    let mut patterns = vec![];
+
+    for direntry in paths {
+        let path = direntry.path();
+        if let Some(extension) = path.extension() {
+            if extension == "png" {
+                let name = path.file_name().unwrap();
+                // println!("Loading: path.path(): {:?}", path.path());
+                // let pattern =  Pattern::from_path(path.path())?;
+                let mut info = PatternInfo {
+                    name: PatternName(name.to_owned().into_string().unwrap()),
+                    description: None,
+                };
+
+                let mut info_path = path.clone();
+                info_path.set_extension("toml");
+                if info_path.is_file() {
+                    use std::io::Read;
+                    let mut file = std::fs::File::open(info_path)?;
+                    let mut data = String::new();
+                    file.read_to_string(&mut data)?;
+                    let metadata: PatternMetadata = toml::from_str(&data)?;
+                    if let Some(name) = metadata.name {
+                        info.name = name;
+                    }
+                    info.description = metadata.description.clone();
+                }
+
+                patterns.push(PatternEntry {
+                    info,
+                    path: path.canonicalize()?,
+                });
+            }
+        }
+    }
+    Ok(patterns)
 }
 
 #[cfg(test)]

@@ -3,24 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Image;
 
-#[derive(Default, Debug, Deserialize, Serialize, Clone)]
-#[serde(transparent)]
-pub struct PatternName(String);
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct PatternDescription {
-    /// Display string in the ui.
-    pub name: PatternName,
-
-    /// Optional description to elaborate.
-    pub description: Option<String>,
-
-    /// Relative path to the file to load.
-    pub path: Option<String>,
-
-    pub x_offset: Option<i32>,
-    pub y_offset: Option<i32>,
-}
+use crate::pattern_match::PatternName;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImageMatchNodeConfig {
@@ -31,10 +14,17 @@ impl IsNodeConfig for ImageMatchNodeConfig {}
 
 #[derive(Default)]
 pub struct ImageMatchNode {
+    /// Actual input image.
     input: Input<Image>,
+
+    /// The image pattern against which is to be matched.
     config: ImageMatchNodeConfig,
 
+    /// The directory from which the image is loaded.
     directory: Option<std::path::PathBuf>,
+
+    /// The actual pattern against which is being matched.
+    pattern: Option<crate::pattern_match::Pattern>,
 }
 impl std::fmt::Debug for ImageMatchNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
