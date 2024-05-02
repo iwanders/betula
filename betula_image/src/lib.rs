@@ -1,6 +1,8 @@
 pub type CaptureError = Box<dyn std::error::Error + Send + Sync + 'static>;
+pub type PatternError = CaptureError;
 
 pub mod nodes;
+pub mod pattern_match;
 
 use serde::{Deserialize, Deserializer, Serialize};
 

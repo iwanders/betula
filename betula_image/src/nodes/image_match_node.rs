@@ -2,18 +2,39 @@ use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::Image;
-use screen_capture::{CaptureConfig, CaptureSpecification, ThreadedCapturer};
+
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
+pub struct PatternName(String);
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PatternDescription {
+    /// Display string in the ui.
+    pub name: PatternName,
+
+    /// Optional description to elaborate.
+    pub description: Option<String>,
+
+    /// Relative path to the file to load.
+    pub path: Option<String>,
+
+    pub x_offset: Option<i32>,
+    pub y_offset: Option<i32>,
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImageMatchNodeConfig {
-    capture: CaptureConfig,
+    use_match: Option<PatternName>,
 }
+
 impl IsNodeConfig for ImageMatchNodeConfig {}
 
 #[derive(Default)]
 pub struct ImageMatchNode {
     input: Input<Image>,
     config: ImageMatchNodeConfig,
+
+    directory: Option<std::path::PathBuf>,
 }
 impl std::fmt::Debug for ImageMatchNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -59,6 +80,10 @@ impl Node for ImageMatchNode {
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
         let r = self.config.load_node_config(config);
         r
+    }
+
+    fn set_directory(&mut self, directory: Option<&std::path::Path>) {
+        self.directory = directory.map(|v| v.to_owned());
     }
 
     fn reset(&mut self) {}
