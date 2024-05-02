@@ -26,6 +26,13 @@ impl Image {
     }
 }
 
+impl std::ops::Deref for Image {
+    type Target = image::RgbaImage;
+    fn deref(&self) -> &Self::Target {
+        &*self.image
+    }
+}
+
 impl Default for Image {
     fn default() -> Self {
         // superb hack here... we make an image that's 0x0 pixels.

@@ -124,7 +124,7 @@ impl Pattern {
     }
 }
 
-#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(transparent)]
 pub struct PatternName(pub String);
 

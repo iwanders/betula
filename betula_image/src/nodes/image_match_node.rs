@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Image;
 
-use crate::pattern_match::PatternName;
+use crate::pattern_match::{load_patterns_directory, PatternEntry, PatternName};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImageMatchNodeConfig {
@@ -20,11 +20,14 @@ pub struct ImageMatchNode {
     /// The image pattern against which is to be matched.
     config: ImageMatchNodeConfig,
 
-    /// The directory from which the image is loaded.
-    directory: Option<std::path::PathBuf>,
-
     /// The actual pattern against which is being matched.
     pattern: Option<crate::pattern_match::Pattern>,
+
+    /// The directory from which the patterns are loaded.
+    directory: Option<std::path::PathBuf>,
+
+    /// The available patterns for selection.
+    pattern_library: Vec<PatternEntry>,
 }
 impl std::fmt::Debug for ImageMatchNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -40,8 +43,33 @@ impl ImageMatchNode {
 
 impl Node for ImageMatchNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
-        todo!();
-        Ok(ExecutionStatus::Success)
+        if self.pattern.is_none() {
+            if let Some(dir) = &self.directory {
+                self.pattern_library = load_patterns_directory(dir).unwrap_or(vec![]);
+            }
+            if let Some(desired) = &self.config.use_match {
+                if let Some(entry) = self
+                    .pattern_library
+                    .iter()
+                    .find(|z| &z.info.name == desired)
+                {
+                    self.pattern = Some(entry.load_pattern()?);
+                }
+            }
+        }
+        if let Some(pattern) = &self.pattern {
+            let image = self.input.get()?;
+            if pattern.matches_exact(&image) {
+                return Ok(ExecutionStatus::Success);
+            } else {
+                return Ok(ExecutionStatus::Failure);
+            }
+        }
+        Err(format!(
+            "no pattern or pattern not found: {:?}",
+            self.config.use_match
+        )
+        .into())
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
