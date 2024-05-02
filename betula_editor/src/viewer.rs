@@ -1917,7 +1917,7 @@ impl BetulaViewer {
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionCommand::{
-            AddBlackboard, PortDisconnectConnect, RemoveBlackboard,
+            AddBlackboard, PortDisconnectConnect, RemoveBlackboard, SetDirectory,
         };
         use betula_common::control::InteractionEvent;
 
@@ -1983,6 +1983,15 @@ impl BetulaViewer {
                                 let ids = self.remove_blackboard(blackboard_id)?;
                                 for snarl_id in ids {
                                     snarl.remove_node(snarl_id);
+                                }
+                            }
+                            SetDirectory(directory) => {
+                                if let Some(path_str) = directory.as_ref() {
+                                    let pathbuf = std::path::PathBuf::from(path_str);
+                                    let directory = pathbuf.as_path();
+                                    for node in self.nodes.values() {
+                                        node.borrow_mut().ui_node.set_directory(Some(directory));
+                                    }
                                 }
                             }
                             _ => {}

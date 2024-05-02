@@ -101,6 +101,7 @@ impl Node for ImageMatchNode {
     }
 
     fn set_directory(&mut self, directory: Option<&std::path::Path>) {
+        println!("Set directory: {directory:?}");
         self.directory = directory.map(|v| v.to_owned());
     }
 
