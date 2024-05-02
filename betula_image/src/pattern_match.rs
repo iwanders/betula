@@ -1,4 +1,4 @@
-use image::{Rgba, RgbaImage};
+use image::{Pixel, Rgba, RgbaImage};
 
 #[derive(Clone, Debug)]
 struct Segment {
@@ -28,7 +28,40 @@ impl Pattern {
 
     pub fn from_image(img: &RgbaImage) -> Pattern {
         let dimensions = (img.width(), img.height());
-        let segments = vec![];
+        let layout = img.sample_layout();
+        if !layout.is_normal(image::flat::NormalForm::ImagePacked)
+            || !layout.is_normal(image::flat::NormalForm::RowMajorPacked)
+        {
+            panic!("images should be packed and row major");
+        }
+
+        let mut segments = vec![];
+        for (y, row) in img.rows().enumerate() {
+            let mut r = vec![];
+            let mut position: Option<(u32, u32)> = None;
+            let end_of_row = row.len();
+            for (x, pixel) in row.enumerate() {
+                let opaque = pixel.channels()[3] == 0xff;
+                if opaque {
+                    if position.is_none() {
+                        position = Some((x as u32, y as u32));
+                    }
+                    r.extend(pixel.channels());
+                }
+                if !opaque || (end_of_row - 1 == x) {
+                    if let Some(position) = position.take() {
+                        println!("r: {r:?}");
+                        let row = RgbaImage::from_vec(r.len() as u32 / 4, 1, r).unwrap();
+                        r = vec![];
+                        segments.push(Segment { position, row });
+                    }
+                }
+            }
+        }
+
+        // Sort the segments by length
+        segments.sort_by(|b, a| a.row.width().partial_cmp(&b.row.width()).unwrap());
+
         Self {
             dimensions,
             segments,
@@ -110,5 +143,34 @@ mod test {
         println!("pattern: {pattern:?}");
         let pattern = Pattern::from_segments(img.width(), img.height(), &[pattern]);
         assert!(pattern.matches_exact(&img));
+    }
+    #[test]
+    fn test_pattern_create() {
+        let mut img = RgbaImage::new(5, 2);
+        let red = Rgba([255, 0, 0, 255]);
+        let blue = Rgba([0, 0, 255, 255]);
+        let green = Rgba([0, 255, 0, 255]);
+        *img.get_pixel_mut(0, 0) = red;
+        *img.get_pixel_mut(1, 0) = red;
+
+        *img.get_pixel_mut(3, 0) = blue;
+        *img.get_pixel_mut(4, 0) = blue;
+
+        *img.get_pixel_mut(1, 1) = green;
+        *img.get_pixel_mut(2, 1) = green;
+        *img.get_pixel_mut(3, 1) = green;
+        println!("img: {img:?} data len {}", img.as_raw().len());
+
+        let pattern = Pattern::from_image(&img);
+        println!("pattern: {pattern:?}");
+        assert_eq!(pattern.dimensions.0, img.width());
+        assert_eq!(pattern.dimensions.1, img.height());
+        assert_eq!(pattern.segments.len(), 3);
+        assert_eq!(pattern.segments[0].position, (1, 1));
+        assert_eq!(pattern.segments[0].row.get_pixel(0, 0), &green);
+        assert_eq!(pattern.segments[1].position, (0, 0));
+        assert_eq!(pattern.segments[1].row.get_pixel(0, 0), &red);
+        assert_eq!(pattern.segments[2].position, (3, 0));
+        assert_eq!(pattern.segments[2].row.get_pixel(0, 0), &blue);
     }
 }
