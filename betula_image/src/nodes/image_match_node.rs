@@ -59,9 +59,12 @@ impl Node for ImageMatchNode {
         }
         if let Some(pattern) = &self.pattern {
             let image = self.input.get()?;
+            let start = std::time::Instant::now();
             if pattern.matches_exact(&image) {
+                // println!("took: {:?}", std::time::Instant::now() - start);
                 return Ok(ExecutionStatus::Success);
             } else {
+                // println!("took: {:?}", std::time::Instant::now() - start);
                 return Ok(ExecutionStatus::Failure);
             }
         }
@@ -115,7 +118,7 @@ mod ui_support {
 
     impl UiNode for ImageMatchNode {
         fn ui_title(&self) -> String {
-            "image_match 📷 ".to_owned()
+            "image_match 🎇 ".to_owned()
         }
 
         fn ui_config(
@@ -127,6 +130,37 @@ mod ui_support {
             let _ = (ctx, scale);
 
             let mut modified = false;
+
+            ui.horizontal(|ui| {
+                if ui.button("🔃 Reload").clicked() {
+                    if let Some(dir) = &self.directory {
+                        println!("Loading patterns from {dir:?}");
+                        let patterns = load_patterns_directory(dir);
+                        match patterns {
+                            Err(e) => println!("Error loading patterns: {:?}", e),
+                            Ok(patterns) => self.pattern_library = patterns,
+                        }
+                    }
+                    println!("patterns {:?}", self.pattern_library);
+                    ui.close_menu();
+                }
+
+                let label = if let Some(name) = self.config.use_match.clone() {
+                    name.0
+                } else {
+                    "Select...".to_owned()
+                };
+
+                ui.menu_button(label, |ui| {
+                    for entry in self.pattern_library.iter() {
+                        if ui.button(entry.info.name.0.clone()).clicked() {
+                            self.config.use_match = Some(entry.info.name.clone());
+                            modified |= true;
+                            ui.close_menu();
+                        }
+                    }
+                });
+            });
 
             if modified {
                 UiConfigResponse::Changed

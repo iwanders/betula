@@ -1,4 +1,4 @@
-use image::{Pixel, Rgba, RgbaImage};
+use image::{Pixel, RgbaImage};
 
 use serde::{Deserialize, Serialize};
 
@@ -158,8 +158,6 @@ impl PatternEntry {
 pub fn load_patterns_directory(
     path: &std::path::Path,
 ) -> Result<Vec<PatternEntry>, crate::PatternError> {
-    use std::collections::HashSet;
-
     let paths = std::fs::read_dir(path)?
         .map(|v| v.ok())
         .flatten()
