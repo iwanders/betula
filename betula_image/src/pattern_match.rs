@@ -124,11 +124,11 @@ impl Pattern {
     }
 }
 
-#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, PartialOrd)]
 #[serde(transparent)]
 pub struct PatternName(pub String);
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialOrd, PartialEq)]
 pub struct PatternInfo {
     /// Display string in the ui.
     pub name: PatternName,
@@ -137,13 +137,13 @@ pub struct PatternInfo {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialOrd, PartialEq)]
 pub struct PatternMetadata {
     pub name: Option<PatternName>,
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct PatternEntry {
     pub info: PatternInfo,
     pub path: std::path::PathBuf,
@@ -198,6 +198,9 @@ pub fn load_patterns_directory(
             }
         }
     }
+
+    patterns.sort_by(|a, b| a.partial_cmp(&b).unwrap());
+
     Ok(patterns)
 }
 

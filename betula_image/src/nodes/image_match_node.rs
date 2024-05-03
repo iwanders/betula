@@ -39,14 +39,21 @@ impl ImageMatchNode {
     pub fn new() -> Self {
         ImageMatchNode::default()
     }
+
+    fn load_patterns(&mut self) -> Result<(), NodeError> {
+        if let Some(dir) = &self.directory {
+            let mut dir = dir.clone();
+            dir.push("image_match");
+            self.pattern_library = load_patterns_directory(&dir)?;
+        }
+        Ok(())
+    }
 }
 
 impl Node for ImageMatchNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.pattern.is_none() {
-            if let Some(dir) = &self.directory {
-                self.pattern_library = load_patterns_directory(dir).unwrap_or(vec![]);
-            }
+            let _ = self.load_patterns();
             if let Some(desired) = &self.config.use_match {
                 if let Some(entry) = self
                     .pattern_library
@@ -59,7 +66,7 @@ impl Node for ImageMatchNode {
         }
         if let Some(pattern) = &self.pattern {
             let image = self.input.get()?;
-            let start = std::time::Instant::now();
+            // let start = std::time::Instant::now();
             if pattern.matches_exact(&image) {
                 // println!("took: {:?}", std::time::Instant::now() - start);
                 return Ok(ExecutionStatus::Success);
@@ -132,19 +139,6 @@ mod ui_support {
             let mut modified = false;
 
             ui.horizontal(|ui| {
-                if ui.button("🔃 Reload").clicked() {
-                    if let Some(dir) = &self.directory {
-                        println!("Loading patterns from {dir:?}");
-                        let patterns = load_patterns_directory(dir);
-                        match patterns {
-                            Err(e) => println!("Error loading patterns: {:?}", e),
-                            Ok(patterns) => self.pattern_library = patterns,
-                        }
-                    }
-                    println!("patterns {:?}", self.pattern_library);
-                    ui.close_menu();
-                }
-
                 let label = if let Some(name) = self.config.use_match.clone() {
                     name.0
                 } else {
@@ -153,13 +147,30 @@ mod ui_support {
 
                 ui.menu_button(label, |ui| {
                     for entry in self.pattern_library.iter() {
-                        if ui.button(entry.info.name.0.clone()).clicked() {
+                        let mut button = ui.button(entry.info.name.0.clone());
+                        if let Some(description) = entry.info.description.as_ref() {
+                            button = button.on_hover_text(description);
+                        }
+                        if button.clicked() {
                             self.config.use_match = Some(entry.info.name.clone());
                             modified |= true;
                             ui.close_menu();
                         }
                     }
                 });
+
+                if ui
+                    .button("🔃")
+                    .on_hover_text("Reload patterns from directory.")
+                    .clicked()
+                {
+                    let patterns = self.load_patterns();
+                    if let Err(e) = patterns {
+                        println!("Error loading patterns: {:?}", e)
+                    }
+
+                    ui.close_menu();
+                }
             });
 
             if modified {
