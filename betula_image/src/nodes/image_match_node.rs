@@ -51,7 +51,7 @@ impl ImageMatchNode {
 }
 
 impl Node for ImageMatchNode {
-    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.pattern.is_none() {
             let _ = self.load_patterns();
             if let Some(desired) = &self.config.use_match {
@@ -69,7 +69,13 @@ impl Node for ImageMatchNode {
             // let start = std::time::Instant::now();
             if pattern.matches_exact(&image) {
                 // println!("took: {:?}", std::time::Instant::now() - start);
-                return Ok(ExecutionStatus::Success);
+                if ctx.children() == 0 {
+                    return Ok(ExecutionStatus::Success);
+                } else if ctx.children() == 1 {
+                    return ctx.run(0);
+                } else if ctx.children() > 1 {
+                    return Err(format!("{:?} had more than one child", Self::static_type()).into());
+                }
             } else {
                 // println!("took: {:?}", std::time::Instant::now() - start);
                 return Ok(ExecutionStatus::Failure);
@@ -111,11 +117,13 @@ impl Node for ImageMatchNode {
     }
 
     fn set_directory(&mut self, directory: Option<&std::path::Path>) {
-        println!("Set directory: {directory:?}");
         self.directory = directory.map(|v| v.to_owned());
+        let _ = self.load_patterns();
     }
 
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        self.pattern = None;
+    }
 }
 
 #[cfg(feature = "betula_editor")]
@@ -187,7 +195,7 @@ mod ui_support {
             ]
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
-            0..0
+            0..1
         }
     }
 }

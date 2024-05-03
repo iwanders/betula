@@ -32,6 +32,9 @@ A gui built on [egui](https://github.com/emilk/egui).
 - `UiNode` implementation for `betula_common` and `betula_core`.
 - Also provides ui support for the nodes from `betula_core`.
 
+Nodes' directory is set to the directory in which the current tree file resides. This is considered the `PROJECT` directory, there can of course
+be multiple `json` files in the root of this directory, reusing assets in the project directory.
+
 ## betula_demo
 - Application that instantiates an editor with all nodes that exist in the workspace.
 
@@ -73,6 +76,36 @@ On Windows, this uses a self-built low level hook, such that it can detect event
   - `HotkeyInstanceNode`: Provides an `Hotkey` instance for registering hotkeys.
   - `HotkeyNode`: Returns `Success` if the hotkey is depressed or toggled.
 
+
+## betula_image
+Provides the `Image` blackboard type, which is effectively an `Arc<crate::RgbaImage>`, so copying them is cheap and they can be kept around. 
+
+
+### ImageCaptureNode
+This facilitates capturing (parts) of the screen on both Windows and Linux. It produces `Image` values when executed. The actual capturing happens in a background thread that runs independently of the tree.
+
+It uses my [screen_capture](https://github.com/iwanders/screen_capture) crate, which efficiently captures the
+desktop's framebuffer (including fullscreen applications). The framebuffer is `BGRA` format, but this is efficiently
+converted to `RGBA`, which allows using the `image::RgbaImage` as a data type. This crate and the `screen_capture`
+crate are best compiled with `rustflags='-C target-feature=+avx2'` which ensures they utilise SIMD instructions for
+the color space conversion.
+
+The outputs `capture_time` and `capture_duration` are optional.
+
+
+### ImageMatchNode
+This node can match a pattern against an input image. Checking against a pattern happens when the node is executed, as such make the patterns as minimal as possible. This node returns `Success` if the pattern matches, `Failure` otherwise.
+
+This node may be a decorator, in which case it returns `Failure` if the pattern doesn't match, or the child node's return if it does.
+
+- Patterns are read from the the `PROJECT/image_match/` directory.
+- Patterns must be `png` images, for example `masked_Screenshot407.png`.
+- The image dimensions must *exactly* match the input image dimensions.
+- Transparent pixels in the pattern are ignored in the input image.
+- A pattern matches if all non transparent pixels in the pattern are identical in the input image.
+- A sidecar `toml` file (`masked_Screenshot407.toml`) may exist with the following keys:
+  - `name`: Used as a display name in the ui, and used for sorting.
+  - `description`: Used for mouseover in the ui.
 
 
 # License
