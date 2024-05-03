@@ -191,6 +191,17 @@ impl BetulaEditor {
         self.save_path = self.path.clone();
     }
 
+    fn set_project_path(&mut self, path: Option<PathBuf>) {
+        // Actually store the path.
+        self.path = path.clone();
+        // Set the directory.
+        if let Some(path) = path {
+            let dir = path.parent();
+            let dir = dir.map(|v| v.to_owned());
+            self.viewer.set_directory(dir.clone());
+        }
+    }
+
     fn load_editor_config(content: &[u8]) -> Result<EditorConfig, BetulaError> {
         let config: EditorConfig = serde_json::de::from_slice(content)?;
         Ok(config)
@@ -230,7 +241,7 @@ impl BetulaEditor {
         if let Ok(path_config) = self.tree_config_load_channel.1.try_recv() {
             // This is the new active path
             let dir_path = path_config.path.clone();
-            self.path = Some(path_config.path);
+            self.set_project_path(Some(path_config.path));
 
             // Pause the execution!
             self.run_state = path_config.config.editor.run_state;
@@ -247,7 +258,7 @@ impl BetulaEditor {
         }
         if let Ok(new_path) = self.tree_config_save_channel.1.try_recv() {
             // Save as happened, set the new path and use it as the new directory.
-            self.path = Some(new_path.clone());
+            self.set_project_path(self.path.clone());
             let dir = new_path.parent();
             self.send_set_directory(dir)?;
         }

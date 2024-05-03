@@ -67,6 +67,7 @@ use betula_common::control::{
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use uuid::Uuid;
 
@@ -1090,6 +1091,9 @@ pub struct BetulaViewer {
 
     /// Color nodes by the execution status.
     color_node_status: bool,
+
+    /// The current directory that's used for nodes.
+    directory: Option<PathBuf>,
 }
 
 impl BetulaViewer {
@@ -1116,6 +1120,16 @@ impl BetulaViewer {
             blackboard_map: Default::default(),
             blackboard_snarl_map: Default::default(),
             color_node_status: true,
+            directory: None,
+        }
+    }
+
+    pub fn set_directory(&mut self, directory: Option<std::path::PathBuf>) {
+        self.directory = directory;
+        for node in self.nodes.values() {
+            node.borrow_mut()
+                .ui_node
+                .set_directory(self.directory.as_deref());
         }
     }
 
@@ -1787,13 +1801,15 @@ impl BetulaViewer {
         if !self.nodes.contains_key(&v.id) {
             // new node
             let viewer_node = self.get_node_mut(v.id, snarl)?;
+            let mut ui_node = self.ui_support.create_ui_node(&v.node_type)?;
+            ui_node.set_directory(self.directory.as_deref());
             let rc = Rc::new(RefCell::new(NodeData {
                 id: v.id,
                 node_status: None,
                 config_needs_send: false,
                 should_remove: false,
                 should_reset: false,
-                ui_node: self.ui_support.create_ui_node(&v.node_type)?,
+                ui_node,
                 name_local: None,
                 name_remote: None,
                 children_local: vec![],
@@ -1917,7 +1933,7 @@ impl BetulaViewer {
     pub fn service(&mut self, snarl: &mut Snarl<BetulaViewerNode>) -> Result<(), BetulaError> {
         use betula_common::control::InteractionCommand::RemoveNode;
         use betula_common::control::InteractionCommand::{
-            AddBlackboard, PortDisconnectConnect, RemoveBlackboard, SetDirectory,
+            AddBlackboard, PortDisconnectConnect, RemoveBlackboard,
         };
         use betula_common::control::InteractionEvent;
 
@@ -1983,15 +1999,6 @@ impl BetulaViewer {
                                 let ids = self.remove_blackboard(blackboard_id)?;
                                 for snarl_id in ids {
                                     snarl.remove_node(snarl_id);
-                                }
-                            }
-                            SetDirectory(directory) => {
-                                if let Some(path_str) = directory.as_ref() {
-                                    let pathbuf = std::path::PathBuf::from(path_str);
-                                    let directory = pathbuf.as_path();
-                                    for node in self.nodes.values() {
-                                        node.borrow_mut().ui_node.set_directory(Some(directory));
-                                    }
                                 }
                             }
                             _ => {}
