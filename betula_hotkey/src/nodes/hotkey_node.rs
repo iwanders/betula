@@ -5,12 +5,28 @@ use crate::HotkeyBlackboard;
 use crate::{Code, Hotkey, HotkeyToken, Modifiers};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+enum ModeType {
+    Held,
+    Toggle,
+    OneShot,
+}
+impl ModeType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ModeType::Held => "Held",
+            ModeType::Toggle => "Toggle",
+            ModeType::OneShot => "OneShot",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub struct HotkeyNodeConfig {
     alt_down: bool,
     shift_down: bool,
     control_down: bool,
     meta_down: bool,
-    toggle: bool,
+    mode: ModeType,
     key: Code,
 }
 impl Default for HotkeyNodeConfig {
@@ -20,7 +36,7 @@ impl Default for HotkeyNodeConfig {
             shift_down: false,
             control_down: false,
             meta_down: false,
-            toggle: true,
+            mode: ModeType::Toggle,
             key: Code::F10,
         }
     }
@@ -50,6 +66,7 @@ pub struct HotkeyNode {
     input: Input<HotkeyBlackboard>,
     config: HotkeyNodeConfig,
     token: Option<HotkeyToken>,
+    last_count: usize,
 
     text_edit: Option<String>,
 }
@@ -67,11 +84,13 @@ impl Node for HotkeyNode {
             self.token = Some(self.input.get()?.register(hotkey)?);
         }
         let token = self.token.as_ref().ok_or(format!("no token"))?;
-        let active = if self.config.toggle {
-            token.depress_count() % 2 == 1
-        } else {
-            token.is_pressed()
+        let new_count = token.state.depress_usize();
+        let active = match self.config.mode {
+            ModeType::Held => token.is_pressed(),
+            ModeType::Toggle => token.depress_count() % 2 == 1,
+            ModeType::OneShot => new_count != self.last_count,
         };
+        self.last_count = new_count;
 
         if active {
             Ok(ExecutionStatus::Success)
@@ -142,8 +161,33 @@ mod ui_support {
                 });
                 ui.horizontal(|ui| {
                     modified |= ui.checkbox(&mut self.config.meta_down, "meta").changed();
-                    modified |= ui.checkbox(&mut self.config.toggle, "toggle").changed();
+                    let d = &mut self.config.mode;
+                    let z = egui::ComboBox::from_id_source("hotkey_mode")
+                        .width(0.0)
+                        .selected_text(d.as_str())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(d, ModeType::Held, ModeType::Held.as_str())
+                                .on_hover_text("Success while the key is held down.")
+                                | ui.selectable_value(
+                                    d,
+                                    ModeType::Toggle,
+                                    ModeType::Toggle.as_str(),
+                                )
+                                .on_hover_text("Success and failure are toggled by the key.")
+                                | ui.selectable_value(
+                                    d,
+                                    ModeType::OneShot,
+                                    ModeType::OneShot.as_str(),
+                                )
+                                .on_hover_text(
+                                    "Success is returned for one execution cycle after key press.",
+                                )
+                        });
+                    modified |= z.inner.unwrap_or(z.response).changed()
                 });
+
+                // modified |= ui.checkbox(&mut self.config.toggle, "toggle").changed();
+
                 let current_str = format!("{:}", self.config.key);
                 if let Some(ref mut edit_string) = self.text_edit {
                     use std::str::FromStr;

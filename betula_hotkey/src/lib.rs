@@ -74,6 +74,12 @@ struct State {
     /// Boolean that's toggled when the key is depressed.
     pub depress_count: AtomicUsize,
 }
+impl State {
+    pub fn depress_usize(&self) -> usize {
+        self.depress_count
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
 
 type StatePtr = Arc<State>;
 
