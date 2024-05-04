@@ -13,4 +13,7 @@ serde =  { version = "1.0", features = ["derive"] }
 screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="5681c388a70445f60956e6c7b323f455568c0db6" }
 
 image = { version ="0.25.1", default-features=false, features=["png"]}
-toml = {version = "0.8.12" , default-features=false, features=["parse"]}
+toml = {version = "0.8.12" }
+
+[dev-dependencies]
+clap = {version="4.5.4", features=["std"]}

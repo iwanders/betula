@@ -142,6 +142,13 @@ pub struct PatternMetadata {
     pub name: Option<PatternName>,
     pub description: Option<String>,
 }
+impl PatternMetadata {
+    pub fn save(&self, path: &std::path::Path) -> Result<(), crate::PatternError> {
+        let toml_string = toml::to_string(&self)?;
+        std::fs::write(path, toml_string)?;
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct PatternEntry {
