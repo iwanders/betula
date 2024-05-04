@@ -8,7 +8,7 @@ use enigo::agent::Agent;
 use enigo::agent::Token;
 
 enum EnigoTask {
-    // SetDelay(u32),
+    SetAbsolutePosOffset(i32, i32),
     Tokens(Vec<Token>),
 }
 
@@ -37,17 +37,27 @@ impl EnigoRunner {
         let thread = Some(std::thread::spawn(move || {
             let enigo = enigo_t;
             let _ = receiver;
+            let mut position_offset = (0, 0);
             while t_running.load(std::sync::atomic::Ordering::Relaxed) {
                 while let Ok(v) = receiver.recv_timeout(std::time::Duration::from_millis(1)) {
                     let mut locked = enigo.lock().unwrap();
                     match v {
-                        // EnigoTask::SetDelay(d) => {
-                        // locked.set_delay(d);
-                        // },
+                        EnigoTask::SetAbsolutePosOffset(x, y) => {
+                            println!("Setting new offset: {x}, {y}");
+                            position_offset = (x, y);
+                        }
                         EnigoTask::Tokens(z) => {
-                            //// Don't really know how to handle this Result.
-                            for t in z {
-                                let _ = locked
+                            for mut t in z {
+                                println!("after: {t:?}");
+                                if let Token::MoveMouse(x, y, coordinate) = &mut t {
+                                    if *coordinate == enigo::Coordinate::Abs {
+                                        *x += position_offset.0;
+                                        *y += position_offset.1;
+                                    }
+                                }
+                                println!("after: {t:?}");
+                                //// Don't really know how to handle this Result, lets panic?
+                                locked
                                     .execute(&t)
                                     .expect(&format!("failed to execute {t:?}"));
                             }
@@ -122,6 +132,17 @@ impl EnigoBlackboard {
         interface.sender.send(EnigoTask::Tokens(tokens.to_vec()))?;
         Ok(())
     }
+
+    pub fn set_cursor_offset(&self, offset: (i32, i32)) -> Result<(), betula_core::BetulaError> {
+        let interface = self
+            .interface
+            .as_ref()
+            .ok_or(format!("no interface present in value"))?;
+        interface
+            .sender
+            .send(EnigoTask::SetAbsolutePosOffset(offset.0, offset.1))?;
+        Ok(())
+    }
 }
 impl std::fmt::Debug for EnigoBlackboard {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -132,7 +153,9 @@ impl std::fmt::Debug for EnigoBlackboard {
 /// Register enigo nodes to the ui support.
 #[cfg(feature = "betula_editor")]
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
-    ui_support.add_node_default::<nodes::EnigoInstanceNode>();
+    // ui_support.add_node_default::<nodes::EnigoInstanceNode>();
+    ui_support
+        .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
     ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
 }
