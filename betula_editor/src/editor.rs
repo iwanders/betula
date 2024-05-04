@@ -88,6 +88,9 @@ pub struct BetulaEditor {
 
     /// The next configuration is stored to this path.
     save_path: Option<PathBuf>,
+
+    /// Whether the viewer is hidden
+    viewer_hidden: bool,
 }
 
 impl BetulaEditor {
@@ -114,6 +117,7 @@ impl BetulaEditor {
             run_state: Default::default(),
             path: None,
             save_path: None,
+            viewer_hidden: false,
         }
     }
     pub fn client(&self) -> &dyn TreeClient {
@@ -410,6 +414,7 @@ impl BetulaEditor {
                     ui.label("no path");
                 }
                 ui.separator();
+                ui.checkbox(&mut self.viewer_hidden, "Hide Viewer");
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_dark_light_mode_switch(ui);
@@ -432,11 +437,12 @@ impl App for BetulaEditor {
         if r.is_err() {
             println!("Error top pannel: {:?}", r.err());
         }
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.snarl
-                .show(&mut self.viewer, &self.style, egui::Id::new("snarl"), ui);
-        });
+        if !self.viewer_hidden {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                self.snarl
+                    .show(&mut self.viewer, &self.style, egui::Id::new("snarl"), ui);
+            });
+        }
     }
 
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
