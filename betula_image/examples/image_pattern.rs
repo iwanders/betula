@@ -104,6 +104,7 @@ fn main() -> Result<(), PatternError> {
         let metadata = PatternMetadata {
             name: Some(PatternName(name.clone())),
             description: description.cloned(),
+            original: Some(name_default),
         };
 
         let img = ImageReader::open(input_image)?.decode()?.to_rgba8();

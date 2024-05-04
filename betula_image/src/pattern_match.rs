@@ -139,8 +139,12 @@ pub struct PatternInfo {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialOrd, PartialEq)]
 pub struct PatternMetadata {
+    /// The pattern name associated to this pattern.
     pub name: Option<PatternName>,
+    /// A description of this pattern.
     pub description: Option<String>,
+    /// An identifier for the original file the pattern was created from.
+    pub original: Option<String>,
 }
 impl PatternMetadata {
     pub fn save(&self, path: &std::path::Path) -> Result<(), crate::PatternError> {
