@@ -112,7 +112,11 @@ impl Node for ImageMatchNode {
     }
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
+        let before = self.config.use_match.clone();
         let r = self.config.load_node_config(config);
+        if self.config.use_match != before {
+            self.pattern = None;
+        }
         r
     }
 
