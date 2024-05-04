@@ -158,6 +158,8 @@ impl PatternMetadata {
 pub struct PatternEntry {
     pub info: PatternInfo,
     pub path: std::path::PathBuf,
+
+    pub hierarchy: Vec<String>,
 }
 
 impl PatternEntry {
@@ -169,43 +171,62 @@ impl PatternEntry {
 pub fn load_patterns_directory(
     path: &std::path::Path,
 ) -> Result<Vec<PatternEntry>, crate::PatternError> {
-    let paths = std::fs::read_dir(path)?
+    let mut patterns = vec![];
+    let mut stack: Vec<(Vec<String>, std::path::PathBuf)> = std::fs::read_dir(path)?
         .map(|v| v.ok())
         .flatten()
+        .map(|v| (vec![], v.path()))
         .collect::<Vec<_>>();
 
-    let mut patterns = vec![];
+    while let Some((hierarchy, path)) = stack.pop() {
+        // println!("{hierarchy:?}: {path:?}");
+        if path.is_file() {
+            if let Some(extension) = path.extension() {
+                if extension == "png" {
+                    let name = path.file_name().unwrap();
+                    // println!("Loading: path.path(): {:?}", path.path());
+                    // let pattern =  Pattern::from_path(path.path())?;
+                    let mut info = PatternInfo {
+                        name: PatternName(name.to_owned().into_string().unwrap()),
+                        description: None,
+                    };
 
-    for direntry in paths {
-        let path = direntry.path();
-        if let Some(extension) = path.extension() {
-            if extension == "png" {
-                let name = path.file_name().unwrap();
-                // println!("Loading: path.path(): {:?}", path.path());
-                // let pattern =  Pattern::from_path(path.path())?;
-                let mut info = PatternInfo {
-                    name: PatternName(name.to_owned().into_string().unwrap()),
-                    description: None,
-                };
-
-                let mut info_path = path.clone();
-                info_path.set_extension("toml");
-                if info_path.is_file() {
-                    use std::io::Read;
-                    let mut file = std::fs::File::open(info_path)?;
-                    let mut data = String::new();
-                    file.read_to_string(&mut data)?;
-                    let metadata: PatternMetadata = toml::from_str(&data)?;
-                    if let Some(name) = metadata.name {
-                        info.name = name;
+                    let mut info_path = path.to_owned();
+                    info_path.set_extension("toml");
+                    if info_path.is_file() {
+                        use std::io::Read;
+                        let mut file = std::fs::File::open(info_path)?;
+                        let mut data = String::new();
+                        file.read_to_string(&mut data)?;
+                        let metadata: PatternMetadata = toml::from_str(&data)?;
+                        if let Some(name) = metadata.name {
+                            info.name = name;
+                        }
+                        info.description = metadata.description.clone();
                     }
-                    info.description = metadata.description.clone();
-                }
 
-                patterns.push(PatternEntry {
-                    info,
-                    path: path.canonicalize()?,
-                });
+                    patterns.push(PatternEntry {
+                        info,
+                        path: path.canonicalize()?,
+                        hierarchy,
+                    });
+                }
+            }
+        } else if path.is_dir() {
+            let this_dirname = path
+                .file_name()
+                .ok_or("no basename")?
+                .to_str()
+                .ok_or("no valid string")?
+                .to_string();
+            let new_hierarchy: Vec<String> = hierarchy
+                .iter()
+                .chain(std::iter::once(&this_dirname))
+                .cloned()
+                .collect();
+            let entries = path.read_dir()?;
+            for e in entries {
+                stack.push((new_hierarchy.clone(), e?.path()));
             }
         }
     }
