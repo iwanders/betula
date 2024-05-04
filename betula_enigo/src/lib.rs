@@ -43,19 +43,16 @@ impl EnigoRunner {
                     let mut locked = enigo.lock().unwrap();
                     match v {
                         EnigoTask::SetAbsolutePosOffset(x, y) => {
-                            println!("Setting new offset: {x}, {y}");
                             position_offset = (x, y);
                         }
                         EnigoTask::Tokens(z) => {
                             for mut t in z {
-                                println!("after: {t:?}");
                                 if let Token::MoveMouse(x, y, coordinate) = &mut t {
                                     if *coordinate == enigo::Coordinate::Abs {
                                         *x += position_offset.0;
                                         *y += position_offset.1;
                                     }
                                 }
-                                println!("after: {t:?}");
                                 //// Don't really know how to handle this Result, lets panic?
                                 locked
                                     .execute(&t)

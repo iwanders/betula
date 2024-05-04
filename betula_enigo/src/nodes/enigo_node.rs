@@ -4,11 +4,20 @@ use serde::{Deserialize, Serialize};
 use crate::EnigoBlackboard;
 
 use enigo::agent::Token;
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnigoNodeConfig {
     execute_async: bool,
     tokens: Vec<Token>,
 }
+impl Default for EnigoNodeConfig {
+    fn default() -> Self {
+        Self {
+            execute_async: true,
+            tokens: vec![],
+        }
+    }
+}
+
 impl IsNodeConfig for EnigoNodeConfig {}
 
 #[derive(Debug, Default)]
@@ -261,7 +270,7 @@ mod ui_support {
                         }
                     }
                     let r = ui.checkbox(&mut self.config.execute_async, "Async");
-                    if r.changed() {
+                    if r.on_hover_text("Send tokens to background thread, required for absolute offsets to take effect.").changed() {
                         ui_response = UiConfigResponse::Changed;
                     }
                 });
