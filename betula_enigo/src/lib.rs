@@ -140,11 +140,28 @@ impl EnigoBlackboard {
             .send(EnigoTask::SetAbsolutePosOffset(offset.0, offset.1))?;
         Ok(())
     }
+    pub fn cursor_location(&self) -> Result<CursorPosition, betula_core::BetulaError> {
+        let interface = self
+            .interface
+            .as_ref()
+            .ok_or(format!("no interface present in value"))?;
+        let locked = interface.enigo.lock().expect("should not be poisoned");
+        use enigo::Mouse;
+        Ok(locked
+            .location()
+            .map(|v| CursorPosition { x: v.0, y: v.1 })?)
+    }
 }
 impl std::fmt::Debug for EnigoBlackboard {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "Enigo")
     }
+}
+
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CursorPosition {
+    pub x: i32,
+    pub y: i32,
 }
 
 /// Register enigo nodes to the ui support.
@@ -154,5 +171,7 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
+    ui_support.add_node_default::<nodes::EnigoCursorNode>();
     ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
+    ui_support.add_value_default_named::<CursorPosition>("EnigoCursorPosition");
 }
