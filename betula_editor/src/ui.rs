@@ -10,7 +10,7 @@ use betula_core::{
     BetulaError, Node, NodeType,
 };
 
-use crate::{menu_node_recurser, MenuEntry, UiMenuNode, UiMenuTree};
+use crate::{UiMenuNode, UiMenuTree};
 
 use std::collections::BTreeMap;
 

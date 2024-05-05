@@ -135,10 +135,10 @@ mod ui_support {
     use super::*;
     use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
-    use betula_editor::{menu_node_recurser, MenuEntry, UiMenuNode, UiMenuTree};
+    use betula_editor::{menu_node_recurser, UiMenuEntry, UiMenuNode, UiMenuTree};
 
     use crate::pattern_match::PatternInfo;
-    impl MenuEntry for PatternInfo {
+    impl UiMenuEntry for PatternInfo {
         fn label(&self) -> &str {
             self.name.0.as_ref()
         }
