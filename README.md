@@ -99,6 +99,7 @@ This node can match a pattern against an input image. Checking against a pattern
 This node may be a decorator, in which case it returns `Failure` if the pattern doesn't match, or the child node's return if it does.
 
 - Patterns are read from the the `PROJECT/image_match/` directory.
+- Subdirectories may exist, their name is used as submenu entry.
 - Patterns must be `png` images, for example `masked_Screenshot407.png`.
 - The image dimensions must *exactly* match the input image dimensions.
 - Transparent pixels in the pattern are ignored in the input image.
@@ -107,6 +108,11 @@ This node may be a decorator, in which case it returns `Failure` if the pattern 
   - `name`: Used as a display name in the ui, and used for sorting.
   - `description`: Used for mouseover in the ui.
 
+The `image_pattern` example can be used to create patterns quickly, (multiple) segments can be specified with `x,y,length`:
+```
+cargo r --example image_pattern -- create --output-dir Game/Left/ ${SCREENSHOTS}/Screenshot518.png  0,95,150 319,154,178  --filename cube --name "Cube" --description "The horadric cube is shown in the left panel."
+```
+The `image_pattern_match` example can be used to verify all files in the `image_match` directory load correctly.
 
 # License
 License is [`BSD-3-Clause`](./LICENSE).
