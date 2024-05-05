@@ -6,7 +6,7 @@ use windows::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_NATIVE,
         PROCESS_QUERY_LIMITED_INFORMATION,
     },
-    Win32::UI::WindowsAndMessaging::{GetCursorPos, GetForegroundWindow, GetWindowThreadProcessId},
+    Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
 };
 
 use crate::WindowFocusError;
