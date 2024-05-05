@@ -16,9 +16,20 @@ pub fn betula_icon() -> egui::IconData {
 pub mod widgets;
 pub use egui;
 
+// mod egui_util;
+// pub use egui_util::{}
+
 pub trait MenuEntry: std::hash::Hash + std::cmp::PartialEq {
     fn label(&self) -> &str;
-    fn hover(&self) -> Option<&str>;
+    fn hover(&self) -> Option<&str> {
+        None
+    }
+}
+
+impl MenuEntry for std::string::String {
+    fn label(&self) -> &str {
+        self.as_str()
+    }
 }
 
 #[derive(Clone, Hash, Debug, Ord, Eq, PartialEq, PartialOrd)]
@@ -38,11 +49,18 @@ impl MenuEntry for MenuEntryData {
 pub type UiMenuTree<K, T> = std::collections::BTreeMap<K, UiMenuNode<K, T>>;
 pub enum UiMenuNode<K: MenuEntry, T> {
     Value(T),
+    Groups(UiMenuTree<K, T>),
     SubElements(UiMenuTree<K, T>),
 }
 impl<K: MenuEntry, T> UiMenuNode<K, T> {
     pub fn sub_elements(&mut self) -> &mut UiMenuTree<K, T> {
         if let UiMenuNode::<K, T>::SubElements(z) = self {
+            return z;
+        }
+        panic!("sub elements called on non subelement enum");
+    }
+    pub fn groups(&mut self) -> &mut UiMenuTree<K, T> {
+        if let UiMenuNode::<K, T>::Groups(z) = self {
             return z;
         }
         panic!("sub elements called on non subelement enum");
@@ -63,6 +81,12 @@ pub fn menu_node_recurser<K: MenuEntry, T: Clone>(
                 if button.clicked() {
                     ui.close_menu();
                     return Some(v.clone());
+                }
+            }
+            UiMenuNode::<K, T>::Groups(ref subtree) => {
+                ui.label(info.label());
+                if let Some(z) = menu_node_recurser(subtree, ui) {
+                    return Some(z);
                 }
             }
             UiMenuNode::<K, T>::SubElements(ref subtree) => {

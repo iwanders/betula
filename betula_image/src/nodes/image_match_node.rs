@@ -210,21 +210,6 @@ mod ui_support {
                         ui.close_menu();
                     }
                 });
-                /*
-                ui.menu_button(label, |ui| {
-                    for entry in self.pattern_library.iter() {
-                        let mut button = ui.button(entry.info.name.0.clone());
-                        if let Some(description) = entry.info.description.as_ref() {
-                            button = button.on_hover_text(description);
-                        }
-                        if button.clicked() {
-                            self.config.use_match = Some(entry.info.name.clone());
-                            modified |= true;
-                            ui.close_menu();
-                        }
-                    }
-                });
-                */
 
                 if ui
                     .button("🔃")

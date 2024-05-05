@@ -10,6 +10,8 @@ use betula_core::{
     BetulaError, Node, NodeType,
 };
 
+use crate::{menu_node_recurser, MenuEntry, UiMenuNode, UiMenuTree};
+
 use std::collections::BTreeMap;
 
 #[derive(PartialEq, Clone, Copy, Hash, Debug, Eq)]
@@ -131,6 +133,15 @@ pub enum UiNodeCategory {
     Folder(String),
     Name(String),
 }
+impl UiNodeCategory {
+    pub fn name(&self) -> &str {
+        match self {
+            UiNodeCategory::Group(v) => v.as_str(),
+            UiNodeCategory::Folder(v) => v.as_str(),
+            UiNodeCategory::Name(v) => v.as_str(),
+        }
+    }
+}
 
 pub trait UiValue: std::fmt::Debug {
     /// Function to render the ui, responds whether changes were made.
@@ -183,11 +194,8 @@ impl<T: Chalkable + std::fmt::Debug + Clone + 'static> UiValue for DefaultUiValu
     }
 }
 
-#[derive(Default, Debug)]
-pub struct UiCategoryTree {
-    pub leafs: BTreeMap<String, NodeType>,
-    pub subtrees: BTreeMap<UiNodeCategory, UiCategoryTree>,
-}
+type UiCategoryTree = UiMenuTree<String, NodeType>;
+type UiCategoryNode = UiMenuNode<String, NodeType>;
 
 pub struct UiSupport {
     ui_node: HashMap<NodeType, UiNodeSupport>,
@@ -247,22 +255,20 @@ impl UiSupport {
         let mut current = &mut self.node_categories;
         for c in category {
             match c {
-                UiNodeCategory::Group(g) => {
-                    let z = current
-                        .subtrees
-                        .entry(UiNodeCategory::Group(g))
-                        .or_default();
-                    current = z;
+                UiNodeCategory::Group(ref g) => {
+                    current = current
+                        .entry(g.to_owned())
+                        .or_insert_with(|| UiCategoryNode::Groups(UiCategoryTree::new()))
+                        .groups()
                 }
-                UiNodeCategory::Folder(v) => {
-                    let z = current
-                        .subtrees
-                        .entry(UiNodeCategory::Folder(v))
-                        .or_default();
-                    current = z;
+                UiNodeCategory::Folder(ref v) => {
+                    current = current
+                        .entry(v.to_owned())
+                        .or_insert_with(|| UiCategoryNode::SubElements(UiCategoryTree::new()))
+                        .sub_elements()
                 }
-                UiNodeCategory::Name(v) => {
-                    current.leafs.insert(v, T::static_type());
+                UiNodeCategory::Name(ref v) => {
+                    current.insert(v.to_owned(), UiCategoryNode::Value(T::static_type()));
                 }
             }
         }

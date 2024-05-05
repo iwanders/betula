@@ -2539,37 +2539,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) {
         ui.label("Node");
         let node_categories = self.ui_support.node_categories();
-        use crate::ui::{UiCategoryTree, UiNodeCategory};
-        fn node_recurser(category: &UiCategoryTree, ui: &mut Ui) -> Option<NodeType> {
-            for (name, node_type) in &category.leafs {
-                if ui.button(name).clicked() {
-                    ui.close_menu();
-                    return Some(node_type.clone());
-                }
-            }
-            for (subcategory, subtree) in &category.subtrees {
-                match subcategory {
-                    UiNodeCategory::Group(g) => {
-                        ui.label(g);
-                        if let Some(z) = node_recurser(subtree, ui) {
-                            return Some(z);
-                        }
-                    }
-                    UiNodeCategory::Folder(v) => {
-                        let z = ui.menu_button(v.to_string(), |ui| node_recurser(subtree, ui));
-                        if let Some(returned_node_type) = z.inner.flatten() {
-                            return Some(returned_node_type);
-                        }
-                    }
-                    UiNodeCategory::Name(_) => {
-                        unreachable!()
-                    }
-                }
-            }
-            None
-        }
 
-        if let Some(node_type) = node_recurser(node_categories, ui) {
+        use crate::menu_node_recurser;
+        if let Some(node_type) = menu_node_recurser(node_categories, ui) {
             self.ui_add_node(BetulaNodeId(Uuid::new_v4()), pos, node_type, snarl);
         }
 
