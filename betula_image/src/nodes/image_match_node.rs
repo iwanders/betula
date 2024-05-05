@@ -135,50 +135,16 @@ mod ui_support {
     use super::*;
     use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
-    #[derive(Clone, Hash, Debug, Ord, Eq, PartialEq, PartialOrd)]
-    struct MenuInfo {
-        label: String,
-        hover: Option<String>,
-    }
+    use betula_editor::{menu_node_recurser, MenuEntry, UiMenuNode, UiMenuTree};
 
-    type UiMenuTree<T> = std::collections::BTreeMap<MenuInfo, UiMenuNode<T>>;
-    enum UiMenuNode<T> {
-        Value(T),
-        SubElements(UiMenuTree<T>),
-    }
-    impl<T> UiMenuNode<T> {
-        pub fn sub_elements(&mut self) -> &mut UiMenuTree<T> {
-            if let UiMenuNode::<T>::SubElements(z) = self {
-                return z;
-            }
-            panic!("sub elements called on non subelement enum");
+    use crate::pattern_match::PatternInfo;
+    impl MenuEntry for PatternInfo {
+        fn label(&self) -> &str {
+            self.name.0.as_ref()
         }
-    }
-
-    fn menu_node_recurser<T: Copy>(tree: &UiMenuTree<T>, ui: &mut egui::Ui) -> Option<T> {
-        for (info, element) in tree.iter() {
-            match element {
-                UiMenuNode::<T>::Value(ref v) => {
-                    let mut button = ui.button(info.label.clone());
-                    if let Some(s) = info.hover.as_ref() {
-                        button = button.on_hover_text(s);
-                    }
-                    if button.clicked() {
-                        ui.close_menu();
-                        return Some(*v);
-                    }
-                }
-                UiMenuNode::<T>::SubElements(ref subtree) => {
-                    let z =
-                        ui.menu_button(info.label.clone(), |ui| menu_node_recurser(subtree, ui));
-                    if let Some(returned_node_type) = z.inner.flatten() {
-                        return Some(returned_node_type);
-                    }
-                }
-            }
+        fn hover(&self) -> Option<&str> {
+            self.description.as_ref().map(|v| v.as_str())
         }
-
-        None
     }
 
     impl UiNode for ImageMatchNode {
@@ -212,17 +178,17 @@ mod ui_support {
                 };
 
                 // Convert the pattern library to the menu tree.
-                type MenuType<'a> = UiMenuNode<&'a PatternEntry>;
-                type TreeType<'a> = UiMenuTree<&'a PatternEntry>;
+                type MenuType<'a> = UiMenuNode<PatternInfo, &'a PatternEntry>;
+                type TreeType<'a> = UiMenuTree<PatternInfo, &'a PatternEntry>;
                 let mut root = TreeType::new();
                 for pattern in self.pattern_library.iter() {
                     let h = pattern
                         .hierarchy
                         .clone()
                         .iter()
-                        .map(|z| MenuInfo {
-                            label: z.clone(),
-                            hover: None,
+                        .map(|z| PatternInfo {
+                            name: PatternName(z.clone()),
+                            description: None,
                         })
                         .collect::<Vec<_>>();
                     let element = {
@@ -235,13 +201,7 @@ mod ui_support {
                         }
                         element
                     };
-                    element.insert(
-                        MenuInfo {
-                            label: pattern.info.name.0.clone(),
-                            hover: pattern.info.description.clone(),
-                        },
-                        MenuType::Value(pattern),
-                    );
+                    element.insert(pattern.info.clone(), MenuType::Value(pattern));
                 }
                 ui.menu_button(label, |ui| {
                     if let Some(entry) = menu_node_recurser(&root, ui) {

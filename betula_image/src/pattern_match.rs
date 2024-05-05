@@ -124,11 +124,11 @@ impl Pattern {
     }
 }
 
-#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, PartialOrd)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, PartialOrd, Hash, Eq, Ord)]
 #[serde(transparent)]
 pub struct PatternName(pub String);
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialOrd, PartialEq, Hash, Eq, Ord)]
 pub struct PatternInfo {
     /// Display string in the ui.
     pub name: PatternName,
@@ -154,7 +154,7 @@ impl PatternMetadata {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
 pub struct PatternEntry {
     pub info: PatternInfo,
     pub path: std::path::PathBuf,
