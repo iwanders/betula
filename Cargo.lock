@@ -1334,8 +1334,7 @@ checksum = "a3d8a32ae18130a3c84dd492d4215c3d913c3b07c6b63c2eb3eb7ff1101ab7bf"
 [[package]]
 name = "enigo"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a4655cdcad61e57cf28922aaa3221b06ce29e644422bba506851a03b8817468"
+source = "git+https://github.com/enximi/enigo?rev=bf6e7b4a99f69a42d44e0c2883e720b224b2aacd#bf6e7b4a99f69a42d44e0c2883e720b224b2aacd"
 dependencies = [
  "core-graphics",
  "foreign-types-shared",

@@ -12,5 +12,6 @@ default = []
 betula_core = { workspace = true, default-features = false }
 betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
-enigo = {version = "0.2.0", features = ["serde"] }
+#enigo = {version = "0.2.0", features = ["serde"] }
+enigo = { git = "https://github.com/enximi/enigo", rev="bf6e7b4a99f69a42d44e0c2883e720b224b2aacd", features = ["serde"]  }
 
