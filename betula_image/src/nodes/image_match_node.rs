@@ -135,6 +135,52 @@ mod ui_support {
     use super::*;
     use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
 
+    #[derive(Clone, Hash, Debug, Ord, Eq, PartialEq, PartialOrd)]
+    struct MenuInfo {
+        label: String,
+        hover: Option<String>,
+    }
+
+    type UiMenuTree<T> = std::collections::BTreeMap<MenuInfo, UiMenuNode<T>>;
+    enum UiMenuNode<T> {
+        Value(T),
+        SubElements(UiMenuTree<T>),
+    }
+    impl<T> UiMenuNode<T> {
+        pub fn sub_elements(&mut self) -> &mut UiMenuTree<T> {
+            if let UiMenuNode::<T>::SubElements(z) = self {
+                return z;
+            }
+            panic!("sub elements called on non subelement enum");
+        }
+    }
+
+    fn menu_node_recurser<T: Copy>(tree: &UiMenuTree<T>, ui: &mut egui::Ui) -> Option<T> {
+        for (info, element) in tree.iter() {
+            match element {
+                UiMenuNode::<T>::Value(ref v) => {
+                    let mut button = ui.button(info.label.clone());
+                    if let Some(s) = info.hover.as_ref() {
+                        button = button.on_hover_text(s);
+                    }
+                    if button.clicked() {
+                        ui.close_menu();
+                        return Some(*v);
+                    }
+                }
+                UiMenuNode::<T>::SubElements(ref subtree) => {
+                    let z =
+                        ui.menu_button(info.label.clone(), |ui| menu_node_recurser(subtree, ui));
+                    if let Some(returned_node_type) = z.inner.flatten() {
+                        return Some(returned_node_type);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     impl UiNode for ImageMatchNode {
         fn ui_title(&self) -> String {
             "image_match 🎇 ".to_owned()
@@ -148,6 +194,14 @@ mod ui_support {
         ) -> UiConfigResponse {
             let _ = (ctx, scale);
 
+            /*
+
+                struct UiMenuElement<T> {
+                    leafs: Vec<(MenuInfo, T)>,
+                    submenu: Vec<(MenuInfo, UiMenuElement<T>)>,
+                }
+            */
+
             let mut modified = false;
 
             ui.horizontal(|ui| {
@@ -157,6 +211,46 @@ mod ui_support {
                     "Select...".to_owned()
                 };
 
+                // Convert the pattern library to the menu tree.
+                type MenuType<'a> = UiMenuNode<&'a PatternEntry>;
+                type TreeType<'a> = UiMenuTree<&'a PatternEntry>;
+                let mut root = TreeType::new();
+                for pattern in self.pattern_library.iter() {
+                    let h = pattern
+                        .hierarchy
+                        .clone()
+                        .iter()
+                        .map(|z| MenuInfo {
+                            label: z.clone(),
+                            hover: None,
+                        })
+                        .collect::<Vec<_>>();
+                    let element = {
+                        let mut element = &mut root;
+                        for sub in h {
+                            element = element
+                                .entry(sub)
+                                .or_insert_with(|| MenuType::SubElements(TreeType::new()))
+                                .sub_elements();
+                        }
+                        element
+                    };
+                    element.insert(
+                        MenuInfo {
+                            label: pattern.info.name.0.clone(),
+                            hover: pattern.info.description.clone(),
+                        },
+                        MenuType::Value(pattern),
+                    );
+                }
+                ui.menu_button(label, |ui| {
+                    if let Some(entry) = menu_node_recurser(&root, ui) {
+                        self.config.use_match = Some(entry.info.name.clone());
+                        modified |= true;
+                        ui.close_menu();
+                    }
+                });
+                /*
                 ui.menu_button(label, |ui| {
                     for entry in self.pattern_library.iter() {
                         let mut button = ui.button(entry.info.name.0.clone());
@@ -170,6 +264,7 @@ mod ui_support {
                         }
                     }
                 });
+                */
 
                 if ui
                     .button("🔃")
