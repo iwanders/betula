@@ -275,9 +275,18 @@ mod ui_support {
                     }
                 });
 
+                let mut change_token_position = None;
+
                 ui.vertical(|ui| {
+                    let total = self.config.tokens.len();
                     for (i, t) in self.config.tokens.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
+                            if ui.add_enabled(i != total - 1, egui::Button::new("⮋")).clicked() {
+                                change_token_position = Some((i, 1));
+                            }
+                            if ui.add_enabled(i != 0, egui::Button::new("⮉")).clicked() {
+                                change_token_position = Some((i, -1));
+                            }
                             let options = [
                                 ("📖Text", Token::Text("".to_owned())),
                                 (
@@ -485,6 +494,11 @@ mod ui_support {
                         });
                     }
                 });
+                if let Some((pos, dir)) = change_token_position {
+                    let new_pos = (pos as isize + dir) as usize;
+                    self.config.tokens.swap(pos, new_pos);
+                    ui_response = UiConfigResponse::Changed;
+                }
             });
 
             ui_response
