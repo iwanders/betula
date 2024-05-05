@@ -1334,7 +1334,7 @@ checksum = "a3d8a32ae18130a3c84dd492d4215c3d913c3b07c6b63c2eb3eb7ff1101ab7bf"
 [[package]]
 name = "enigo"
 version = "0.2.0"
-source = "git+https://github.com/iwanders/enigo?rev=78153009cccc4003849969fc5fbf29c35df2123e#78153009cccc4003849969fc5fbf29c35df2123e"
+source = "git+https://github.com/iwanders/enigo?rev=6dec1e29b355d7df1f3d4821b90e2204aa5273df#6dec1e29b355d7df1f3d4821b90e2204aa5273df"
 dependencies = [
  "core-graphics",
  "foreign-types-shared",
