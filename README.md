@@ -114,5 +114,34 @@ cargo r --example image_pattern -- create --output-dir Game/Left/ ${SCREENSHOTS}
 ```
 The `image_pattern_match` example can be used to verify all files in the `image_match` directory load correctly.
 
+# Capture, cursors and coordinates.
+
+In my setup, I have two 1080p monitors side by side, with the right monitor being the primary monitor in windows.
+
+- Windows:
+  - Top left corner of the right monitor is cursor position 0,0.
+  - Bottom right corner of the right monitor is 1919,1079. 
+  - Top left corner of left monitor is -1919,0.
+- Linux:
+  - Top left corner of the right monitor is cursor position 1920,0.
+  - Bottom right corner of the right monitor is 3839,1079. 
+  - Top left corner of left monitor is 0,1079.
+
+## Normalisation
+So to get platform agnostic capture & cursor coordinates for complete right monitor;
+
+- Capture configuration has one rule with:
+  - `match_width: 3840`  This ensures it only matches on linux.
+  - `x_offset: 1920`
+  - `width: 1920`
+  - `height: 1080`
+- Enigo cursor:
+  - Delta Linux: `-1920, 0`, Delta Windows: `0,0`
+- Enigo Instance:
+  - Delta Linux: `1920, 0`, Delta Windows: `0,0`
+
+With this all cursors are expressed in the right monitor coordinate frame, and the right monitor is the only image captured.
+
+
 # License
 License is [`BSD-3-Clause`](./LICENSE).
