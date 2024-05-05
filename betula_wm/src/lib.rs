@@ -1,5 +1,4 @@
 pub type WindowFocusError = Box<dyn std::error::Error + Send + Sync + 'static>;
-use serde::{Deserialize, Serialize};
 
 pub mod nodes;
 
@@ -46,36 +45,8 @@ impl WindowFocusRetriever {
     }
 }
 
-#[derive(Debug, Default)]
-struct CursorPositionRetriever {
-    backend: backend::BackendType,
-}
-impl CursorPositionRetriever {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
-        self.backend.cursor_position()
-    }
-}
-
-/// Structure to represent a cursor position.
-///
-/// For two 1080p monitors, side by side, right one being primary:
-///
-/// Windows: 0,0 is top left of primary, top right is 1919,0, bottom right is 1919,1079. Left monitor (non primary) is
-/// -1920,0 top left and -1920,1079 bottom left.
-/// Linux: top left is 0,0, top right is 3839,0, bottom right is 3839,1070
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CursorPosition {
-    pub x: i32,
-    pub y: i32,
-}
-
 pub fn main_test() {
     let mut window_focus = WindowFocusRetriever::new();
-    let cursor_position = CursorPositionRetriever::new();
 
     loop {
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -87,9 +58,6 @@ pub fn main_test() {
         if let Ok(n) = window_focus.process_name() {
             println!("name: {n}");
         }
-        if let Ok(p) = cursor_position.cursor_position() {
-            println!("cursor position: {p:?}");
-        }
     }
 }
 
@@ -98,8 +66,4 @@ pub fn main_test() {
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::WindowFocusNode, nodes::WindowFocusNodeConfig>();
-    ui_support
-        .add_node_default_with_config::<nodes::CursorPositionNode, nodes::CursorPositionNodeConfig>(
-        );
-    ui_support.add_value_default_named::<CursorPosition>("CursorPosition");
 }

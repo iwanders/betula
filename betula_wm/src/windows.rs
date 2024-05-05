@@ -9,7 +9,7 @@ use windows::{
     Win32::UI::WindowsAndMessaging::{GetCursorPos, GetForegroundWindow, GetWindowThreadProcessId},
 };
 
-use crate::{CursorPosition, WindowFocusError};
+use crate::WindowFocusError;
 type DWORD = u32;
 
 pub type BackendType = WindowsFocusHandler;
@@ -54,13 +54,18 @@ impl WindowsFocusHandler {
         }
     }
 
+    /*
     pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
-        let mut p: windows::Win32::Foundation::POINT = Default::default();
+        let mut p : windows::Win32::Foundation::POINT = Default::default();
         unsafe {
             GetCursorPos(&mut p)?;
         }
-        Ok(CursorPosition { x: p.x, y: p.y })
+        Ok(CursorPosition{
+            x: p.x,
+            y: p.y,
+        })
     }
+    */
 
     pub fn process_id(&self) -> Result<u32, WindowFocusError> {
         unsafe {

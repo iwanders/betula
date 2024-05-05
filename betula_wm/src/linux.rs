@@ -1,4 +1,4 @@
-use crate::{CursorPosition, WindowFocusError};
+use crate::WindowFocusError;
 pub type BackendType = X11FocusHandler;
 pub type CacheKey = std::ffi::c_ulong;
 
@@ -190,7 +190,8 @@ impl Handler {
         Ok(window_id)
     }
 
-    fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
+    /*
+    fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError>  {
         unsafe {
             let count = (self.instance.XScreenCount)(self.display);
             if count < 1 {
@@ -207,20 +208,17 @@ impl Handler {
             let mut win_x_return: c_int = 0;
             let mut win_y_return: c_int = 0;
             let mut mask_return: c_uint = 0;
-            let res = (self.instance.XQueryPointer)(
-                self.display,
-                root_window,
-                &mut root_return,
-                &mut child_return,
-                &mut root_x_return,
-                &mut root_y_return,
-                &mut win_x_return,
-                &mut win_y_return,
-                &mut mask_return,
-            );
+            let res = (self.instance.XQueryPointer)(self.display, root_window,
+                    &mut root_return,
+                    &mut child_return,
+                    &mut root_x_return,
+                    &mut root_y_return,
+                    &mut win_x_return,
+                    &mut win_y_return,
+                    &mut mask_return);
             // We always retrieve the root, so root and win retrieval are identical.
             if res > 0 {
-                Ok(CursorPosition {
+                Ok(CursorPosition{
                     x: win_x_return,
                     y: win_y_return,
                 })
@@ -229,6 +227,7 @@ impl Handler {
             }
         }
     }
+    */
 }
 
 #[derive(Default)]
@@ -305,6 +304,7 @@ impl X11FocusHandler {
         Err("failed to obtain focussed process id".into())
     }
 
+    /*
     pub fn cursor_position(&self) -> Result<CursorPosition, WindowFocusError> {
         self.setup()?;
         let locked = self
@@ -316,4 +316,5 @@ impl X11FocusHandler {
         }
         Err("failed to retrieve cursor position".into())
     }
+    */
 }
