@@ -5,10 +5,15 @@
 This is a [behaviour](https://en.wikipedia.org/wiki/Behavior_tree_(artificial_intelligence,_robotics_and_control)) [tree](https://en.wikipedia.org/wiki/Birch) library.
 It is created with the goal of automating a computer game, but the library itself should work for other use cases.
 
-
-# Crates
+# Architecture
 
 Overview of the crates in this workspace. Crates with nodes provide the `UiNode` implementation if the `betula_editor` feature is enabled.
+
+Nodes are categorised into:
+- Action: Nodes that perform an action: Pressing a key.
+- Conditionals: Make a decision, usually based on a blackboard value, can be used as decorator: Checking if a window is focussed.
+- Control: Nodes that merely affect control flow: Selector node.
+- Decorators: Pure decorators without inputs: Always make the subtree return success.
 
 ## betula_core
 - Holds the traits for `Node` and `Tree`.
