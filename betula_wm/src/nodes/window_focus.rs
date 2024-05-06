@@ -27,11 +27,17 @@ impl WindowFocusNode {
 }
 
 impl Node for WindowFocusNode {
-    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let name = self.focus.process_name()?;
         for re in &self.matches {
             if re.is_match(&name) {
-                return Ok(ExecutionStatus::Success);
+                if ctx.children() == 0 {
+                    return Ok(ExecutionStatus::Success);
+                } else if ctx.children() == 1 {
+                    return ctx.run(0);
+                } else if ctx.children() > 1 {
+                    return Err(format!("{:?} had more than one child", Self::static_type()).into());
+                }
             }
         }
         Ok(ExecutionStatus::Failure)
@@ -143,7 +149,7 @@ pub mod ui_support {
             ui_response
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
-            0..0
+            0..1
         }
 
         fn ui_category() -> Vec<UiNodeCategory> {
