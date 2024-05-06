@@ -5,4 +5,4 @@ mod enigo_node;
 pub use enigo_node::{EnigoNode, EnigoNodeConfig};
 
 mod enigo_cursor_node;
-pub use enigo_cursor_node::{EnigoCursorNode, EnigoCursorNodeConfig};
+pub use enigo_cursor_node::EnigoCursorNode;

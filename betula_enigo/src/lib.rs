@@ -16,7 +16,8 @@ enum EnigoTask {
 }
 
 // use std::cell::RefCell;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicBool, AtomicI32};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
 
@@ -28,7 +29,10 @@ pub struct EnigoRunner {
 impl EnigoRunner {
     pub fn new() -> Result<EnigoInterface, enigo::NewConError> {
         let running = std::sync::Arc::new(AtomicBool::new(true));
-        let t_running = running.clone();
+        let cursor_offset: std::sync::Arc<(AtomicI32, AtomicI32)> =
+            std::sync::Arc::new((0i32.into(), 0i32.into()));
+        let t_running = Arc::clone(&running);
+        let t_cursor_offset = Arc::clone(&cursor_offset);
         let (sender, receiver) = channel::<EnigoTask>();
         let settings = enigo::Settings {
             release_keys_when_dropped: true,
@@ -40,20 +44,21 @@ impl EnigoRunner {
         let thread = Some(std::thread::spawn(move || {
             let enigo = enigo_t;
             let _ = receiver;
-            let mut position_offset = (0, 0);
-            while t_running.load(std::sync::atomic::Ordering::Relaxed) {
+            let position_offset = t_cursor_offset;
+            while t_running.load(Relaxed) {
                 while let Ok(v) = receiver.recv_timeout(std::time::Duration::from_millis(1)) {
                     let mut locked = enigo.lock().unwrap();
                     match v {
                         EnigoTask::SetAbsolutePosOffset(x, y) => {
-                            position_offset = (x, y);
+                            position_offset.0.store(x, Relaxed);
+                            position_offset.1.store(y, Relaxed);
                         }
                         EnigoTask::Tokens(z) => {
                             for mut t in z {
                                 if let Token::MoveMouse(x, y, coordinate) = &mut t {
                                     if *coordinate == enigo::Coordinate::Abs {
-                                        *x += position_offset.0;
-                                        *y += position_offset.1;
+                                        *x += position_offset.0.load(Relaxed);
+                                        *y += position_offset.1.load(Relaxed);
                                     }
                                 }
                                 //// Don't really know how to handle this Result, lets panic?
@@ -66,20 +71,21 @@ impl EnigoRunner {
                 }
             }
         }));
+
         let runner = Arc::new(EnigoRunner { thread, running });
 
         Ok(EnigoInterface {
             enigo,
             sender,
             runner,
+            cursor_offset,
         })
     }
 }
 
 impl Drop for EnigoRunner {
     fn drop(&mut self) {
-        self.running
-            .store(false, std::sync::atomic::Ordering::Relaxed);
+        self.running.store(false, Relaxed);
         let t = self.thread.take();
         t.unwrap().join().expect("join should succeed");
     }
@@ -90,6 +96,8 @@ use std::sync::{Arc, Mutex};
 pub struct EnigoInterface {
     sender: Sender<EnigoTask>,
     enigo: Arc<Mutex<Enigo>>,
+
+    cursor_offset: std::sync::Arc<(AtomicI32, AtomicI32)>,
 
     // dead code allowed, it contains the execution thread.
     #[allow(dead_code)]
@@ -150,9 +158,10 @@ impl EnigoBlackboard {
             .ok_or(format!("no interface present in value"))?;
         let locked = interface.enigo.lock().expect("should not be poisoned");
         use enigo::Mouse;
-        Ok(locked
-            .location()
-            .map(|v| CursorPosition { x: v.0, y: v.1 })?)
+        Ok(locked.location().map(|v| CursorPosition {
+            x: v.0 - interface.cursor_offset.0.load(Relaxed),
+            y: v.1 - interface.cursor_offset.1.load(Relaxed),
+        })?)
     }
 }
 impl std::fmt::Debug for EnigoBlackboard {
@@ -181,8 +190,7 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
-    ui_support
-        .add_node_default_with_config::<nodes::EnigoCursorNode, nodes::EnigoCursorNodeConfig>();
+    ui_support.add_node_default::<nodes::EnigoCursorNode>();
     ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
     ui_support.add_value_default_named::<CursorPosition>("Cursor");
 }

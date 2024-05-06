@@ -141,8 +141,6 @@ So to get platform agnostic capture & cursor coordinates for complete right moni
   - `x_offset: 1920`
   - `width: 1920`
   - `height: 1080`
-- Enigo cursor:
-  - Delta Linux: `-1920, 0`, Delta Windows: `0,0`
 - Enigo Instance:
   - Delta Linux: `1920, 0`, Delta Windows: `0,0`
 
