@@ -14,6 +14,7 @@ Nodes are categorised into:
 - Conditionals: Make a decision, usually based on a blackboard value, can be used as decorator: Checking if a window is focussed.
 - Control: Nodes that merely affect control flow: Selector node.
 - Decorators: Pure decorators without inputs: Always make the subtree return success.
+- Providers: Provides blackboard value: Clock, screen capture, etc.
 
 ## betula_core
 - Holds the traits for `Node` and `Tree`.
