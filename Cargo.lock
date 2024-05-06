@@ -631,6 +631,7 @@ dependencies = [
  "betula_editor",
  "enigo",
  "serde",
+ "toml",
 ]
 
 [[package]]

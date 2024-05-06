@@ -177,33 +177,33 @@ mod ui_support {
                     "Select...".to_owned()
                 };
 
-                // Convert the pattern library to the menu tree.
-                type MenuType<'a> = UiMenuNode<PatternInfo, &'a PatternEntry>;
-                type TreeType<'a> = UiMenuTree<PatternInfo, &'a PatternEntry>;
-                let mut root = TreeType::new();
-                for pattern in self.pattern_library.iter() {
-                    let h = pattern
-                        .hierarchy
-                        .clone()
-                        .iter()
-                        .map(|z| PatternInfo {
-                            name: PatternName(z.clone()),
-                            description: None,
-                        })
-                        .collect::<Vec<_>>();
-                    let element = {
-                        let mut element = &mut root;
-                        for sub in h {
-                            element = element
-                                .entry(sub)
-                                .or_insert_with(|| MenuType::SubElements(TreeType::new()))
-                                .sub_elements();
-                        }
-                        element
-                    };
-                    element.insert(pattern.info.clone(), MenuType::Value(pattern));
-                }
                 ui.menu_button(label, |ui| {
+                    // Convert the pattern library to the menu tree.
+                    type MenuType<'a> = UiMenuNode<PatternInfo, &'a PatternEntry>;
+                    type TreeType<'a> = UiMenuTree<PatternInfo, &'a PatternEntry>;
+                    let mut root = TreeType::new();
+                    for pattern in self.pattern_library.iter() {
+                        let h = pattern
+                            .hierarchy
+                            .clone()
+                            .iter()
+                            .map(|z| PatternInfo {
+                                name: PatternName(z.clone()),
+                                description: None,
+                            })
+                            .collect::<Vec<_>>();
+                        let element = {
+                            let mut element = &mut root;
+                            for sub in h {
+                                element = element
+                                    .entry(sub)
+                                    .or_insert_with(|| MenuType::SubElements(TreeType::new()))
+                                    .sub_elements();
+                            }
+                            element
+                        };
+                        element.insert(pattern.info.clone(), MenuType::Value(pattern));
+                    }
                     if let Some(entry) = menu_node_recurser(&root, ui) {
                         self.config.use_match = Some(entry.info.name.clone());
                         modified |= true;

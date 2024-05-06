@@ -7,6 +7,9 @@ use enigo::Enigo;
 use enigo::agent::Agent;
 use enigo::agent::Token;
 
+mod preset;
+pub use preset::{load_preset_directory, EnigoPreset};
+
 enum EnigoTask {
     SetAbsolutePosOffset(i32, i32),
     Tokens(Vec<Token>),

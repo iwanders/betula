@@ -1,39 +1,78 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::EnigoBlackboard;
+use crate::{EnigoBlackboard, EnigoPreset, load_preset_directory};
 
 use enigo::agent::Token;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnigoNodeConfig {
     execute_async: bool,
+
     tokens: Vec<Token>,
+
+    preset: Option<Vec<String>>,
 }
 impl Default for EnigoNodeConfig {
     fn default() -> Self {
         Self {
             execute_async: true,
             tokens: vec![],
+            preset: None,
         }
     }
 }
 
 impl IsNodeConfig for EnigoNodeConfig {}
 
+
 #[derive(Debug, Default)]
 pub struct EnigoNode {
     input: Input<EnigoBlackboard>,
     pub config: EnigoNodeConfig,
+
+    /// The directory from which the patterns are loaded.
+    directory: Option<std::path::PathBuf>,
+
+    /// The available patterns for selection.
+    presets: Vec<EnigoPreset>,
+
+    /// True if the preset needs to be reloaded.
+    preset_dirty: bool,
 }
 
 impl EnigoNode {
     pub fn new() -> Self {
         EnigoNode::default()
     }
+
+    pub fn load_presets(&mut self) -> Result<(), NodeError>  {
+        if let Some(dir) = &self.directory {
+            let mut dir = dir.clone();
+            dir.push("enigo_node");
+            self.presets = load_preset_directory(&dir)?;
+        }
+        Ok(())
+    }
+
+    pub fn apply_preset(&mut self) -> Result<(), NodeError> {
+        if let Some(desired) = self.config.preset.as_ref() {
+            if let Some(entry) = self.presets.iter().find(|z| &z.index == desired) {
+                self.config.tokens = entry.info.actions.clone();
+            } else {
+                return Err(format!("Could not find desired preset: {desired:?}").into());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Node for EnigoNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+        if self.preset_dirty {
+            self.load_presets()?;
+            self.apply_preset()?;
+            self.preset_dirty = false;
+        }
         let interface = self.input.get()?;
         if self.config.execute_async {
             interface.execute_async(&self.config.tokens)?;
@@ -67,7 +106,16 @@ impl Node for EnigoNode {
     }
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
-        self.config.load_node_config(config)
+        let preset_before = self.config.preset.clone();
+        let r = self.config.load_node_config(config);
+        self.preset_dirty = preset_before != self.config.preset && !self.config.preset.is_none();
+        let _ = self.apply_preset();
+        r
+    }
+
+    fn set_directory(&mut self, directory: Option<&std::path::Path>) {
+        self.directory = directory.map(|v| v.to_owned());
+        let _ = self.load_presets();
     }
 }
 
@@ -76,6 +124,7 @@ mod ui_support {
     use super::*;
     use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
     use enigo::{Axis, Coordinate, Direction};
+    use betula_editor::{UiMenuTree, UiMenuNode, menu_node_recurser};
 
     fn direction_to_str(d: Direction) -> &'static str {
         match d {
@@ -254,29 +303,71 @@ mod ui_support {
             scale: f32,
         ) -> UiConfigResponse {
             let _ = ctx;
-            let mut ui_response = UiConfigResponse::UnChanged;
+            
+            let mut preset_modified = false;
+            let mut non_preset_modified = false;
+            let mut token_modified = false;
+
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
+                    let label = if let Some(index) = self.config.preset.clone() {
+                        index.join(".")
+                    } else {
+                        "Select...".to_owned()
+                    };
+
+                    ui.menu_button(label, |ui| {
+                        // Convert the pattern library to the menu tree.
+                        type MenuType<'a>  = UiMenuNode::<String, &'a EnigoPreset>;
+                        type TreeType<'a>  = UiMenuTree::<String, &'a EnigoPreset>; 
+                        let mut root = TreeType::new();
+                        for pattern in self.presets.iter() {
+                            let index_into = &pattern.index[0.. pattern.index.len() - 1];
+                            let element = {
+                                let mut element = &mut root;
+                                for sub in index_into {
+                                    element = element.entry(sub.clone()).or_insert_with(|| MenuType::SubElements(TreeType::new())).sub_elements();
+                                }
+                                element
+                            };
+                            element.insert(pattern.index.last().unwrap().clone(), MenuType::Value(pattern));
+                        }
+
+                        if let Some(entry) = menu_node_recurser(&root, ui) {
+                            self.config.preset = Some(entry.index.clone());
+                            self.config.tokens = entry.info.actions.clone();
+                            preset_modified |= true;
+                            ui.close_menu();
+                        }
+                    });
+
+                    if ui.button("🔃").on_hover_text("Reload presets from directory.").clicked() {
+                        let patterns = self.load_presets();
+                        if let Err(e) = patterns {
+                            println!("Error loading presets: {:?}", e)
+                        }
+                        ui.close_menu();
+                    }
+
                     if ui.add(egui::Button::new("➕")).clicked() {
                         self.config
                             .tokens
                             .push(enigo::agent::Token::Text("".to_owned()));
-                        ui_response = UiConfigResponse::Changed;
+                            non_preset_modified = true;
                     }
                     if ui.add(egui::Button::new("➖")).clicked() {
                         if !self.config.tokens.is_empty() {
                             self.config.tokens.truncate(self.config.tokens.len() - 1);
-                            ui_response = UiConfigResponse::Changed;
+                            non_preset_modified = true;
                         }
                     }
                     let r = ui.checkbox(&mut self.config.execute_async, "Async");
                     if r.on_hover_text("Send tokens to background thread, required for absolute offsets to take effect.").changed() {
-                        ui_response = UiConfigResponse::Changed;
+                        non_preset_modified = true;
                     }
                 });
 
                 let mut change_token_position = None;
-
                 ui.vertical(|ui| {
                     let total = self.config.tokens.len();
                     for (i, t) in self.config.tokens.iter_mut().enumerate() {
@@ -315,7 +406,7 @@ mod ui_support {
                                 .show_index(ui, &mut selected, options.len(), |i| options[i].0);
                             if z.changed() {
                                 *t = options[selected].1.clone();
-                                ui_response = UiConfigResponse::Changed;
+                                token_modified = true;
                             }
                             match t {
                                 Token::Text(ref mut v) => {
@@ -325,15 +416,11 @@ mod ui_support {
                                             .hint_text(text)
                                             .min_size(egui::vec2(100.0 * scale, 0.0)),
                                     );
-                                    if response.on_hover_text(text).changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= response.on_hover_text(text).changed();
                                 }
                                 Token::Key(ref mut k, ref mut d) => {
                                     let response = direction_ui(format!("keydir{i}"), d, ui);
-                                    if response.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= response.changed();
                                     // There's 96 options here :(
                                     // https://docs.rs/enigo/latest/enigo/enum.Key.html#variant.Unicode
 
@@ -425,9 +512,7 @@ mod ui_support {
                                                 )
                                         });
                                     let response = y.inner.unwrap_or(y.response);
-                                    if response.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= response.changed();
                                     match k {
                                         enigo::Key::Unicode(ref mut c) => {
                                             let mut buffer = format!("{c}");
@@ -442,7 +527,7 @@ mod ui_support {
                                                 .changed()
                                             {
                                                 if let Some(v) = buffer.chars().next() {
-                                                    ui_response = UiConfigResponse::Changed;
+                                                    token_modified = true;
                                                     *c = v;
                                                 }
                                             }
@@ -452,42 +537,28 @@ mod ui_support {
                                 }
                                 Token::Button(ref mut b, ref mut d) => {
                                     let response = direction_ui(format!("buttondir{i}"), d, ui);
-                                    if response.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= response.changed();
                                     let response = button_ui(format!("button{i}"), b, ui);
-                                    if response.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= response.changed();
                                 }
                                 Token::MoveMouse(ref mut x, ref mut y, ref mut c) => {
                                     ui.label("x");
                                     let r =
                                         ui.add(egui::DragValue::new(x).update_while_editing(false));
-                                    if r.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= r.changed();
                                     ui.label("y");
                                     let r =
                                         ui.add(egui::DragValue::new(y).update_while_editing(false));
-                                    if r.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
-                                    let response = coordinate_ui(format!("coordinate{i}"), c, ui);
-                                    if response.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= r.changed();
+                                    let r = coordinate_ui(format!("coordinate{i}"), c, ui);
+                                    token_modified |= r.changed();
                                 }
                                 Token::Scroll(ref mut v, ref mut c) => {
                                     let r =
                                         ui.add(egui::DragValue::new(v).update_while_editing(false));
-                                    if r.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= r.changed();
                                     let response = axis_ui(format!("axis{i}"), c, ui);
-                                    if response.changed() {
-                                        ui_response = UiConfigResponse::Changed;
-                                    }
+                                    token_modified |= response.changed();
                                 }
                                 _ => {}
                             }
@@ -497,11 +568,23 @@ mod ui_support {
                 if let Some((pos, dir)) = change_token_position {
                     let new_pos = (pos as isize + dir) as usize;
                     self.config.tokens.swap(pos, new_pos);
-                    ui_response = UiConfigResponse::Changed;
+                    token_modified |= true;
                 }
             });
 
-            ui_response
+            if token_modified {
+                // This is no longer a preset, it has been modified.
+                self.config.preset = None;
+            }
+            if preset_modified {
+                self.preset_dirty = true;
+            }
+
+            if preset_modified || non_preset_modified || token_modified {
+                UiConfigResponse::Changed
+            } else {
+                UiConfigResponse::UnChanged
+            }
         }
 
         fn ui_category() -> Vec<UiNodeCategory> {
