@@ -148,7 +148,7 @@ pub mod ui_support {
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("leaf".to_owned()),
+                UiNodeCategory::Folder("conditional".to_owned()),
                 UiNodeCategory::Name("window_focus".to_owned()),
             ]
         }

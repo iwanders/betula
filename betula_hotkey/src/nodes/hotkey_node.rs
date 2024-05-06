@@ -228,7 +228,7 @@ mod ui_support {
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("action".to_owned()),
+                UiNodeCategory::Folder("conditional".to_owned()),
                 UiNodeCategory::Name("hotkey".to_owned()),
             ]
         }

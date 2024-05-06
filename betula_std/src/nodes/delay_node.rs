@@ -151,8 +151,8 @@ pub mod ui_support {
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("decorator".to_owned()),
-                UiNodeCategory::Group("time".to_owned()),
+                UiNodeCategory::Folder("conditional".to_owned()),
+                // UiNodeCategory::Group("time".to_owned()),
                 UiNodeCategory::Name("delay".to_owned()),
             ]
         }
