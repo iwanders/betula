@@ -2,7 +2,7 @@ mod sequence_node;
 pub use sequence_node::{SequenceNode, SequenceNodeConfig};
 
 mod selector_node;
-pub use selector_node::SelectorNode;
+pub use selector_node::{SelectorNode, SelectorNodeConfig};
 
 mod failure_node;
 pub use failure_node::FailureNode;

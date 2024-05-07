@@ -4,7 +4,7 @@ pub mod nodes;
 #[cfg(feature = "betula_editor")]
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_node_default_with_config::<nodes::SequenceNode, nodes::SequenceNodeConfig>();
-    ui_support.add_node_default::<nodes::SelectorNode>();
+    ui_support.add_node_default_with_config::<nodes::SelectorNode, nodes::SelectorNodeConfig>();
     ui_support.add_node_default::<nodes::FailureNode>();
     ui_support.add_node_default::<nodes::SuccessNode>();
     ui_support.add_node_default::<nodes::RunningNode>();
