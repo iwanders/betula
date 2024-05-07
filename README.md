@@ -68,6 +68,26 @@ Betula nodes for [enigo](https://crates.io/crates/enigo): `Cross platform input 
   - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
   - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
 
+The `EnigoNode` can load presets from files.
+- All `toml` files in the `PROJECT/enigo_node/` directory are parsed.
+- Filename is ignored.
+- Tables can be used to specify where in the preset menu the entry exists.
+- Modifying the actions that are shown when a preset is selected decouples from the preset, but keeps the actions.
+
+For example:
+```toml
+[GameMenu.Difficulty.Normal]
+description="Click Normal difficulty."
+actions = [
+    {MoveMouse = [950, 450, "Abs"]},
+    {Button = ["Left", "Click"]}
+]
+```
+This preset will create a preset named `Normal` in the `GameMenu`'s `Difficulty` submenu. This preset
+contains two actions, an absolute mouse move to `950,450`, followed by a left mouse button click.
+
+The actions are a list of [enigo::Token](https://docs.rs/enigo/latest/enigo/agent/enum.Token.html) entries.
+
 ## betula_wm
 Pertains itself to information obtained from the window manager.
 

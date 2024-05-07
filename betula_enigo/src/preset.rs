@@ -135,6 +135,14 @@ mod test {
         .unwrap();
         println!("move_token: {move_token:?}");
 
+        let button_token: Token = toml::from_str(
+            r#"
+            Button = ["Middle", "Click"]
+        "#,
+        )
+        .unwrap();
+        println!("button_token: {button_token:?}");
+
         let presets = parse_toml_file(
             r#"
 [PresetAtRoot]
