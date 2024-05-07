@@ -66,6 +66,11 @@ impl Node for DelayNode {
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
         self.config.load_node_config(config)
     }
+
+    fn reset(&mut self) {
+        self.last_time = 0.0;
+    }
+
     fn static_type() -> NodeType {
         "common_delay".into()
     }

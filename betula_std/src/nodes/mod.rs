@@ -1,5 +1,5 @@
 mod sequence_node;
-pub use sequence_node::SequenceNode;
+pub use sequence_node::{SequenceNode, SequenceNodeConfig};
 
 mod selector_node;
 pub use selector_node::SelectorNode;
