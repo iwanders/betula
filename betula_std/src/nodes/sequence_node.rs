@@ -9,6 +9,12 @@ pub struct SequenceNodeConfig {
     /// Default is off, which makes it a reactive node; each cycle all nodes are executed from the
     /// start.
     pub memory: bool,
+
+    /// Whether to retry the node that failed in the previous execution.
+    ///
+    /// This means the sequence will always be executed in order and failing nodes will be retried
+    /// until they succeed and the entire sequence succeeds.
+    pub retry: bool,
 }
 impl IsNodeConfig for SequenceNodeConfig {}
 
@@ -47,8 +53,10 @@ impl Node for SequenceNode {
                     self.current_position = id + 1;
                 }
                 ExecutionStatus::Failure => {
-                    // Reset the sequence.
-                    self.current_position = 0;
+                    // Reset the sequence if we are not using retry.
+                    if !self.config.retry {
+                        self.current_position = 0;
+                    }
                     // println!("current_position: 0");
                     return Ok(ExecutionStatus::Failure);
                 }
@@ -107,6 +115,9 @@ pub mod ui_support {
             ui.horizontal(|ui| {
                 let r = ui.checkbox(&mut self.config.memory, "Memory");
                 let r = r.on_hover_text("Check this to continue execution where the previous cycle returned, if false the node is reactive and resets each cycle");
+                modified |= r.changed();
+                let r = ui.checkbox(&mut self.config.retry, "Retry");
+                let r = r.on_hover_text("Whether to retry the node that failed in the previous execution, always running the sequence to completion.");
                 modified |= r.changed();
             });
 

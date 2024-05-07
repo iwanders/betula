@@ -119,6 +119,7 @@ pub trait RunContext {
 
 /// The error type.
 pub type BetulaError = Box<dyn std::error::Error + Send + Sync>;
+// Should this switch to [`thiserror`] and [`anyhow`]?
 
 /// Error type for results from node execution.
 pub type NodeError = BetulaError;
