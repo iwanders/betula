@@ -65,8 +65,9 @@ Decorators:
 ## betula_enigo
 Betula nodes for [enigo](https://crates.io/crates/enigo): `Cross platform input simulation in Rust`.
 
-  - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
-  - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
+- `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
+- `EnigoCursorNode`: Provides the position of the cursor to the blackboard.
+- `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
 
 The `EnigoNode` can load presets from files.
 - All `toml` files in the `PROJECT/enigo_node/` directory are parsed.
