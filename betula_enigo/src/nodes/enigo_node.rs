@@ -1,7 +1,7 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{EnigoBlackboard, EnigoPreset, load_preset_directory};
+use crate::{load_preset_directory, EnigoBlackboard, EnigoPreset};
 
 use enigo::agent::Token;
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,7 +24,6 @@ impl Default for EnigoNodeConfig {
 
 impl IsNodeConfig for EnigoNodeConfig {}
 
-
 #[derive(Debug, Default)]
 pub struct EnigoNode {
     input: Input<EnigoBlackboard>,
@@ -45,7 +44,7 @@ impl EnigoNode {
         EnigoNode::default()
     }
 
-    pub fn load_presets(&mut self) -> Result<(), NodeError>  {
+    pub fn load_presets(&mut self) -> Result<(), NodeError> {
         if let Some(dir) = &self.directory {
             let mut dir = dir.clone();
             dir.push("enigo_node");
@@ -123,8 +122,8 @@ impl Node for EnigoNode {
 mod ui_support {
     use super::*;
     use betula_editor::{egui, UiConfigResponse, UiNode, UiNodeCategory, UiNodeContext};
+    use betula_editor::{menu_node_recurser, UiMenuNode, UiMenuTree};
     use enigo::{Axis, Coordinate, Direction};
-    use betula_editor::{UiMenuTree, UiMenuNode, menu_node_recurser};
 
     fn direction_to_str(d: Direction) -> &'static str {
         match d {
@@ -294,7 +293,7 @@ mod ui_support {
     impl UiNode for EnigoNode {
         fn ui_title(&self) -> String {
             if let Some(preset) = &self.config.preset {
-                preset.last().unwrap().clone()
+                preset.join(".")
             } else {
                 "enigo".to_owned()
             }
@@ -304,7 +303,6 @@ mod ui_support {
             ui.add(egui::Label::new("🖱🖮").selectable(false));
         }
 
-
         fn ui_config(
             &mut self,
             ctx: &dyn UiNodeContext,
@@ -312,7 +310,7 @@ mod ui_support {
             scale: f32,
         ) -> UiConfigResponse {
             let _ = ctx;
-            
+
             let mut preset_modified = false;
             let mut non_preset_modified = false;
             let mut token_modified = false;
@@ -328,7 +326,7 @@ mod ui_support {
                     ui.menu_button(label, |ui| {
                         // Convert the pattern library to the menu tree.
                         type MenuType<'a>  = UiMenuNode::<String, &'a EnigoPreset>;
-                        type TreeType<'a>  = UiMenuTree::<String, &'a EnigoPreset>; 
+                        type TreeType<'a>  = UiMenuTree::<String, &'a EnigoPreset>;
                         let mut root = TreeType::new();
                         for pattern in self.presets.iter() {
                             let index_into = &pattern.index[0.. pattern.index.len() - 1];
