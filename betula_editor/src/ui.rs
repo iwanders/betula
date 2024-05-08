@@ -32,9 +32,18 @@ pub trait UiNodeContext {
 /// useful as it allows reusing the get_config and set_config methods as
 /// well as the ports function.
 pub trait UiNode: Node {
-    /// The title for this ui node.
+    /// The title that should be displayed for this node.
+    ///
+    /// If empty, the node type is shown.
     fn ui_title(&self) -> String {
         self.node_type().0.clone()
+    }
+
+    /// Function to render an icon for this node, usually shown in the title.
+    ///
+    /// Standard usage is an emoji.
+    fn ui_icon(&self, ui: &mut egui::Ui) {
+        let _ = ui;
     }
 
     /// The range of children this node may have.

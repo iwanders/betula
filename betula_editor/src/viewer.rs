@@ -330,7 +330,7 @@ impl NodeData {
 
     pub fn name(&self) -> String {
         if let Some(name) = self.name_remote.as_ref() {
-            format!("{name} {}", self.ui_node.ui_title())
+            format!("{name}")
         } else {
             self.ui_node.ui_title()
         }
@@ -2687,9 +2687,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref node) => {
                 if let Some(data) = node.data() {
+                    let r =
+                        r.on_hover_text(format!("type: {}", data.ui_node.node_type().0.as_str()));
                     if let Some(Err(e)) = &data.node_status {
                         r.on_hover_text(e);
                     }
+                    data.ui_node.ui_icon(ui);
                 }
             }
             _ => {}

@@ -293,8 +293,16 @@ mod ui_support {
 
     impl UiNode for EnigoNode {
         fn ui_title(&self) -> String {
-            "enigo 🖱🖮 ".to_owned()
+            if let Some(preset) = &self.config.preset {
+                preset.last().unwrap().clone()
+            } else {
+                "enigo".to_owned()
+            }
         }
+        fn ui_icon(&self, ui: &mut egui::Ui) {
+            ui.add(egui::Label::new("🖱🖮").selectable(false));
+        }
+
 
         fn ui_config(
             &mut self,

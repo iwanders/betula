@@ -87,7 +87,10 @@ pub mod ui_support {
 
     impl UiNode for DelayNode {
         fn ui_title(&self) -> String {
-            "delay ⏱".to_owned()
+            "delay".to_owned()
+        }
+        fn ui_icon(&self, ui: &mut egui::Ui) {
+            ui.add(egui::Label::new("⏱").selectable(false));
         }
 
         fn ui_config(
