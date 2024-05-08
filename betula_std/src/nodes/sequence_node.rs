@@ -116,8 +116,8 @@ pub mod ui_support {
                 let r = ui.checkbox(&mut self.config.memory, "Memory");
                 let r = r.on_hover_text("Check this to continue execution where the previous cycle returned, if false the node is reactive and resets each cycle");
                 modified |= r.changed();
-                let r = ui.checkbox(&mut self.config.retry, "Retry");
-                let r = r.on_hover_text("Whether to retry the node that failed in the previous execution, always running the sequence to completion.");
+                let r = ui.add_enabled(self.config.memory, egui::Checkbox::new(&mut self.config.retry, "Retry"));
+                let r = r.on_hover_text("Whether to retry the node that failed in the previous execution, always running the sequence to completion. Requires memory.");
                 modified |= r.changed();
             });
 
