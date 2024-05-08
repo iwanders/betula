@@ -1094,6 +1094,9 @@ pub struct BetulaViewer {
 
     /// The current directory that's used for nodes.
     directory: Option<PathBuf>,
+
+    /// The current selection
+    selection: std::collections::HashSet<SnarlNodeId>,
 }
 
 impl BetulaViewer {
@@ -1121,6 +1124,7 @@ impl BetulaViewer {
             blackboard_snarl_map: Default::default(),
             color_node_status: true,
             directory: None,
+            selection: Default::default(),
         }
     }
 
@@ -2712,17 +2716,39 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         if !self.color_node_status {
             return None;
         }
+        let selection_width_multiplier = if self.selection.contains(&id) {
+            Some(2.0)
+        } else {
+            None
+        };
         match &snarl[id] {
             BetulaViewerNode::Node(ref node) => {
                 let data = node.data()?;
                 let node_status = data.node_status.as_ref();
                 if let Some(new_color) = color_edge_status(current.color, node_status) {
-                    Some(egui::Stroke::from((current.width + 0.5, new_color)))
+                    Some(egui::Stroke::from((
+                        (current.width * selection_width_multiplier.unwrap_or(1.0) + 0.5),
+                        new_color,
+                    )))
+                } else {
+                    if let Some(selection_width_multiplier) = selection_width_multiplier {
+                        let mut new_stroke = *current;
+                        new_stroke.width *= selection_width_multiplier;
+                        Some(new_stroke)
+                    } else {
+                        None
+                    }
+                }
+            }
+            BetulaViewerNode::Blackboard(_) => {
+                if let Some(width_multiplier) = selection_width_multiplier {
+                    let mut new_stroke = *current;
+                    new_stroke.width *= width_multiplier;
+                    Some(new_stroke)
                 } else {
                     None
                 }
             }
-            BetulaViewerNode::Blackboard(_) => None,
         }
     }
 
@@ -2734,6 +2760,35 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
     ) -> Option<Color32> {
         let _ = (id, current, snarl);
         None
+    }
+
+    fn selection_pending(
+        &mut self,
+        ids: &[SnarlNodeId],
+        modifiers: &egui::Modifiers,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        let _ = (ids, modifiers, snarl);
+        self.selection = ids.iter().copied().collect();
+    }
+
+    /// Called when a node is moved, to facilitate moving the selection.
+    fn node_moved(
+        &mut self,
+        id: SnarlNodeId,
+        delta: egui::Vec2,
+        new_pos: egui::Pos2,
+        snarl: &mut Snarl<BetulaViewerNode>,
+    ) {
+        let _ = new_pos;
+        if self.selection.contains(&id) {
+            // Move the entire selection.
+            for (iter_id, pos, _node) in snarl.nodes_pos_ids_mut() {
+                if self.selection.contains(&iter_id) && id != iter_id {
+                    *pos += delta;
+                }
+            }
+        }
     }
 }
 
