@@ -2692,7 +2692,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     if let Some(Err(e)) = &data.node_status {
                         r.on_hover_text(e);
                     }
-                    data.ui_node.ui_icon(ui);
+                    data.ui_node
+                        .ui_icon(ui, egui::vec2(14.0 * scale, 14.0 * scale));
                 }
             }
             _ => {}

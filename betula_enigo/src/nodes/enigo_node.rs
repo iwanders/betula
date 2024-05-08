@@ -299,7 +299,8 @@ mod ui_support {
                 "enigo".to_owned()
             }
         }
-        fn ui_icon(&self, ui: &mut egui::Ui) {
+        fn ui_icon(&self, ui: &mut egui::Ui, desired_size: egui::Vec2) {
+            let _ = desired_size;
             ui.add(egui::Label::new("🖱🖮").selectable(false));
         }
 

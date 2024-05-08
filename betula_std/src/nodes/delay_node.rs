@@ -89,7 +89,8 @@ pub mod ui_support {
         fn ui_title(&self) -> String {
             "delay".to_owned()
         }
-        fn ui_icon(&self, ui: &mut egui::Ui) {
+        fn ui_icon(&self, ui: &mut egui::Ui, desired_size: egui::Vec2) {
+            let _ = desired_size;
             ui.add(egui::Label::new("⏱").selectable(false));
         }
 

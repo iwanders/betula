@@ -41,9 +41,9 @@ pub trait UiNode: Node {
 
     /// Function to render an icon for this node, usually shown in the title.
     ///
-    /// Standard usage is an emoji.
-    fn ui_icon(&self, ui: &mut egui::Ui) {
-        let _ = ui;
+    /// Standard usage is an emoji, the icon should fit inside the desired size, which is square.
+    fn ui_icon(&self, ui: &mut egui::Ui, desired_size: egui::Vec2) {
+        let _ = (ui, desired_size);
     }
 
     /// The range of children this node may have.

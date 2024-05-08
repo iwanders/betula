@@ -57,11 +57,25 @@ impl Node for EnigoCursorNode {
 #[cfg(feature = "betula_editor")]
 mod ui_support {
     use super::*;
-    use betula_editor::{UiNode, UiNodeCategory};
+    use betula_editor::{egui, UiNode, UiNodeCategory};
 
     impl UiNode for EnigoCursorNode {
         fn ui_title(&self) -> String {
-            "enigo cursor 🖱 ".to_owned()
+            "cursor".to_owned()
+        }
+
+        fn ui_icon(&self, ui: &mut egui::Ui, desired_size: egui::Vec2) {
+            let visuals = ui.style().noninteractive();
+            let svg_paths = betula_editor::widgets::SVGPaths{
+                viewbox: egui::vec2(130.0, 130.0), // was 100, this adds some whitespace.
+                transform: egui::vec2(20.0, -167.0), // was 0.0, -197.0
+                paths: vec![
+                    "m 43.666015,289.96634 -20.433078,-35.39113 -22.68307393,22.68307 -2.75e-6,-79.5916 68.92834368,39.79581 -30.985656,8.30258 20.433077,35.39113 z".to_owned(),
+                ],
+                fill: egui::Color32::TRANSPARENT,
+                stroke: visuals.fg_stroke,
+            };
+            ui.add(svg_paths.to_widget(desired_size));
         }
 
         fn ui_category() -> Vec<UiNodeCategory> {

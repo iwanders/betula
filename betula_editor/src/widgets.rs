@@ -7,6 +7,12 @@ pub struct SVGPaths {
     pub transform: Vec2,
     /// SVG path strings.
     pub paths: Vec<String>,
+
+    /// The fill the shape, this only works for convex polygons.
+    pub fill: Color32,
+
+    /// Whether to apply a stroke to the polygon.
+    pub stroke: Stroke,
 }
 
 impl SVGPaths {
@@ -119,7 +125,6 @@ impl SVGPaths {
             let (response, painter) = ui.allocate_painter(desired_size, egui::Sense::hover());
             let response_rect = response.rect;
             if ui.is_rect_visible(response_rect) {
-                let visuals = ui.style().noninteractive();
                 // let rect = response_rect.expand(visuals.expansion);
 
                 for points in shapes {
@@ -131,8 +136,8 @@ impl SVGPaths {
                             .map(|v| v + response_rect.min.to_vec2())
                             .collect(),
                         closed: true,
-                        fill: visuals.fg_stroke.color,
-                        stroke: Stroke::NONE,
+                        fill: self.fill,
+                        stroke: self.stroke,
                     };
                     painter.add(shape);
                 }
@@ -194,6 +199,8 @@ impl SVGPaths {
             viewbox: self.viewbox * scale,
             transform: Default::default(),
             paths,
+            fill: Color32::TRANSPARENT,
+            stroke: Default::default(),
         };
 
         std::fs::write(path, rasterized_path.to_svg()?).expect("Unable to write file");
@@ -245,6 +252,21 @@ mod test {
         svg_paths.write_svg(&std::path::PathBuf::from("/tmp/test_svg_widget.svg"))?;
         svg_paths.write_svg_rasterized(
             &std::path::PathBuf::from("/tmp/test_svg_widget_rasterized.svg"),
+            desired_size,
+        )?;
+
+        let svg_paths = SVGPaths{
+            viewbox: egui::vec2(100.0, 100.0),
+            transform: egui::vec2(0.0, -197.0),
+            paths: vec![
+                "m 43.666015,289.96634 -20.433078,-35.39113 -22.68307393,22.68307 -2.75e-6,-79.5916 68.92834368,39.79581 -30.985656,8.30258 20.433077,35.39113 z".to_owned(),
+            ],
+        };
+        let desired_size = egui::vec2(10.0, 10.0);
+        let _ = svg_paths.to_widget(desired_size);
+        svg_paths.write_svg(&std::path::PathBuf::from("/tmp/test_svg_cursor.svg"))?;
+        svg_paths.write_svg_rasterized(
+            &std::path::PathBuf::from("/tmp/test_svg_cursor_rasterized.svg"),
             desired_size,
         )?;
 
