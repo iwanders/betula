@@ -2,8 +2,7 @@ use betula_core::node_prelude::*;
 
 /// Node that writes the child's execution status to a blackboard.
 ///
-/// One output port `status`, of type [`ExecutionStatus`], which is time in seconds since
-/// the unix epoch.
+/// One output port `status`, of type [`ExecutionStatus`], which is the status of the child node.
 #[derive(Debug, Default)]
 pub struct StatusWriteNode {
     status_output: Output<ExecutionStatus>,

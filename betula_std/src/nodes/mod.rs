@@ -25,6 +25,8 @@ pub use retry_node::{RetryNode, RetryNodeConfig};
 
 mod status_write_node;
 pub use status_write_node::StatusWriteNode;
+mod status_read_node;
+pub use status_read_node::StatusReadNode;
 
 #[cfg(feature = "betula_editor")]
 pub use time_node::ui_support;

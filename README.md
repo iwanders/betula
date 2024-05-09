@@ -49,9 +49,13 @@ be multiple `json` files in the root of this directory, reusing assets in the pr
 A collection of standard nodes, that don't have any additional dependencies.
 
 #### Nodes
+Provider:
   - `TimeNode`: Write the unix time to a blackboard as `f64`.
+  - `StatusWriteNode`: Writes the execution status of the child node to the blackboard.
+
+Conditional:
   - `DelayNode`: Delays execution of the child node with the specified interval.
-  - `RetryNode`: Retries a node up to a specified time limit, turning failure into success while the time limit is not reached.
+  - `StatusReadNode`: Reads an execution status off the blackboard and returns this, regardless of the optional child's status.
 
 Control:
   - `ParallelNode`: A node that executes all children and determines status based on their return.
@@ -62,6 +66,7 @@ Decorators:
   - `SuccessNode`: Always returns `Success`, may be a decorator.
   - `RunningNode`: Always returns `Running`, may be a decorator.
   - `FailureNode`: Always returns `Failure`, may be a decorator.
+  - `RetryNode`: Retries a node up to a specified time limit, turning failure into success while the time limit is not reached.
 
 
 ## betula_enigo
