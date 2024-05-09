@@ -11,9 +11,9 @@ Overview of the crates in this workspace. Crates with nodes provide the `UiNode`
 
 Nodes are categorised into:
 - Action: Nodes that perform an action: Pressing a key.
-- Conditionals: Make a decision, usually based on a blackboard value and optionally internal state, often used as decorator: Checking if a window is focussed, retry for up to a time limit.
+- Conditionals: Make a decision, usually based on a blackboard value and optionally internal state, often used as decorator: Checking if a window is focussed, add delay between executions.
 - Control: Nodes that merely affect control flow: Selector node.
-- Decorators: Pure decorators without inputs: Always make the subtree return success.
+- Decorators: Decorators: Nodes that must be used as a decorator: Change return value, retry up to a duration.
 - Providers: Provides blackboard value: Clock, screen capture, etc.
 
 ## betula_core

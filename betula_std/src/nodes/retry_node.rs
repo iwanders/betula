@@ -130,7 +130,7 @@ pub mod ui_support {
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("conditional".to_owned()),
+                UiNodeCategory::Folder("decorator".to_owned()),
                 // UiNodeCategory::Group("time".to_owned()),
                 UiNodeCategory::Name("retry".to_owned()),
             ]
