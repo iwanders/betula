@@ -16,11 +16,12 @@ pub use running_node::RunningNode;
 mod time_node;
 pub use time_node::TimeNode;
 mod delay_node;
-pub use delay_node::DelayNode;
-pub use delay_node::DelayNodeConfig;
+pub use delay_node::{DelayNode, DelayNodeConfig};
 mod parallel_node;
-pub use parallel_node::ParallelNode;
-pub use parallel_node::ParallelNodeConfig;
+pub use parallel_node::{ParallelNode, ParallelNodeConfig};
+
+mod retry_node;
+pub use retry_node::{RetryNode, RetryNodeConfig};
 
 #[cfg(feature = "betula_editor")]
 pub use time_node::ui_support;

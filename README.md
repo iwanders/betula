@@ -11,7 +11,7 @@ Overview of the crates in this workspace. Crates with nodes provide the `UiNode`
 
 Nodes are categorised into:
 - Action: Nodes that perform an action: Pressing a key.
-- Conditionals: Make a decision, usually based on a blackboard value, can be used as decorator: Checking if a window is focussed.
+- Conditionals: Make a decision, usually based on a blackboard value and optionally internal state, often used as decorator: Checking if a window is focussed, retry for up to a time limit.
 - Control: Nodes that merely affect control flow: Selector node.
 - Decorators: Pure decorators without inputs: Always make the subtree return success.
 - Providers: Provides blackboard value: Clock, screen capture, etc.
@@ -37,6 +37,7 @@ A gui built on [egui](https://github.com/emilk/egui).
 - `Editor`, an `eframe::App` that can be instantiated.
 - `UiNode` implementation for `betula_common` and `betula_core`.
 - Also provides ui support for the nodes from `betula_core`.
+- Shift+drag to (de)select nodes, selected nodes can be moved together.
 
 Nodes' directory is set to the directory in which the current tree file resides. This is considered the `PROJECT` directory, there can of course
 be multiple `json` files in the root of this directory, reusing assets in the project directory.

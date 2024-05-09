@@ -80,3 +80,46 @@ pub fn menu_node_recurser<K: UiMenuEntry, T: Clone>(
 
     None
 }
+
+pub fn time_drag_value(ui: &mut egui::Ui, value: &mut f64) -> egui::Response {
+    let speed = if *value < 1.0 {
+        0.001
+    } else if *value < 10.0 {
+        0.01
+    } else {
+        0.1
+    };
+
+    ui.add(
+        egui::DragValue::new(value)
+            .clamp_range(0.0f64..=(24.0 * 60.0 * 60.0))
+            .speed(speed)
+            .custom_formatter(|v, _| {
+                if v < 10.0 {
+                    format!("{:.0} ms", v * 1000.0)
+                } else if v < 60.0 {
+                    format!("{:.3} s", v)
+                } else {
+                    format!("{:.0} s", v)
+                }
+            })
+            .custom_parser(|s| {
+                let parts: Vec<&str> = s.split(' ').collect();
+                let value = parts[0].parse::<f64>().ok()?;
+                if let Some(scale) = parts.get(1) {
+                    if *scale == "ms" {
+                        Some(value * 0.001)
+                    } else if *scale == "s" {
+                        Some(value)
+                    } else if *scale == "m" {
+                        Some(value * 60.0)
+                    } else {
+                        None
+                    }
+                } else {
+                    Some(value)
+                }
+            })
+            .update_while_editing(false),
+    )
+}

@@ -16,5 +16,5 @@ pub fn betula_icon() -> egui::IconData {
 pub mod widgets;
 pub use egui;
 
-mod egui_util;
+pub mod egui_util;
 pub use egui_util::{menu_node_recurser, UiMenuEntry, UiMenuNode, UiMenuTree};
