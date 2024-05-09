@@ -61,6 +61,7 @@ Control:
   - `ParallelNode`: A node that executes all children and determines status based on their return.
   - `SelectorNode`: Executes in order, returns first non-`Failure`, may resume from previous cycle.
   - `SequenceNode`: Executes in order, returns first non-`Success`, may resume from the previous cycle, may retry failed nodes.
+  - `IfThenElseNode`: Runs the first child to decide whether to run the second (or optional third).
 
 Decorators:
   - `SuccessNode`: Always returns `Success`, may be a decorator.

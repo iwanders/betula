@@ -15,6 +15,7 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_node_default::<nodes::TimeNode>();
     ui_support.add_node_default::<nodes::StatusWriteNode>();
     ui_support.add_node_default::<nodes::StatusReadNode>();
+    ui_support.add_node_default::<nodes::IfThenElseNode>();
     ui_support.add_value_default::<f64>();
     ui_support.add_value_default_named::<betula_core::ExecutionStatus>("status");
 }

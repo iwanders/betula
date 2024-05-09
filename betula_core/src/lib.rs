@@ -52,6 +52,11 @@ On blackboards:
         If multiple trees share the same blackboard, we can always add a
         execution counter value on the blackboard, nodes that want to execute
         each cycle can use the counter as an input, and be guaranteed execution.
+
+    There's no way to reset a sequence if we stop executing it such that it starts from the beginning
+    again. Need to think a bit about this, is this a problem, if so how do we solve it elegantly?
+        - Let nodes return whether to reset their children?
+        - Always reset children if success or failure is returned? (do not reset on running?)
 */
 
 pub mod basic;
