@@ -35,7 +35,7 @@ impl Node for TimeNode {
     }
 
     fn static_type() -> NodeType {
-        "common_time".into()
+        "std_time".into()
     }
 
     fn node_type(&self) -> NodeType {

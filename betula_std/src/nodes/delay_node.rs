@@ -72,7 +72,7 @@ impl Node for DelayNode {
     }
 
     fn static_type() -> NodeType {
-        "common_delay".into()
+        "std_delay".into()
     }
 
     fn node_type(&self) -> NodeType {

@@ -66,7 +66,7 @@ impl Node for ParallelNode {
         self.config.load_node_config(config)
     }
     fn static_type() -> NodeType {
-        "common_parallel".into()
+        "parallel".into()
     }
 
     fn node_type(&self) -> NodeType {
