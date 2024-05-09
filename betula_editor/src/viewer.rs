@@ -225,6 +225,9 @@ impl NodeData {
                 self.children_local.push(None);
             }
         }
+        while self.children_local.len() < allowed.start {
+            self.children_local.push(None);
+        }
         // need to drop entries from the rear if there's two none's
         if self.children_local.len() > allowed.start && self.children_local.len() > 2 {
             let last = self.children_local[self.children_local.len() - 1];
