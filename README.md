@@ -98,10 +98,10 @@ contains two actions, an absolute mouse move to `950,450`, followed by a left mo
 The actions are a list of [enigo::Token](https://docs.rs/enigo/latest/enigo/agent/enum.Token.html) entries.
 
 ## betula_wm
-Pertains itself to information obtained from the window manager.
+Pertains itself to information obtained from the window manager, contains the `betula_wm` example which can be used to
+retrieve the binary based on the current focus.
 
   - `WindowFocusNode`: Returns `Success` if the regex matches the binary that created the window that has focus.
-  - `CursorPositionNode`: Provides the cursor position.
 
 ## betula_hotkey
 Facilitates detecting hotkeys (without the editor being focussed).
