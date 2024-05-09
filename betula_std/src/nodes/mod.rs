@@ -23,5 +23,8 @@ pub use parallel_node::{ParallelNode, ParallelNodeConfig};
 mod retry_node;
 pub use retry_node::{RetryNode, RetryNodeConfig};
 
+mod status_write_node;
+pub use status_write_node::StatusWriteNode;
+
 #[cfg(feature = "betula_editor")]
 pub use time_node::ui_support;
