@@ -51,11 +51,12 @@ A collection of standard nodes, that don't have any additional dependencies.
 #### Nodes
   - `TimeNode`: Write the unix time to a blackboard as `f64`.
   - `DelayNode`: Delays execution of the child node with the specified interval.
+  - `RetryNode`: Retries a node up to a specified time limit, turning failure into success while the time limit is not reached.
 
 Control:
   - `ParallelNode`: A node that executes all children and determines status based on their return.
-  - `SelectorNode`: Executes in order, returns first non-`Failure`.
-  - `SequenceNode`: Executes in order, returns first non-`Success`.
+  - `SelectorNode`: Executes in order, returns first non-`Failure`, may resume from previous cycle.
+  - `SequenceNode`: Executes in order, returns first non-`Success`, may resume from the previous cycle, may retry failed nodes.
 
 Decorators:
   - `SuccessNode`: Always returns `Success`, may be a decorator.
