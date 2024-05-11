@@ -323,6 +323,9 @@ pub trait Blackboard:
     /// Get the value for the provided port name.
     fn get(&self, port: &PortName) -> Option<Value>;
 
+    /// Remove a port from the blackboard.
+    fn remove(&mut self, port: &PortName) -> Option<Value>;
+
     /// Set a value to the provided port name.
     ///
     /// Returns `Err` if the type that already exists on the blackboard is different

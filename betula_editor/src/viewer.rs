@@ -528,6 +528,7 @@ pub struct BlackboardData {
     name_local: Option<String>,
 
     should_remove: bool,
+    should_prune: Option<Vec<PortName>>,
 }
 impl BlackboardData {
     /// Return whether local and remote are identical.
@@ -573,7 +574,14 @@ impl BlackboardData {
         ui_support: &UiSupport,
         port_values: SerializedBlackboardValues,
     ) -> Result<(), BetulaError> {
-        // self.ui_values = values;
+        // remove any values that don't exist anymore.
+        let still_present: std::collections::HashSet<_> = port_values.keys().cloned().collect();
+        let previously_present: std::collections::HashSet<_> =
+            self.ui_values.keys().cloned().collect();
+        for to_remove in previously_present.difference(&still_present) {
+            self.ui_values.remove(to_remove);
+        }
+        // Then update the values.
         for (port, value) in port_values {
             if let Some(existing) = self.ui_values.get_mut(&port) {
                 // Deserialize the value.
@@ -589,7 +597,6 @@ impl BlackboardData {
                     .insert(port.clone(), ui_support.create_ui_value(value)?);
             }
         }
-        // ui_support.create_ui_value(value);
         Ok(())
     }
     /// Return the list of port names.
@@ -658,6 +665,15 @@ impl BlackboardData {
 
     pub fn is_disconnected(&self) -> bool {
         self.connections_local.is_empty() && self.connections_remote.is_empty()
+    }
+
+    pub fn prunable_ports(&self) -> Vec<PortName> {
+        let mut all_portnames: std::collections::HashSet<&PortName> =
+            self.ui_values.keys().collect();
+        for connection in self.connections_remote.iter() {
+            all_portnames.remove(&connection.blackboard.name());
+        }
+        all_portnames.iter().map(|z| (*z).clone()).collect()
     }
 }
 
@@ -967,6 +983,23 @@ impl ViewerBlackboard {
             {
                 data.should_remove = true;
                 ui.close_menu();
+            }
+
+            let prunable = data.prunable_ports();
+            let prune_str = format!(
+                "Prune: {}",
+                prunable
+                    .iter()
+                    .map(|z| z.as_ref())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            if ui
+                .add_enabled(!prunable.is_empty(), egui::Button::new("Prune"))
+                .on_hover_text(prune_str)
+                .clicked()
+            {
+                data.should_prune = Some(prunable.iter().cloned().collect());
             }
         });
 
@@ -1629,6 +1662,10 @@ impl BetulaViewer {
                 self.client.send_command(cmd)?;
                 blackboard.should_remove = false;
             }
+            if let Some(v) = blackboard.should_prune.take() {
+                let cmd = InteractionCommand::remove_blackboard_ports(blackboard.id, &v);
+                self.client.send_command(cmd)?;
+            }
         }
 
         if self.tree_roots_remote != self.tree_roots_local {
@@ -1918,6 +1955,7 @@ impl BetulaViewer {
                 name_remote: v.name,
                 name_local: None,
                 should_remove: false,
+                should_prune: None,
             }));
             let cloned_rc = Rc::clone(&rc);
             self.blackboards.insert(v.id, cloned_rc);

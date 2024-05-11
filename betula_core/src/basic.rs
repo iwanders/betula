@@ -669,6 +669,10 @@ impl Blackboard for BasicBlackboard {
 
         Ok(())
     }
+
+    fn remove(&mut self, port: &PortName) -> Option<Value> {
+        self.values.remove(port).map(|x| x.1.borrow().clone_boxed())
+    }
 }
 
 #[cfg(test)]

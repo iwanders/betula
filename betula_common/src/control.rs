@@ -1,5 +1,5 @@
 use betula_core::{
-    blackboard::{BlackboardId, PortConnection},
+    blackboard::{BlackboardId, PortConnection, PortName},
     BetulaError, ExecutionStatus, NodeId, NodeType,
 };
 
@@ -126,6 +126,9 @@ pub enum InteractionCommand {
     /// Remove a blackboard
     RemoveBlackboard(BlackboardId),
 
+    /// Remove values from a blackboard
+    RemoveBlackboardPorts(BlackboardId, Vec<PortName>),
+
     /// Name a blackboard.
     SetBlackboardName(BlackboardId, Option<String>),
 
@@ -182,6 +185,10 @@ impl InteractionCommand {
 
     pub fn remove_blackboard(id: BlackboardId) -> Self {
         InteractionCommand::RemoveBlackboard(id)
+    }
+
+    pub fn remove_blackboard_ports(id: BlackboardId, ports: &[PortName]) -> Self {
+        InteractionCommand::RemoveBlackboardPorts(id, ports.to_vec())
     }
 
     pub fn remove_node(id: NodeId) -> Self {
@@ -389,6 +396,25 @@ impl InteractionCommand {
                     command: self.clone(),
                     error: None,
                 })])
+            }
+            InteractionCommand::RemoveBlackboardPorts(blackboard_id, ports) => {
+                let bb = tree
+                    .blackboard_mut(*blackboard_id)
+                    .ok_or(format!("cannot find blackboard {blackboard_id:?}"))?;
+                for port in ports {
+                    bb.remove(port);
+                }
+                Ok(vec![
+                    InteractionEvent::CommandResult(CommandResult {
+                        command: self.clone(),
+                        error: None,
+                    }),
+                    InteractionEvent::BlackboardInformation(Self::blackboard_information(
+                        tree_support,
+                        *blackboard_id,
+                        tree,
+                    )?),
+                ])
             }
             InteractionCommand::PortDisconnectConnect(port_changes) => {
                 let mut involved_blackboards: std::collections::HashSet<BlackboardId> =
