@@ -124,6 +124,14 @@ pub trait RunContext {
 
     /// Reset a child's branch.
     fn reset_recursive(&self, index: usize) -> Result<(), NodeError>;
+
+    /// Reset all children associated to this context.
+    fn reset_children(&self) -> Result<(), NodeError> {
+        for i in 0..self.children() {
+            self.reset_recursive(i)?;
+        }
+        Ok(())
+    }
 }
 
 /// The context through which nodes are reset.

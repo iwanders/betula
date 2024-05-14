@@ -28,9 +28,7 @@ impl Node for IfThenElseNode {
             ExecutionStatus::Running => Ok(ExecutionStatus::Running),
         }?;
         if r != ExecutionStatus::Running {
-            for i in 0..ctx.children() {
-                ctx.reset_recursive(i)?;
-            }
+            ctx.reset_children()?;
         }
         Ok(r)
     }

@@ -68,9 +68,7 @@ impl Node for SelectorNode {
         }
 
         // Reached here, all children must've failed, reset them and return failure.
-        for i in 0..ctx.children() {
-            ctx.reset_recursive(i)?;
-        }
+        ctx.reset_children()?;
 
         Ok(ExecutionStatus::Failure)
     }

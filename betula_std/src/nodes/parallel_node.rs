@@ -50,9 +50,11 @@ impl Node for ParallelNode {
         let failure_threshold = n.saturating_sub(self.config.success_threshold);
         if success_count >= self.config.success_threshold {
             // Required success criteria met.
+            ctx.reset_children()?;
             Ok(ExecutionStatus::Success)
         } else if failure_count > failure_threshold {
             // Can no longer return success.
+            ctx.reset_children()?;
             Ok(ExecutionStatus::Failure)
         } else {
             // Still undecided

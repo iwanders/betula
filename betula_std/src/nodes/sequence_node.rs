@@ -81,9 +81,7 @@ impl Node for SequenceNode {
         }
 
         // All children succeeded, sequence completes, reset all children.
-        for i in 0..ctx.children() {
-            ctx.reset_recursive(i)?;
-        }
+        ctx.reset_children()?;
         Ok(ExecutionStatus::Success)
     }
 
