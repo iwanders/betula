@@ -30,6 +30,8 @@ impl ParallelNode {
 
 impl Node for ParallelNode {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+        // Should this node have state and only continue executing nodes that have not yet returned
+        // success or failure?
         let mut success_count = 0;
         let mut failure_count = 0;
         let n = ctx.children();
