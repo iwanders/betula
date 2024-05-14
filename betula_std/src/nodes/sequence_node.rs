@@ -7,13 +7,13 @@ pub struct SequenceNodeConfig {
     /// Whether to keep memory between cycles and continue from the previous state.
     ///
     /// Default is off, which makes it a reactive node; each cycle all nodes are executed from the
-    /// start.
+    /// start. Memory false is a reactive sequence, memory true is a normal sequence.
     pub memory: bool,
 
     /// Whether to retry the node that failed in the previous execution.
     ///
     /// This means the sequence will always be executed in order and failing nodes will be retried
-    /// until they succeed and the entire sequence succeeds.
+    /// until they succeed and the entire sequence succeeds. Sometimes called Sequence with Memory.
     pub retry: bool,
 }
 impl IsNodeConfig for SequenceNodeConfig {}
@@ -31,9 +31,11 @@ pub struct SequenceNode {
 }
 impl Node for SequenceNode {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+        // Wrap around to reset, this also accounts for child changes while we have state.
         if self.current_position >= ctx.children() {
             self.current_position = 0;
         }
+        // Retrieve the current index based on whether or not we have memory.
         let previous = if self.config.memory {
             self.current_position
         } else {
@@ -51,27 +53,37 @@ impl Node for SequenceNode {
                     // Advance the sequence up to this point.
                     // println!("current_position: {id}");
                     self.current_position = id + 1;
-                    // We stop executing this branch, so reset it.
+                    // We stop executing this previous branch, so reset it.
                     ctx.reset_recursive(id)?;
                 }
                 ExecutionStatus::Failure => {
                     // Reset the sequence if we are not using retry.
                     if !self.config.retry {
                         self.current_position = 0;
+                        for i in 0..=id {
+                            // We failed, and we're not retrying, so reset all children up to this point.
+                            ctx.reset_recursive(i)?;
+                        }
                     }
-                    // We failed executing this branch so reset it.
-                    ctx.reset_recursive(id)?;
                     // println!("current_position: 0");
                     return Ok(ExecutionStatus::Failure);
                 }
                 ExecutionStatus::Running => {
+                    if !self.config.memory {
+                        // Precursors already got reset in success call, so only need to reset the
+                        // current one here.
+                        ctx.reset_recursive(id)?;
+                    }
                     // No action, next cycle we would run this again.
                     return Ok(ExecutionStatus::Running);
                 }
             }
         }
 
-        // All children succeeded.
+        // All children succeeded, sequence completes, reset all children.
+        for i in 0..ctx.children() {
+            ctx.reset_recursive(i)?;
+        }
         Ok(ExecutionStatus::Success)
     }
 
