@@ -29,6 +29,10 @@ impl RunContext for TrackedTreeContext<'_, '_> {
         }
         Ok(v?)
     }
+    fn reset_recursive(&self, index: usize) -> Result<(), NodeError> {
+        let ids = self.tree.children(self.this_node)?;
+        self.tree.reset_recursive(ids[index])
+    }
 }
 
 /// Execute a node on a tree and track all node execution status.

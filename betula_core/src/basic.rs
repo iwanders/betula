@@ -22,6 +22,23 @@ impl RunContext for TreeContext<'_> {
         let ids = self.tree.children(self.this_node)?;
         self.tree.execute(ids[index])
     }
+    fn reset_recursive(&self, index: usize) -> Result<(), NodeError> {
+        let ids = self.tree.children(self.this_node)?;
+        self.tree.reset_recursive(ids[index])
+    }
+}
+
+impl ResetContext for TreeContext<'_> {
+    fn children(&self) -> usize {
+        self.tree
+            .children(self.this_node)
+            .expect("node must exist in tree")
+            .len()
+    }
+    fn reset_recursive(&self, index: usize) -> Result<(), NodeError> {
+        let ids = self.tree.children(self.this_node)?;
+        self.tree.reset_recursive(ids[index])
+    }
 }
 
 use std::cell::RefCell;
@@ -375,6 +392,21 @@ impl Tree for BasicTree {
         };
 
         n.execute(&mut context)
+    }
+
+    fn reset_recursive(&self, id: NodeId) -> Result<(), NodeError> {
+        let mut n = self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
+            .node
+            .try_borrow_mut()?;
+        let mut context = TreeContext {
+            this_node: id,
+            tree: &self,
+        };
+
+        n.reset_recursive(&mut context)
     }
 
     fn blackboards(&self) -> Vec<BlackboardId> {

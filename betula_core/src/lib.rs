@@ -66,7 +66,8 @@ pub mod blackboard;
 pub mod prelude {
     pub use crate::{
         blackboard::BlackboardInputInterface, blackboard::BlackboardOutputInterface,
-        blackboard::SetupInput, blackboard::SetupOutput, NodeConfigLoad, RunContext, Tree,
+        blackboard::SetupInput, blackboard::SetupOutput, NodeConfigLoad, ResetContext, RunContext,
+        Tree,
     };
 }
 
@@ -120,6 +121,23 @@ pub trait RunContext {
 
     /// Run a child node.
     fn run(&self, index: usize) -> Result<ExecutionStatus, NodeError>;
+
+    /// Reset a child's branch.
+    fn reset_recursive(&self, index: usize) -> Result<(), NodeError>;
+}
+
+/// The context through which nodes are reset.
+///
+/// Nodes don't have access to the children directly, this allows for
+/// reusing the exact same node in multiple places in the tree. It also
+/// allows the tree itself to decide whether or not to re-evaluate a node
+/// or return the previous result in case it cannot have changed.
+pub trait ResetContext {
+    /// Get the number of immediate children.
+    fn children(&self) -> usize;
+
+    /// Reset a child node.
+    fn reset_recursive(&self, index: usize) -> Result<(), NodeError>;
 }
 
 /// The error type.
@@ -258,6 +276,17 @@ pub trait Node: std::fmt::Debug + AsAny {
         Ok(())
     }
 
+    /// Recursive reset, resets this node and all children.
+    ///
+    /// Can be overwritten to do custom behaviour or ignore resets.
+    fn reset_recursive(&mut self, ctx: &dyn ResetContext) -> Result<(), NodeError> {
+        self.reset();
+        for z in 0..ctx.children() {
+            ctx.reset_recursive(z)?;
+        }
+        Ok(())
+    }
+
     /// The human readable type of this node, must guarantee:
     /// ```ignore
     /// fn node_type(&self) -> NodeType {
@@ -350,6 +379,9 @@ pub trait Tree: std::fmt::Debug + AsAny {
 
     /// Execute a particular node, starting at the provided node.
     fn execute(&self, id: NodeId) -> Result<ExecutionStatus, NodeError>;
+
+    /// Reset a node and all its children
+    fn reset_recursive(&self, id: NodeId) -> Result<(), NodeError>;
 
     /// Set the name of a node.
     fn set_node_name(&mut self, id: NodeId, name: Option<&str>) -> Result<(), BetulaError>;
