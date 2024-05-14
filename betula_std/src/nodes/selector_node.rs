@@ -6,7 +6,7 @@ pub struct SelectorNodeConfig {
     /// Whether to keep memory between cycles and continue from the previous state.
     ///
     /// Default is off, which makes it a reactive node; each cycle all nodes are executed from the
-    /// start.
+    /// start. Memory false is reactive, memory true is normal selector/fallback.
     pub memory: bool,
 }
 impl IsNodeConfig for SelectorNodeConfig {}
@@ -32,33 +32,46 @@ impl Node for SelectorNode {
         } else {
             0
         };
-        println!("Previous: {previous}");
+        // println!("Previous: {previous}");
 
         for id in 0..ctx.children() {
             if id < previous {
-                println!("Skipping as {id} < {previous}");
+                // println!("Skipping as {id} < {previous}");
                 continue; // done in a prior cycle.
             }
             match ctx.run(id)? {
                 ExecutionStatus::Failure => {
                     // Advance the sequence up to this point.
-                    println!("current_position: {id}");
+                    // println!("current_position: {id}");
                     self.current_position = id + 1;
+                    ctx.reset_recursive(id)?;
                 }
                 ExecutionStatus::Success => {
-                    // Reset the sequence.
+                    // Reset the sequence, resetting all previous children.
                     self.current_position = 0;
-                    println!("current_position: 0");
+                    for i in 0..=id {
+                        ctx.reset_recursive(i)?;
+                    }
+                    // println!("current_position: 0");
                     return Ok(ExecutionStatus::Success);
                 }
                 ExecutionStatus::Running => {
+                    if !self.config.memory {
+                        // Precursors already got reset in failure call, so only need to reset the
+                        // current one here.
+                        ctx.reset_recursive(id)?;
+                    }
                     // No action, next cycle we would run this again.
                     return Ok(ExecutionStatus::Running);
                 }
             }
         }
 
-        // Reached here, all children must've failed.
+        // Reached here, all children must've failed, reset them and return failure.
+        for i in 0..ctx.children() {
+            ctx.reset_recursive(i)?;
+        }
+
         Ok(ExecutionStatus::Failure)
     }
 
