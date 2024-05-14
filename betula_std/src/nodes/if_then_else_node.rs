@@ -16,7 +16,7 @@ impl Node for IfThenElseNode {
             return Err("IfThenElseNode must have two or three child nodes".into());
         }
 
-        match ctx.run(0)? {
+        let r = match ctx.run(0)? {
             ExecutionStatus::Success => ctx.run(1),
             ExecutionStatus::Failure => {
                 if ctx.children() == 3 {
@@ -26,7 +26,13 @@ impl Node for IfThenElseNode {
                 }
             }
             ExecutionStatus::Running => Ok(ExecutionStatus::Running),
+        }?;
+        if r != ExecutionStatus::Running {
+            for i in 0..ctx.children() {
+                ctx.reset_recursive(i)?;
+            }
         }
+        Ok(r)
     }
 
     fn static_type() -> NodeType {
