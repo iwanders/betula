@@ -147,7 +147,7 @@ The `image_pattern` example can be used to create patterns quickly, (multiple) s
 ```
 cargo r --example image_pattern -- create --output-dir Game/Left/ ${SCREENSHOTS}/Screenshot518.png  0,95,150 319,154,178  --filename cube --name "Cube" --description "The horadric cube is shown in the left panel."
 ```
-The `image_pattern_match` example can be used to verify all files in the `image_match` directory load correctly.
+The `image_pattern_match` example can be used to verify all files in the `image_match` directory load correctly. Coordinates match the ones in GIMP, select by color, combined with layer mask from selection makes it easy to identify useful pixels.
 
 # Capture, cursors and coordinates.
 
