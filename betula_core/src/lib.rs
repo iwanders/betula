@@ -125,6 +125,17 @@ pub trait RunContext {
     /// Reset a child's branch.
     fn reset_recursive(&self, index: usize) -> Result<(), NodeError>;
 
+    /// Act as a decorator, checking if there's one child, if so running that, else return status.
+    fn decorate_or(&self, status: ExecutionStatus) -> Result<ExecutionStatus, NodeError> {
+        if self.children() == 0 {
+            Ok(status)
+        } else if self.children() == 1 {
+            self.run(0)
+        } else {
+            Err("had more than one child, cannot decorate".into())
+        }
+    }
+
     /// Reset all children associated to this context.
     fn reset_children(&self) -> Result<(), NodeError> {
         for i in 0..self.children() {
