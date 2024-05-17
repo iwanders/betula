@@ -94,7 +94,7 @@ pub struct BetulaEditor {
 }
 
 impl BetulaEditor {
-    pub fn new(client: Box<dyn TreeClient>, ui_support: UiSupport, _cx: &CreationContext) -> Self {
+    pub fn new(client: Box<dyn TreeClient>, ui_support: UiSupport, cx: &CreationContext) -> Self {
         let snarl = Snarl::<BetulaViewerNode>::new();
 
         let (viewer_server, viewer_client) = InProcessControl::new();
@@ -104,6 +104,9 @@ impl BetulaEditor {
         let mut style = SnarlStyle::new();
         style.simple_wire = true;
         // style.collapsible = false;
+
+        // Lets just force dark mode for now, the colors are made for that.
+        cx.egui_ctx.set_visuals(egui::Visuals::dark());
 
         BetulaEditor {
             viewer,
