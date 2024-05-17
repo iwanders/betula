@@ -155,7 +155,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                             }
                         }
                         Err(e) => {
-                            // println!("failed to execute: {e:?}");
+                            println!("failed to execute: {e:?}");
                             server.send_event(InteractionEvent::CommandResult(CommandResult {
                                 command: command,
                                 error: Some(format!("{e:?}")),
