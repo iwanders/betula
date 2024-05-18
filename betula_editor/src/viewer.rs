@@ -2181,7 +2181,7 @@ impl BetulaViewer {
         // println!("ui_node: {ui_node:?}");
         if node_port.direction() == PortDirection::Input {
             // let input_pin = viewer_node.input_port_to_pin(&node_port.name()).ok_or("failed")?;
-            todo!();
+            unimplemented!("didn't need this for a unit test yet.");
         } else {
             let output_pin = viewer_node
                 .output_port_to_pin(&node_port.name())
@@ -2367,8 +2367,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 // One outpin can only point at a single thing, so we only have to disconnect one child.
                 to_disconnect = Some(pin.id);
             }
-            _ => {
-                todo!();
+            BetulaViewerNode::Blackboard(_) => {
+                // lets not do anything, since not all connections may be shown.
+                return;
             }
         }
         if let Some(to_disconnect) = to_disconnect {
