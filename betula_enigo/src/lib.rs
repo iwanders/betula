@@ -170,6 +170,15 @@ impl std::fmt::Debug for EnigoBlackboard {
     }
 }
 
+#[derive(Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct EnigoTokens(pub Vec<Token>);
+
+impl std::fmt::Debug for EnigoTokens {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "EnigoTokens ({})", self.0.len())
+    }
+}
+
 /// Structure to represent a cursor position.
 ///
 /// For two 1080p monitors, side by side, right one being primary:
@@ -190,7 +199,9 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
+    ui_support.add_node_default_with_config::<nodes::EnigoReadNode, nodes::EnigoReadNodeConfig>();
     ui_support.add_node_default::<nodes::EnigoCursorNode>();
     ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
     ui_support.add_value_default_named::<CursorPosition>("Cursor");
+    ui_support.add_value_default_named::<EnigoTokens>("EnigoTokens");
 }
