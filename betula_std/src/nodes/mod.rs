@@ -28,7 +28,7 @@ pub use status_write_node::StatusWriteNode;
 mod status_read_node;
 pub use status_read_node::StatusReadNode;
 mod if_then_else_node;
-pub use if_then_else_node::IfThenElseNode;
+pub use if_then_else_node::{IfThenElseNode, IfThenElseNodeConfig};
 
 #[cfg(feature = "betula_editor")]
 pub use time_node::ui_support;

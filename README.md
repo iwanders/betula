@@ -58,10 +58,10 @@ Conditional:
   - `StatusReadNode`: Reads an execution status off the blackboard and returns this, regardless of the optional child's status.
 
 Control:
-  - `ParallelNode`: A node that executes all children and determines status based on their return.
+  - `ParallelNode`: A node that executes all children and determines status based on their return, may resume running nodes from previous cycle.
   - `SelectorNode`: Executes in order, returns first non-`Failure`, may resume from previous cycle.
   - `SequenceNode`: Executes in order, returns first non-`Success`, may resume from the previous cycle, may retry failed nodes.
-  - `IfThenElseNode`: Runs the first child to decide whether to run the second (or optional third).
+  - `IfThenElseNode`: Runs the first child to decide whether to run the second (or optional third), may remember the branching statement from previous cycle.
 
 Decorators:
   - `SuccessNode`: Always returns `Success`, may be a decorator.
