@@ -2234,7 +2234,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
     fn connect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<BetulaViewerNode>) {
         // Validate connection
-        let mut child_to_disconnect = None;
         let mut child_to_connect = None;
 
         let mut port_to_connect = None;
@@ -2254,7 +2253,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     println!("Not allow connections to self.");
                     return;
                 }
-                child_to_disconnect = Some(to.id);
                 child_to_connect = Some((from.id, to.id));
             }
             (BetulaViewerNode::Blackboard(bb), BetulaViewerNode::Node(node)) => {
@@ -2275,26 +2273,10 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
 
-        if let Some(to_disconnect) = child_to_disconnect {
-            let pin_with_remotes = snarl.in_pin(to_disconnect);
-            if let Some(remote_to_disconnect) = pin_with_remotes.remotes.first() {
-                // remote_to_disconnect
-                match &mut snarl[to_disconnect.node] {
-                    BetulaViewerNode::Node(n) => {
-                        n.data_mut()
-                            .unwrap()
-                            .child_disconnect(&remote_to_disconnect);
-                    }
-                    _ => unreachable!(),
-                }
-            }
-        }
-
         if let Some((from, to)) = child_to_connect {
             match &mut snarl[from.node] {
                 BetulaViewerNode::Node(n) => {
                     if let Ok(child_id) = self.get_betula_id(&to.node) {
-                        println!("connecting {from:?} to {child_id:?}");
                         n.data_mut().unwrap().child_connect(&from, child_id);
                     }
                 }
