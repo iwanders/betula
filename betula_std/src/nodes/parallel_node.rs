@@ -5,7 +5,16 @@ use serde::{Deserialize, Serialize};
 pub struct ParallelNodeConfig {
     /// If this at least this many children return Success, report Success.
     pub success_threshold: usize,
+
+    /// Whether to keep memory between cycles and continue from the previous state.
+    ///
+    /// Default is off, which starts with no prior knowledge and just executes all children and then
+    /// determines the return state. If on, children that previously returned a status other than
+    /// running will not be executed again.
+    #[serde(default)]
+    pub memory: bool,
 }
+
 impl IsNodeConfig for ParallelNodeConfig {}
 
 /// Node for parallel execution of its children.
@@ -18,14 +27,7 @@ impl IsNodeConfig for ParallelNodeConfig {}
 #[derive(Debug, Default)]
 pub struct ParallelNode {
     pub config: ParallelNodeConfig,
-}
-
-impl ParallelNode {
-    pub fn new(success_threshold: usize) -> Self {
-        ParallelNode {
-            config: ParallelNodeConfig { success_threshold },
-        }
-    }
+    statuses: Vec<ExecutionStatus>,
 }
 
 impl Node for ParallelNode {
@@ -35,8 +37,23 @@ impl Node for ParallelNode {
         let mut success_count = 0;
         let mut failure_count = 0;
         let n = ctx.children();
+
+        // Ensure statuses is the correct size.
+        self.statuses.resize(n, ExecutionStatus::Running);
+
+        // If we don't have memory, just clear the status vector.
+        if !self.config.memory {
+            self.statuses.fill(ExecutionStatus::Running);
+        }
+
+        // Then, tick children and determine count.
         for id in 0..n {
-            match ctx.run(id)? {
+            if self.statuses[id] == ExecutionStatus::Running {
+                let node_res = ctx.run(id)?;
+                self.statuses[id] = node_res
+            }
+
+            match self.statuses[id] {
                 ExecutionStatus::Success => success_count += 1,
                 ExecutionStatus::Failure => failure_count += 1,
                 ExecutionStatus::Running => {}
@@ -76,6 +93,10 @@ impl Node for ParallelNode {
     fn node_type(&self) -> NodeType {
         Self::static_type()
     }
+
+    fn reset(&mut self) {
+        self.statuses.fill(ExecutionStatus::Running);
+    }
 }
 
 #[cfg(feature = "betula_editor")]
@@ -102,11 +123,17 @@ pub mod ui_support {
                 ui_response = UiConfigResponse::Changed;
             }
             ui.horizontal(|ui| {
+                let r = ui.checkbox(&mut self.config.memory, "Memory");
+                let r = r.on_hover_text("Check this to continue execution where the previous cycle returned, if false the node is reactive and resets each cycle");
+                if r.changed() {
+                    ui_response = UiConfigResponse::Changed;
+                }
+
                 ui.label("Threshold: ");
                 let r = ui.add(
                     egui::DragValue::new(&mut self.config.success_threshold)
-                        .clamp_range(0..=children_count)
-                        .update_while_editing(false),
+                    .clamp_range(0..=children_count)
+                    .update_while_editing(false),
                 );
 
                 if r.changed() {
