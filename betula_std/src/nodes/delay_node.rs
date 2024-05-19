@@ -68,7 +68,7 @@ impl Node for DelayNode {
     }
 
     fn reset(&mut self) {
-        self.last_time = 0.0;
+        // self.last_time = 0.0;
     }
 
     fn static_type() -> NodeType {
