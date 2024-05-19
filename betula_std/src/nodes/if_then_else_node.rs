@@ -64,6 +64,7 @@ impl Node for IfThenElseNode {
 
         // Reached the end of our if statement.
         if r != ExecutionStatus::Running {
+            self.reset();
             ctx.reset_children()?;
         }
         Ok(r)
