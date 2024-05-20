@@ -2,7 +2,7 @@ use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::Image;
-use screen_capture::{CaptureConfig, CaptureSpecification, ThreadedCapturer};
+use screen_capture::{CaptureConfig, ThreadedCapturer};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImageCaptureNodeConfig {
@@ -123,10 +123,7 @@ mod ui_support {
 
                 ui.horizontal(|ui| {
                     if ui.add(egui::Button::new("➕")).clicked() {
-                        self.config
-                            .capture
-                            .capture
-                            .push(CaptureSpecification::default());
+                        self.config.capture.capture.push(Default::default());
                         modified |= true;
                     }
                     if ui.add(egui::Button::new("➖")).clicked() {
