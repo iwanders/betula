@@ -23,9 +23,10 @@ pub struct Pattern {
 impl Pattern {
     pub fn from_path<P>(path: P) -> Result<Pattern, crate::PatternError>
     where
-        P: AsRef<std::path::Path>,
+        P: AsRef<std::path::Path> + Copy,
     {
-        let img = image::open(path)?;
+        let img = image::open(path)
+            .map_err(|e| format!("failed to open {}: {e:?}", path.as_ref().display()))?;
         let img = img
             .as_rgba8()
             .ok_or("image could not be converted to rgba8")?;
@@ -172,7 +173,8 @@ pub fn load_patterns_directory(
     path: &std::path::Path,
 ) -> Result<Vec<PatternEntry>, crate::PatternError> {
     let mut patterns = vec![];
-    let mut stack: Vec<(Vec<String>, std::path::PathBuf)> = std::fs::read_dir(path)?
+    let mut stack: Vec<(Vec<String>, std::path::PathBuf)> = std::fs::read_dir(path)
+        .map_err(|e| format!("failed to open {}: {e:?}", path.display()))?
         .map(|v| v.ok())
         .flatten()
         .map(|v| (vec![], v.path()))
