@@ -162,7 +162,8 @@ mod tests {
     #[test]
     fn sequence_fail() -> Result<(), NodeError> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SequenceNode {}))?;
+        let root =
+            tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SequenceNode::default()))?;
         let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode {}))?;
         tree.set_children(root, &vec![f1])?;
         let res = tree.execute(root)?;

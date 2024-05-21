@@ -542,8 +542,8 @@ mod test {
     #[test]
     fn test_tree() -> Result<(), BetulaError> {
         let mut tree_support = TreeSupport::new();
-        tree_support.add_node_default::<betula_std::nodes::SequenceNode>();
-        tree_support.add_node_default::<betula_std::nodes::SelectorNode>();
+        tree_support.add_node_default_with_config::<betula_std::nodes::SequenceNode, betula_std::nodes::SequenceNodeConfig>();
+        tree_support.add_node_default_with_config::<betula_std::nodes::SelectorNode, betula_std::nodes::SelectorNodeConfig>();
         tree_support.add_node_default::<betula_std::nodes::FailureNode>();
         tree_support.add_node_default::<betula_std::nodes::SuccessNode>();
         tree_support
@@ -553,9 +553,10 @@ mod test {
 
         // Lets make a new tree.
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
-        let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode {}))?;
-        let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode {}))?;
-        let s1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SuccessNode {}))?;
+        let root =
+            tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode::default()))?;
+        let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode::default()))?;
+        let s1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SuccessNode::default()))?;
         tree.set_children(root, &vec![f1, s1])?;
 
         let obj = TreeSerializer::new(&tree_support, &*tree);
@@ -582,8 +583,8 @@ mod test {
     #[test]
     fn test_with_blackboard() -> Result<(), BetulaError> {
         let mut tree_support = TreeSupport::new();
-        tree_support.add_node_default::<betula_std::nodes::SequenceNode>();
-        tree_support.add_node_default::<betula_std::nodes::SelectorNode>();
+        tree_support.add_node_default_with_config::<betula_std::nodes::SequenceNode, betula_std::nodes::SequenceNodeConfig>();
+        tree_support.add_node_default_with_config::<betula_std::nodes::SelectorNode, betula_std::nodes::SelectorNodeConfig>();
         tree_support.add_node_default::<betula_std::nodes::FailureNode>();
         tree_support.add_node_default::<betula_std::nodes::SuccessNode>();
         tree_support
@@ -595,7 +596,7 @@ mod test {
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root = tree.add_node_boxed(
             NodeId(Uuid::new_v4()),
-            Box::new(betula_std::nodes::SequenceNode {}),
+            Box::new(betula_std::nodes::SequenceNode::default()),
         )?;
         let time_node = tree.add_node_boxed(
             NodeId(Uuid::new_v4()),

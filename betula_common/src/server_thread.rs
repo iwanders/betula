@@ -190,7 +190,7 @@ mod tests {
         // use crate::TrackedTreeExecution;
         let mut tree: Box<dyn Tree> = Box::new(BasicTree::new());
         let root_id = NodeId(Uuid::new_v4());
-        let root = tree.add_node_boxed(root_id, Box::new(SelectorNode {}))?;
+        let root = tree.add_node_boxed(root_id, Box::new(SelectorNode::default()))?;
         let f1_id = NodeId(Uuid::new_v4());
         let f1 = tree.add_node_boxed(f1_id, Box::new(FailureNode {}))?;
         let s1_id = NodeId(Uuid::new_v4());

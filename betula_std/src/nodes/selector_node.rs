@@ -148,7 +148,8 @@ mod tests {
     #[test]
     fn selector_success() -> Result<(), NodeError> {
         let mut tree = BasicTree::new();
-        let root = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode {}))?;
+        let root =
+            tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SelectorNode::default()))?;
         let f1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(FailureNode {}))?;
         let s1 = tree.add_node_boxed(NodeId(Uuid::new_v4()), Box::new(SuccessNode {}))?;
         tree.set_children(root, &vec![f1, s1])?;

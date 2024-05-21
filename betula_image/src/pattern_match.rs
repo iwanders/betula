@@ -262,6 +262,9 @@ impl<T: std::fmt::Debug> std::fmt::Debug for EnumPattern<T> {
 ///
 /// Common use case:
 /// ```
+/// # use serde::{Deserialize, Serialize};
+/// # use betula_image::pattern_match::{EnumMatcher, EnumPatternName, PatternEntry};
+/// # use betula_image::PatternError;
 /// #[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Eq, Hash, Deserialize, Serialize)]
 /// enum Foo {
 ///     Bar,
@@ -276,7 +279,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for EnumPattern<T> {
 ///     foo_matcher: EnumMatcher<Foo>,
 /// }
 /// impl ImageMatcher {
-///     pub fn new(config: MatchConfig, patterns: &[PatternEntry]) -> Result<ImageMatcher, crate::PatternError> {
+///     pub fn new(config: MatchConfig, patterns: &[PatternEntry]) -> Result<ImageMatcher, PatternError> {
 ///         Ok(Self{
 ///             foo_matcher: EnumMatcher::new(&config.foo_patterns, patterns)?,
 ///         })
