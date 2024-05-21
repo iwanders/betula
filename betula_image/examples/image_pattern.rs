@@ -47,12 +47,21 @@ fn main() -> Result<(), PatternError> {
          .subcommand(
             Command::new("create")
                 .about("Create a new pattern.")
+                // .arg(arg(arg!([image] "The image to make a pattern of.").required(true).value_parser!(std::path::PathBuf)))
                 .arg(arg!([image] "The image to make a pattern of.").required(true).value_parser(clap::value_parser!(std::path::PathBuf)))
+                .arg(
+                    arg!(--images "More images to be used.")
+                        .action(clap::ArgAction::Append)
+                        .value_name("images")
+                        .help("Provide paths to the files to create the pattern from, only consistent pixels remain.")
+                        .value_parser(value_parser!(std::path::PathBuf))
+                        .action(clap::ArgAction::Append))
                 .arg(Arg::new("segments")
                       .action(clap::ArgAction::Append)
                       .value_name("SEGMENTS")
                       .help("Provide segments as x,y,len  x2,y2,len2")
                       .value_parser(value_parser!(SegmentSpec))
+                      // .last(true)
                       .num_args(1..).required(true))
                 .arg(
                     clap::arg!(--"output-dir" <PATH>).value_parser(clap::value_parser!(std::path::PathBuf))
@@ -72,7 +81,14 @@ fn main() -> Result<(), PatternError> {
 
     if let Some(matches) = cmd.subcommand_matches("create") {
         let output_dir = matches.get_one::<PathBuf>("output-dir").unwrap();
-        let input_image = matches.get_one::<PathBuf>("image").unwrap();
+        let image = matches.get_one::<PathBuf>("image").unwrap();
+        let mut images = vec![image];
+
+        let more_images: Vec<&std::path::PathBuf> =
+            matches.get_many("images").unwrap_or_default().collect();
+        images.extend(more_images);
+        // println!("images is: {images:?}");
+
         let name_default = matches
             .get_one::<PathBuf>("image")
             .map(|v| v.file_name().clone())
@@ -85,6 +101,7 @@ fn main() -> Result<(), PatternError> {
         let filename = matches
             .get_one::<String>("filename")
             .unwrap_or(&name_default);
+
         let segments: Vec<SegmentSpec> = matches
             .get_many("segments")
             .expect("segments is required")
@@ -107,15 +124,42 @@ fn main() -> Result<(), PatternError> {
             original: Some(name_default),
         };
 
-        let img = ImageReader::open(input_image)?.decode()?.to_rgba8();
-        let mut new_img = image::RgbaImage::new(img.width(), img.height());
-        for spec in segments {
-            for i in 0..spec.length {
-                *new_img.get_pixel_mut(spec.x + i as u32, spec.y) =
-                    *img.get_pixel(spec.x + i as u32, spec.y);
+        let mut mask_img = None;
+        for input_image in &images {
+            let img = ImageReader::open(input_image)?.decode()?.to_rgba8();
+            let first_image = if mask_img.is_none() {
+                mask_img = Some(image::RgbaImage::new(img.width(), img.height()));
+                true
+            } else {
+                false
+            };
+
+            let mask_img = mask_img.as_mut().unwrap();
+            if mask_img.dimensions() != img.dimensions() {
+                println!(
+                    "{input_image:?} is of different size, it is {:?} and already had {:?} ",
+                    img.dimensions(),
+                    mask_img.dimensions()
+                );
+            }
+            for spec in &segments {
+                for i in 0..spec.length {
+                    let original_in_mask = mask_img.get_pixel(spec.x + i as u32, spec.y);
+                    let new_in_mask = img.get_pixel(spec.x + i as u32, spec.y);
+                    let should_clear = (original_in_mask != new_in_mask) && !first_image;
+                    if should_clear {
+                        // Not consistent, clear the pixel.
+                        *mask_img.get_pixel_mut(spec.x + i as u32, spec.y) =
+                            image::Rgba([0, 0, 0, 0]);
+                    } else {
+                        // Copy the pixel.
+                        *mask_img.get_pixel_mut(spec.x + i as u32, spec.y) =
+                            *img.get_pixel(spec.x + i as u32, spec.y);
+                    }
+                }
             }
         }
-        new_img.save(&output_path)?;
+        mask_img.as_ref().unwrap().save(&output_path)?;
         output_path.set_extension("toml");
         metadata.save(&output_path)?;
     }
