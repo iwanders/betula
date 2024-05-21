@@ -246,13 +246,44 @@ pub struct EnumPatternName<T> {
 }
 
 /// Relates an enum value to an actual pattern.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EnumPattern<T: std::fmt::Debug> {
     value: T,
     pattern: Pattern,
 }
+impl<T: std::fmt::Debug> std::fmt::Debug for EnumPattern<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "{:?}", self.value)
+    }
+}
 
 /// Helper to match enums using patterns.
+///
+///
+/// Common use case:
+/// ```
+/// #[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Eq, Hash, Deserialize, Serialize)]
+/// enum Foo {
+///     Bar,
+///     Buz
+/// }
+/// #[derive(Deserialize, Serialize)]
+/// struct MatchConfig {
+///     foo_patterns: Vec<EnumPatternName<Foo>>,
+/// }
+/// #[derive(Clone, Debug)]
+/// pub struct ImageMatcher {
+///     foo_matcher: EnumMatcher<Foo>,
+/// }
+/// impl ImageMatcher {
+///     pub fn new(config: MatchConfig, patterns: &[PatternEntry]) -> Result<ImageMatcher, crate::PatternError> {
+///         Ok(Self{
+///             foo_matcher: EnumMatcher::new(&config.foo_patterns, patterns)?,
+///         })
+///     }
+/// }
+/// ```
+
 #[derive(Debug, Clone)]
 pub struct EnumMatcher<T: std::fmt::Debug + Copy + std::cmp::PartialEq<T>> {
     matchers: Vec<EnumPattern<T>>,
@@ -319,6 +350,8 @@ impl<T: std::fmt::Debug + Copy + std::cmp::PartialEq<T>> EnumMatcher<T> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use image::Rgba;
+
     #[test]
     fn test_pattern_match() {
         // Test whether we include the last pixel.
