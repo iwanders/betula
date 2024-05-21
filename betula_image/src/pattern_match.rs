@@ -238,6 +238,84 @@ pub fn load_patterns_directory(
     Ok(patterns)
 }
 
+/// Maps a enum value to a pattern name.
+#[derive(Debug, Clone, PartialOrd, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct EnumPatternName<T> {
+    value: T,
+    pattern: PatternName,
+}
+
+/// Relates an enum value to an actual pattern.
+#[derive(Debug, Clone)]
+pub struct EnumPattern<T: std::fmt::Debug> {
+    value: T,
+    pattern: Pattern,
+}
+
+/// Helper to match enums using patterns.
+#[derive(Debug, Clone)]
+pub struct EnumMatcher<T: std::fmt::Debug + Copy + std::cmp::PartialEq<T>> {
+    matchers: Vec<EnumPattern<T>>,
+}
+
+impl<T: std::fmt::Debug + Copy + std::cmp::PartialEq<T>> EnumMatcher<T> {
+    /// Local helper to find the appropriate patterns from the list.
+    fn find_pattern(
+        patterns: &[PatternEntry],
+        name: &PatternName,
+    ) -> Result<Pattern, crate::PatternError> {
+        let pattern_entry = patterns
+            .iter()
+            .find(|z| z.info.name == *name)
+            .ok_or(format!("could not find pattern {name:?}"))?;
+        pattern_entry.load_pattern()
+    }
+
+    /// Instantiate a new enum match, using the provided match entries and a collection of patterns to select from.
+    pub fn new(
+        match_entries: &[EnumPatternName<T>],
+        patterns: &[PatternEntry],
+    ) -> Result<EnumMatcher<T>, crate::PatternError> {
+        let mut matchers = vec![];
+        for entry in match_entries.iter() {
+            let pattern = Self::find_pattern(&patterns, &entry.pattern)?;
+            matchers.push(EnumPattern {
+                value: entry.value,
+                pattern,
+            });
+        }
+        Ok(EnumMatcher { matchers })
+    }
+
+    /// Test a specific enum against the image.
+    pub fn test(&self, img: &image::RgbaImage, test_for: T) -> bool {
+        if let Some(pattern) = self.matchers.iter().find(|v| v.value == test_for) {
+            if pattern.pattern.matches_exact(img) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Search the patterns in order to see if one matches, optionally checking 'prior' first.
+    pub fn search(&self, img: &image::RgbaImage, prior: Option<T>) -> Option<T> {
+        if let Some(prior_label) = &prior {
+            if let Some(pattern) = self.matchers.iter().find(|v| v.value == *prior_label) {
+                if pattern.pattern.matches_exact(img) {
+                    return Some(pattern.value);
+                }
+            }
+        }
+        for p in self.matchers.iter() {
+            if p.pattern.matches_exact(img) {
+                return Some(p.value);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
