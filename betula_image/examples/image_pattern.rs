@@ -144,6 +144,10 @@ fn main() -> Result<(), PatternError> {
             }
             for spec in &segments {
                 for i in 0..spec.length {
+                    use image::GenericImageView;
+                    if !mask_img.in_bounds(spec.x + i as u32, spec.y) {
+                        panic!("Segment is out of bounds: {spec:?}, bounds are {:?}, at this position max length is {}.", mask_img.dimensions(), mask_img.width() - spec.x);
+                    }
                     let original_in_mask = mask_img.get_pixel(spec.x + i as u32, spec.y);
                     let new_in_mask = img.get_pixel(spec.x + i as u32, spec.y);
                     let should_clear = (original_in_mask != new_in_mask) && !first_image;
