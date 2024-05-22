@@ -18,8 +18,15 @@ struct EnigoData {
     cursor_offset: Arc<(AtomicI32, AtomicI32)>,
 }
 
+#[derive(Debug, Default, Clone)]
+struct FullData {
+    image_cursor: ImageCursor,
+    time: f64,
+    duration: f64,
+}
+
 type FrameData = Arc<Mutex<EnigoData>>;
-type ImageCursorData = Arc<Mutex<Option<ImageCursor>>>;
+type ImageCursorData = Arc<Mutex<Option<FullData>>>;
 
 pub struct ImageCaptureCursorNode {
     enigo: Input<EnigoBlackboard>,
@@ -89,26 +96,57 @@ impl Node for ImageCaptureCursorNode {
                     println!("data_block: {data_block:?}");
                 });
                 c.set_pre_callback(pre_callback);
+
+                // Now, we can craft the post callback.
+                let data = Arc::clone(&self.data);
+                let post_callback =
+                    Arc::new(move |capture_info: screen_capture::capturer::CaptureInfo| {
+                        let (cx, cy) = (
+                            post_data_block.cursor_position.0.load(Relaxed),
+                            post_data_block.cursor_position.1.load(Relaxed),
+                        );
+                        let time = capture_info
+                            .time
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs_f64();
+                        let duration = capture_info.duration.as_secs_f64();
+                        if let Ok(info) = capture_info.result {
+                            let image_cursor = ImageCursor {
+                                image: crate::Image::new(info),
+                                cursor: betula_enigo::CursorPosition { x: cx, y: cy },
+                            };
+                            let full_data = FullData {
+                                image_cursor,
+                                time,
+                                duration,
+                            };
+                            // Finally, assign the full data.
+                            {
+                                let mut locked = data.lock().unwrap();
+                                *locked = Some(full_data);
+                            }
+                        }
+                    });
+                c.set_post_callback(post_callback);
+
                 self.setup_done = true;
             }
         }
 
-        /*
-        match info.result {
-            Ok(img) => {
-                use std::time::UNIX_EPOCH;
-                let _ = self.node.output.set(Image::new(img));
-                let _ = self.output.set(Default::default())?;
-                let _ = self
-                    .node.output_time
-                    .set(info.time.duration_since(UNIX_EPOCH)?.as_secs_f64());
-                let _ = self.node.output_duration.set(info.duration.as_secs_f64());
-                Ok(ExecutionStatus::Success)
-            }
-            Err(()) => Ok(ExecutionStatus::Failure),
+        let full_data = {
+            let locked = self.data.lock().unwrap();
+            locked.as_ref().map(|z| (*z).clone())
+        };
+        if let Some(full_data) = full_data {
+            let _ = self.node.output.set(full_data.image_cursor.image.clone());
+            let _ = self.output.set(full_data.image_cursor)?;
+            let _ = self.node.output_time.set(full_data.time);
+            let _ = self.node.output_duration.set(full_data.duration);
+            Ok(ExecutionStatus::Success)
+        } else {
+            Ok(ExecutionStatus::Failure)
         }
-        */
-        Ok(ExecutionStatus::Running)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
