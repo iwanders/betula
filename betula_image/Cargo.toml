@@ -10,7 +10,7 @@ betula_core = { workspace = true, default-features = false }
 betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
-screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="5681c388a70445f60956e6c7b323f455568c0db6" }
+screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="d5726960d3cb979823fdee6abe3eb6cd4527d595" }
 
 image = { version ="0.25.1", default-features=false, features=["png"]}
 toml = {version = "0.8.12" }

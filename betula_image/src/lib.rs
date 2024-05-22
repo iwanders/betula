@@ -76,10 +76,19 @@ mod enigo_support {
     use super::*;
     use betula_enigo::CursorPosition;
 
-    #[derive(Debug, Clone, Serialize, PartialEq, Deserialize, Default)]
+    #[derive(Clone, Serialize, PartialEq, Deserialize, Default)]
     pub struct ImageCursor {
         pub image: Image,
         pub cursor: CursorPosition,
+    }
+    impl std::fmt::Debug for ImageCursor {
+        fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+            write!(
+                fmt,
+                "{:?}@({},{})",
+                self.image, self.cursor.x, self.cursor.y
+            )
+        }
     }
 }
 #[cfg(feature = "betula_enigo")]

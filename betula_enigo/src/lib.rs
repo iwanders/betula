@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod nodes;
 
+pub use enigo;
 use enigo::Enigo;
 
 use enigo::agent::Agent;
@@ -162,6 +163,15 @@ impl EnigoBlackboard {
             x: v.0 - interface.cursor_offset.0.load(Relaxed),
             y: v.1 - interface.cursor_offset.1.load(Relaxed),
         })?)
+    }
+
+    pub fn enigo(&self) -> Option<Arc<Mutex<Enigo>>> {
+        self.interface.as_ref().map(|v| Arc::clone(&v.enigo))
+    }
+    pub fn cursor_offset(&self) -> Option<Arc<(AtomicI32, AtomicI32)>> {
+        self.interface
+            .as_ref()
+            .map(|v| Arc::clone(&v.cursor_offset))
     }
 }
 impl std::fmt::Debug for EnigoBlackboard {

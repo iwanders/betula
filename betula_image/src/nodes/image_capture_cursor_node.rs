@@ -2,11 +2,45 @@ use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::ImageCaptureNode;
+use crate::{Image, ImageCursor};
+use screen_capture::ThreadedCapturer;
 
-#[derive(Default)]
-pub struct ImageCaptureCursorNode {
-    node: ImageCaptureNode,
+use betula_enigo::EnigoBlackboard;
+
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicI32, AtomicUsize};
+use std::sync::{Arc, Mutex};
+
+#[derive(Debug)]
+struct EnigoData {
+    counter: AtomicUsize,
+    cursor_position: (AtomicI32, AtomicI32),
+    cursor_offset: Arc<(AtomicI32, AtomicI32)>,
 }
+
+type FrameData = Arc<Mutex<EnigoData>>;
+type ImageCursorData = Arc<Mutex<Option<ImageCursor>>>;
+
+pub struct ImageCaptureCursorNode {
+    enigo: Input<EnigoBlackboard>,
+    output: Output<ImageCursor>,
+    node: ImageCaptureNode,
+    setup_done: bool,
+    data: ImageCursorData,
+}
+impl Default for ImageCaptureCursorNode {
+    fn default() -> ImageCaptureCursorNode {
+        let data = Arc::new(Mutex::new(None));
+        Self {
+            enigo: Default::default(),
+            output: Default::default(),
+            node: Default::default(),
+            setup_done: false,
+            data,
+        }
+    }
+}
+
 impl std::fmt::Debug for ImageCaptureCursorNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "ImageCaptureCursorNode")
@@ -15,17 +49,93 @@ impl std::fmt::Debug for ImageCaptureCursorNode {
 
 impl Node for ImageCaptureCursorNode {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
-        self.node.execute(ctx)
+        let c = self
+            .node
+            .capture
+            .get_or_insert_with(|| ThreadedCapturer::new(self.node.config.capture.clone()));
+        // let info = c.latest();
+
+        let interface = self.enigo.get()?;
+        if !self.setup_done {
+            if let Some(enigo) = interface.enigo() {
+                let cursor_offset = interface.cursor_offset().unwrap();
+
+                let data_block = Arc::new(EnigoData {
+                    counter: 0.into(),
+                    cursor_position: (0.into(), 0.into()),
+                    cursor_offset,
+                });
+                let post_data_block = Arc::clone(&data_block);
+
+                // Now we have both enigo, and the cursor offset, we can craft the callbacks
+                let pre_callback = Arc::new(move |counter: usize| {
+                    // Store the data!
+                    data_block.counter.store(counter, Relaxed);
+                    // get the cursor position;
+                    let location = {
+                        use betula_enigo::enigo::Mouse;
+                        let locked = enigo.lock().expect("should not be poisoned");
+                        locked.location().unwrap_or((0, 0))
+                    };
+                    // Convert that using the offsets.
+                    data_block.cursor_position.0.store(
+                        location.0 - data_block.cursor_offset.0.load(Relaxed),
+                        Relaxed,
+                    );
+                    data_block.cursor_position.1.store(
+                        location.1 - data_block.cursor_offset.1.load(Relaxed),
+                        Relaxed,
+                    );
+                    println!("data_block: {data_block:?}");
+                });
+                c.set_pre_callback(pre_callback);
+                self.setup_done = true;
+            }
+        }
+
+        /*
+        match info.result {
+            Ok(img) => {
+                use std::time::UNIX_EPOCH;
+                let _ = self.node.output.set(Image::new(img));
+                let _ = self.output.set(Default::default())?;
+                let _ = self
+                    .node.output_time
+                    .set(info.time.duration_since(UNIX_EPOCH)?.as_secs_f64());
+                let _ = self.node.output_duration.set(info.duration.as_secs_f64());
+                Ok(ExecutionStatus::Success)
+            }
+            Err(()) => Ok(ExecutionStatus::Failure),
+        }
+        */
+        Ok(ExecutionStatus::Running)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
-        self.node.ports()
+        Ok(vec![
+            Port::output::<ImageCursor>("image_cursor"),
+            Port::output::<f64>("capture_time"),
+            Port::output::<f64>("capture_duration"),
+            Port::input::<EnigoBlackboard>("enigo"),
+        ])
     }
     fn setup_outputs(
         &mut self,
         interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
-        self.node.setup_outputs(interface)
+        self.output = interface.output::<ImageCursor>("image_cursor", Default::default())?;
+        self.node.output_time = interface.output::<f64>("capture_time", Default::default())?;
+        self.node.output_duration =
+            interface.output::<f64>("capture_duration", Default::default())?;
+        Ok(())
+    }
+
+    fn setup_inputs(
+        &mut self,
+        interface: &mut dyn BlackboardInputInterface,
+    ) -> Result<(), NodeError> {
+        self.enigo = interface.input::<EnigoBlackboard>("enigo")?;
+        Ok(())
     }
 
     fn static_type() -> NodeType {
@@ -45,6 +155,7 @@ impl Node for ImageCaptureCursorNode {
     }
 
     fn reset(&mut self) {
+        self.setup_done = false;
         self.node.reset();
     }
 }

@@ -6,17 +6,17 @@ use screen_capture::{CaptureConfig, ThreadedCapturer};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImageCaptureNodeConfig {
-    capture: CaptureConfig,
+    pub capture: CaptureConfig,
 }
 impl IsNodeConfig for ImageCaptureNodeConfig {}
 
 #[derive(Default)]
 pub struct ImageCaptureNode {
-    output: Output<Image>,
-    output_time: Output<f64>,
-    output_duration: Output<f64>,
-    capture: Option<ThreadedCapturer>,
-    config: ImageCaptureNodeConfig,
+    pub(crate) output: Output<Image>,
+    pub(crate) output_time: Output<f64>,
+    pub(crate) output_duration: Output<f64>,
+    pub(crate) capture: Option<ThreadedCapturer>,
+    pub(crate) config: ImageCaptureNodeConfig,
 }
 impl std::fmt::Debug for ImageCaptureNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
