@@ -15,5 +15,8 @@ screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="5681
 image = { version ="0.25.1", default-features=false, features=["png"]}
 toml = {version = "0.8.12" }
 
+
+betula_enigo = { workspace = true, default-features = false, optional=true}
+
 [dev-dependencies]
 clap = {version="4.5.4", features=["std"]}

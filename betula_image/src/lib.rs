@@ -65,12 +65,25 @@ impl std::fmt::Debug for Image {
         write!(fmt, "Image({}x{})", self.width, self.height)
     }
 }
-
 impl PartialEq for Image {
     fn eq(&self, other: &Image) -> bool {
         self.image.as_ptr() == other.image.as_ptr()
     }
 }
+
+#[cfg(feature = "betula_enigo")]
+mod enigo_support {
+    use super::*;
+    use betula_enigo::CursorPosition;
+
+    #[derive(Debug, Clone, Serialize, PartialEq, Deserialize, Default)]
+    pub struct ImageCursor {
+        pub image: Image,
+        pub cursor: CursorPosition,
+    }
+}
+#[cfg(feature = "betula_enigo")]
+pub use enigo_support::ImageCursor;
 
 /// Register nodes to the ui support.
 #[cfg(feature = "betula_editor")]
@@ -79,4 +92,9 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support
         .add_node_default_with_config::<nodes::ImageCaptureNode, nodes::ImageCaptureNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::ImageMatchNode, nodes::ImageMatchNodeConfig>();
+
+    #[cfg(feature = "betula_enigo")]
+    {
+        ui_support.add_value_default_named::<ImageCursor>("ImageCursor");
+    }
 }
