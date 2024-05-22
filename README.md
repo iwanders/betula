@@ -127,6 +127,8 @@ the color space conversion.
 
 The outputs `capture_time` and `capture_duration` are optional.
 
+If the crate is compiled with the `betula_enigo` feature, the `ImageCaptureCursorNode` is also created. This node is a superset of the `ImageCaptureNode` and can capture the cursor position at the exact time the threaded capturer starts the screen capture, ensuring that the cursor position is captured at the moment of screen capture.
+
 
 ### ImageMatchNode
 This node can match a pattern against an input image. Checking against a pattern happens when the node is executed, as such make the patterns as minimal as possible. This node returns `Success` if the pattern matches, `Failure` otherwise.
