@@ -1,5 +1,4 @@
 use betula_core::node_prelude::*;
-use serde::{Deserialize, Serialize};
 
 use super::ImageCaptureNode;
 use crate::{Image, ImageCursor};
@@ -25,7 +24,6 @@ struct FullData {
     duration: f64,
 }
 
-type FrameData = Arc<Mutex<EnigoData>>;
 type ImageCursorData = Arc<Mutex<Option<FullData>>>;
 
 pub struct ImageCaptureCursorNode {
@@ -55,7 +53,7 @@ impl std::fmt::Debug for ImageCaptureCursorNode {
 }
 
 impl Node for ImageCaptureCursorNode {
-    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let c = self
             .node
             .capture
@@ -93,7 +91,7 @@ impl Node for ImageCaptureCursorNode {
                         location.1 - data_block.cursor_offset.1.load(Relaxed),
                         Relaxed,
                     );
-                    println!("data_block: {data_block:?}");
+                    // println!("data_block: {data_block:?}");
                 });
                 c.set_pre_callback(pre_callback);
 
@@ -152,6 +150,7 @@ impl Node for ImageCaptureCursorNode {
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
         Ok(vec![
             Port::output::<ImageCursor>("image_cursor"),
+            Port::output::<Image>("image"),
             Port::output::<f64>("capture_time"),
             Port::output::<f64>("capture_duration"),
             Port::input::<EnigoBlackboard>("enigo"),
@@ -162,10 +161,7 @@ impl Node for ImageCaptureCursorNode {
         interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
         self.output = interface.output::<ImageCursor>("image_cursor", Default::default())?;
-        self.node.output_time = interface.output::<f64>("capture_time", Default::default())?;
-        self.node.output_duration =
-            interface.output::<f64>("capture_duration", Default::default())?;
-        Ok(())
+        self.node.setup_outputs(interface)
     }
 
     fn setup_inputs(
