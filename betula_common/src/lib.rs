@@ -1,3 +1,4 @@
+pub mod callback;
 pub mod control;
 mod server_thread;
 pub mod tree_support;
