@@ -2,11 +2,14 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::sync::{Arc, Weak};
 
-type CallbackFun<T> = Weak<Arc<dyn Fn(T) -> ()>>;
+pub trait CallbackValueRequirements: Send + 'static + Clone + Sync {}
+impl<T: Send + 'static + Clone + Sync> CallbackValueRequirements for T {}
+
+type CallbackFun<T> = Weak<Arc<dyn Fn(T) -> () + Send + Sync>>;
 
 /// The ticket is returned after registration, keep this around to ensure the registration stays active.
 pub struct Ticket<T> {
-    _registration: Arc<Arc<dyn Fn(T) -> ()>>,
+    _registration: Arc<Arc<dyn Fn(T) -> () + Send + Sync>>,
 }
 impl<T> std::fmt::Debug for Ticket<T> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -15,10 +18,19 @@ impl<T> std::fmt::Debug for Ticket<T> {
 }
 
 // #[derive(Default)]
-pub struct Callbacks<T: Send + 'static + Clone> {
+pub struct Callbacks<T: CallbackValueRequirements> {
     callbacks: RwLock<Vec<CallbackFun<T>>>,
 }
-impl<T: Send + 'static + Clone> Default for Callbacks<T> {
+impl<T: CallbackValueRequirements> std::fmt::Debug for Callbacks<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "Callbacks<{}>({})", std::any::type_name::<T>(), {
+            let z = self.callbacks.read();
+            z.len()
+        })
+    }
+}
+
+impl<T: CallbackValueRequirements> Default for Callbacks<T> {
     fn default() -> Self {
         Self {
             callbacks: RwLock::new(vec![]),
@@ -26,7 +38,7 @@ impl<T: Send + 'static + Clone> Default for Callbacks<T> {
     }
 }
 
-impl<T: Send + 'static + Clone> Callbacks<T> {
+impl<T: CallbackValueRequirements> Callbacks<T> {
     /// Create a new callbacks object.
     pub fn new() -> Self {
         Callbacks {
@@ -41,12 +53,12 @@ impl<T: Send + 'static + Clone> Callbacks<T> {
     }
 
     /// Register a callback with this callbacks object.
-    pub fn register<F: Fn(T) -> () + 'static>(&self, f: F) -> Ticket<T> {
+    pub fn register<F: Fn(T) -> () + 'static + Send + Sync>(&self, f: F) -> Ticket<T> {
         self.register_arc(Arc::new(f))
     }
 
     /// Register a callback with this callbacks object.
-    pub fn register_arc(&self, f: Arc<dyn Fn(T) -> ()>) -> Ticket<T> {
+    pub fn register_arc(&self, f: Arc<dyn Fn(T) -> () + Send + Sync>) -> Ticket<T> {
         // Wrap the function in a new arc, of which we keep the weak pointer.
         // We hand the strong pointer back in the ticket, that way if the ticket goes out of
         // scope, we know the registration has become invalid.
@@ -69,8 +81,7 @@ impl<T: Send + 'static + Clone> Callbacks<T> {
             locked.clone()
         };
         let orig = ptrs.len();
-        let to_call: Vec<Arc<Arc<dyn Fn(T) -> ()>>> =
-            ptrs.iter().filter_map(|v| v.upgrade()).collect();
+        let to_call: Vec<Arc<Arc<_>>> = ptrs.iter().filter_map(|v| v.upgrade()).collect();
 
         // Length changed, we actaully need to prune registrations.
         if orig != to_call.len() {
@@ -90,12 +101,17 @@ impl<T: Send + 'static + Clone> Callbacks<T> {
 }
 
 #[derive(Default, Clone)]
-pub struct CallbacksBlackboard<T: Send + 'static + Clone> {
+pub struct CallbacksBlackboard<T: CallbackValueRequirements> {
     callbacks: Arc<Option<Callbacks<T>>>,
     count: usize,
 }
+impl<T: CallbackValueRequirements> std::cmp::PartialEq for CallbacksBlackboard<T> {
+    fn eq(&self, other: &CallbacksBlackboard<T>) -> bool {
+        Arc::as_ptr(&self.callbacks) == Arc::as_ptr(&other.callbacks)
+    }
+}
 
-impl<T: Send + 'static + Clone> CallbacksBlackboard<T> {
+impl<T: CallbackValueRequirements> CallbacksBlackboard<T> {
     pub fn new() -> Self {
         Self {
             callbacks: Arc::new(Some(Default::default())),
@@ -107,7 +123,7 @@ impl<T: Send + 'static + Clone> CallbacksBlackboard<T> {
     }
 }
 
-impl<T: Send + 'static + Clone> std::fmt::Debug for CallbacksBlackboard<T> {
+impl<T: CallbackValueRequirements> std::fmt::Debug for CallbacksBlackboard<T> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             fmt,
@@ -127,7 +143,7 @@ struct CallbacksDummy {
     count: usize,
 }
 
-impl<T: Send + 'static + Clone> Serialize for CallbacksBlackboard<T> {
+impl<T: CallbackValueRequirements> Serialize for CallbacksBlackboard<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -145,7 +161,7 @@ impl<T: Send + 'static + Clone> Serialize for CallbacksBlackboard<T> {
     }
 }
 
-impl<'de, T: Send + 'static + Clone> Deserialize<'de> for CallbacksBlackboard<T> {
+impl<'de, T: CallbackValueRequirements> Deserialize<'de> for CallbacksBlackboard<T> {
     fn deserialize<D>(deserializer: D) -> Result<CallbacksBlackboard<T>, D::Error>
     where
         D: Deserializer<'de>,

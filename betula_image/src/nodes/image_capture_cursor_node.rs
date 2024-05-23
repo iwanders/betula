@@ -4,6 +4,7 @@ use super::ImageCaptureNode;
 use crate::{Image, ImageCursor};
 use screen_capture::ThreadedCapturer;
 
+use betula_common::callback::{Callbacks, CallbacksBlackboard};
 use betula_enigo::EnigoBlackboard;
 
 use std::sync::atomic::Ordering::Relaxed;
@@ -29,6 +30,8 @@ type ImageCursorData = Arc<Mutex<Option<FullData>>>;
 pub struct ImageCaptureCursorNode {
     enigo: Input<EnigoBlackboard>,
     output: Output<ImageCursor>,
+    callbacks: CallbacksBlackboard<ImageCursor>,
+    output_cb: Output<CallbacksBlackboard<ImageCursor>>,
     node: ImageCaptureNode,
     setup_done: bool,
     data: ImageCursorData,
@@ -36,10 +39,13 @@ pub struct ImageCaptureCursorNode {
 impl Default for ImageCaptureCursorNode {
     fn default() -> ImageCaptureCursorNode {
         let data = Arc::new(Mutex::new(None));
+        let callbacks = CallbacksBlackboard::<ImageCursor>::new();
         Self {
             enigo: Default::default(),
+            callbacks,
             output: Default::default(),
             node: Default::default(),
+            output_cb: Default::default(),
             setup_done: false,
             data,
         }
@@ -97,6 +103,7 @@ impl Node for ImageCaptureCursorNode {
 
                 // Now, we can craft the post callback.
                 let data = Arc::clone(&self.data);
+                // let cb = self.callbacks.map(|v|v.
                 let post_callback =
                     Arc::new(move |capture_info: screen_capture::capturer::CaptureInfo| {
                         let (cx, cy) = (
@@ -136,6 +143,7 @@ impl Node for ImageCaptureCursorNode {
             let locked = self.data.lock().unwrap();
             locked.as_ref().map(|z| (*z).clone())
         };
+        let _ = self.output_cb.set(self.callbacks.clone());
         if let Some(full_data) = full_data {
             let _ = self.node.output.set(full_data.image_cursor.image.clone());
             let _ = self.output.set(full_data.image_cursor)?;
@@ -151,6 +159,7 @@ impl Node for ImageCaptureCursorNode {
         Ok(vec![
             Port::output::<ImageCursor>("image_cursor"),
             Port::output::<Image>("image"),
+            Port::output::<CallbacksBlackboard<ImageCursor>>("image_cursor_cb"),
             Port::output::<f64>("capture_time"),
             Port::output::<f64>("capture_duration"),
             Port::input::<EnigoBlackboard>("enigo"),
@@ -161,6 +170,8 @@ impl Node for ImageCaptureCursorNode {
         interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
         self.output = interface.output::<ImageCursor>("image_cursor", Default::default())?;
+        self.output_cb = interface
+            .output::<CallbacksBlackboard<ImageCursor>>("image_cursor_cb", Default::default())?;
         self.node.setup_outputs(interface)
     }
 

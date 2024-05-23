@@ -651,6 +651,7 @@ dependencies = [
 name = "betula_image"
 version = "0.0.1"
 dependencies = [
+ "betula_common",
  "betula_core",
  "betula_editor",
  "betula_enigo",
