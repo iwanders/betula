@@ -124,6 +124,8 @@ impl Node for ImageCaptureCursorNode {
                             let image_cursor = ImageCursor {
                                 image: crate::Image::new(info),
                                 cursor: betula_enigo::CursorPosition { x: cx, y: cy },
+                                time,
+                                counter: capture_info.counter,
                             };
                             let ic = image_cursor.clone();
                             let full_data = FullData {

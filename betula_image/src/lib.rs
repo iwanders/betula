@@ -82,6 +82,8 @@ mod enigo_support {
     pub struct ImageCursor {
         pub image: Image,
         pub cursor: CursorPosition,
+        pub time: f64,
+        pub counter: usize,
     }
     impl std::fmt::Debug for ImageCursor {
         fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {

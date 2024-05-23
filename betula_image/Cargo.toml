@@ -16,6 +16,7 @@ screen_capture = { git = "https://github.com/iwanders/screen_capture", rev="d572
 image = { version ="0.25.1", default-features=false, features=["png"]}
 toml = {version = "0.8.12" }
 
+threadpool = "1.8.1"
 
 betula_enigo = { workspace = true, default-features = false, optional=true}
 

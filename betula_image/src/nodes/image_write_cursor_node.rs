@@ -1,6 +1,7 @@
 use betula_common::callback::{CallbacksBlackboard, Ticket};
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::ImageCursor;
 
@@ -19,6 +20,8 @@ pub struct ImageWriteCursorNode {
     pub config: ImageWriteCursorNodeConfig,
 
     ticket: Option<Ticket<ImageCursor>>,
+
+    pool: Arc<threadpool::ThreadPool>,
 }
 
 impl std::fmt::Debug for ImageWriteCursorNode {
@@ -35,7 +38,7 @@ impl Node for ImageWriteCursorNode {
                 .callbacks()
                 .ok_or(format!("callbacks not populated yet"))?;
             if self.config.path.is_empty() {
-                self.ticket = Some(callback_interface.register(|img| {}));
+                self.ticket = Some(callback_interface.register(|_| {}));
             } else {
                 let config_path = std::path::PathBuf::from(&self.config.path);
                 let final_path = if config_path.is_absolute() {
@@ -50,8 +53,26 @@ impl Node for ImageWriteCursorNode {
                     dir
                 };
 
+                let pool = Arc::clone(&self.pool);
+                let fp = final_path.clone();
+                let string_path = fp
+                    .into_os_string()
+                    .into_string()
+                    .map_err(|e| format!("failed convering path: {e:?}"))?;
+
+                let string_path = string_path.trim_end_matches(".png").to_owned();
+
                 self.ticket = Some(callback_interface.register(move |img| {
-                    let _ = img.image.save(&final_path);
+                    let ctr = format!("{:0>6}", img.counter);
+                    let e = string_path.replace("{c}", &ctr);
+                    let t = format!("{}", (img.time * 1000.0).floor() as u64);
+                    let mut e = e.replace("{t}", &t);
+                    e.push_str(".png");
+                    // DOn't block the main callback queue, so dispatch to the pool.
+                    pool.execute(move || {
+                        let z = img.image.save(&e);
+                        println!("z: {z:?}: {e:?}");
+                    });
                 }));
             }
         }
@@ -117,13 +138,19 @@ mod ui_support {
             scale: f32,
         ) -> UiConfigResponse {
             let mut token_modified = false;
-            let text = "path to save screenshots in, empty is dont do anything, relative if not / at begin";
+            let text = "path to save screenshots in, empty is dont do anything, added to directory if not absolute, extension is always png.";
+            let text2 = "{c} gets replaced with the frame counter and some zeros 000001";
+            let text3 = "{t} gets replaced with the unix timestamp in msec";
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.config.path)
                     .hint_text(text)
                     .min_size(egui::vec2(100.0 * scale, 0.0)),
             );
-            token_modified |= response.on_hover_text(text).changed();
+            token_modified |= response
+                .on_hover_text(text)
+                .on_hover_text(text2)
+                .on_hover_text(text3)
+                .changed();
             if token_modified {
                 UiConfigResponse::Changed
             } else {
