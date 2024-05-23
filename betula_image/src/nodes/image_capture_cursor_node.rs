@@ -4,7 +4,7 @@ use super::ImageCaptureNode;
 use crate::{Image, ImageCursor};
 use screen_capture::ThreadedCapturer;
 
-use betula_common::callback::{Callbacks, CallbacksBlackboard};
+use betula_common::callback::CallbacksBlackboard;
 use betula_enigo::EnigoBlackboard;
 
 use std::sync::atomic::Ordering::Relaxed;
@@ -103,7 +103,11 @@ impl Node for ImageCaptureCursorNode {
 
                 // Now, we can craft the post callback.
                 let data = Arc::clone(&self.data);
-                // let cb = self.callbacks.map(|v|v.
+                let cb = self
+                    .callbacks
+                    .callbacks()
+                    .map(|v| v.clone())
+                    .expect("callbacks is always populated here");
                 let post_callback =
                     Arc::new(move |capture_info: screen_capture::capturer::CaptureInfo| {
                         let (cx, cy) = (
@@ -121,6 +125,7 @@ impl Node for ImageCaptureCursorNode {
                                 image: crate::Image::new(info),
                                 cursor: betula_enigo::CursorPosition { x: cx, y: cy },
                             };
+                            let ic = image_cursor.clone();
                             let full_data = FullData {
                                 image_cursor,
                                 time,
@@ -131,6 +136,7 @@ impl Node for ImageCaptureCursorNode {
                                 let mut locked = data.lock().unwrap();
                                 *locked = Some(full_data);
                             }
+                            (cb).call(ic);
                         }
                     });
                 c.set_post_callback(post_callback);

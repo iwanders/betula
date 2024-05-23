@@ -17,9 +17,9 @@ impl<T> std::fmt::Debug for Ticket<T> {
     }
 }
 
-// #[derive(Default)]
+#[derive(Clone)]
 pub struct Callbacks<T: CallbackValueRequirements> {
-    callbacks: RwLock<Vec<CallbackFun<T>>>,
+    callbacks: Arc<RwLock<Vec<CallbackFun<T>>>>,
 }
 impl<T: CallbackValueRequirements> std::fmt::Debug for Callbacks<T> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -29,11 +29,16 @@ impl<T: CallbackValueRequirements> std::fmt::Debug for Callbacks<T> {
         })
     }
 }
+impl<T: CallbackValueRequirements> std::cmp::PartialEq for Callbacks<T> {
+    fn eq(&self, other: &Callbacks<T>) -> bool {
+        Arc::as_ptr(&self.callbacks) == Arc::as_ptr(&other.callbacks)
+    }
+}
 
 impl<T: CallbackValueRequirements> Default for Callbacks<T> {
     fn default() -> Self {
         Self {
-            callbacks: RwLock::new(vec![]),
+            callbacks: Arc::new(RwLock::new(vec![])),
         }
     }
 }
@@ -102,33 +107,42 @@ impl<T: CallbackValueRequirements> Callbacks<T> {
 
 #[derive(Default, Clone)]
 pub struct CallbacksBlackboard<T: CallbackValueRequirements> {
-    callbacks: Arc<Option<Callbacks<T>>>,
+    callbacks: Option<Callbacks<T>>,
     count: usize,
 }
 impl<T: CallbackValueRequirements> std::cmp::PartialEq for CallbacksBlackboard<T> {
     fn eq(&self, other: &CallbacksBlackboard<T>) -> bool {
-        Arc::as_ptr(&self.callbacks) == Arc::as_ptr(&other.callbacks)
+        if let Some(ours) = self.callbacks.as_ref() {
+            if let Some(other) = other.callbacks.as_ref() {
+                return other == ours;
+            }
+        }
+        false
     }
 }
 
 impl<T: CallbackValueRequirements> CallbacksBlackboard<T> {
     pub fn new() -> Self {
         Self {
-            callbacks: Arc::new(Some(Default::default())),
+            callbacks: Some(Default::default()),
             count: 0,
         }
     }
     pub fn callbacks(&self) -> Option<&Callbacks<T>> {
-        self.callbacks.as_ref().as_ref()
+        self.callbacks.as_ref()
     }
 }
 
 impl<T: CallbackValueRequirements> std::fmt::Debug for CallbacksBlackboard<T> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let tname = std::any::type_name::<T>()
+            .split("::")
+            .last()
+            .unwrap_or(std::any::type_name::<T>());
         write!(
             fmt,
             "CB<{}>({})",
-            std::any::type_name::<T>(),
+            tname,
             self.callbacks
                 .as_ref()
                 .as_ref()
@@ -169,7 +183,7 @@ impl<'de, T: CallbackValueRequirements> Deserialize<'de> for CallbacksBlackboard
         let t = CallbacksDummy::deserialize(deserializer)?;
         Ok(CallbacksBlackboard {
             count: t.count,
-            callbacks: Arc::new(Default::default()),
+            callbacks: Default::default(),
         })
     }
 }
