@@ -10,11 +10,13 @@ pub struct BlackboardId(pub Uuid);
 /// A name for an input or outuput port.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct PortName(pub String);
-impl PortName {
-    pub fn as_ref(&self) -> &str {
+impl AsRef<str> for PortName {
+    // Required method
+    fn as_ref(&self) -> &str {
         &self.0
     }
 }
+
 impl From<&str> for PortName {
     fn from(v: &str) -> Self {
         PortName(v.to_owned())
@@ -32,9 +34,9 @@ impl From<String> for PortName {
         PortName(v.clone())
     }
 }
-impl Into<String> for PortName {
-    fn into(self) -> std::string::String {
-        self.0.clone()
+impl From<PortName> for String {
+    fn from(val: PortName) -> Self {
+        val.0.clone()
     }
 }
 
@@ -109,10 +111,10 @@ impl Port {
     }
 
     pub fn port_type(&self) -> PortType {
-        self.port_type.clone()
+        self.port_type
     }
     pub fn direction(&self) -> PortDirection {
-        self.direction.clone()
+        self.direction
     }
     pub fn name(&self) -> PortName {
         self.name.clone()
@@ -135,13 +137,13 @@ impl NodePort {
         }
     }
     pub fn node(&self) -> NodeId {
-        self.node.clone()
+        self.node
     }
     pub fn name(&self) -> PortName {
         self.name.clone()
     }
     pub fn direction(&self) -> PortDirection {
-        self.direction.clone()
+        self.direction
     }
 }
 
@@ -159,7 +161,7 @@ impl BlackboardPort {
         }
     }
     pub fn blackboard(&self) -> BlackboardId {
-        self.blackboard.clone()
+        self.blackboard
     }
     pub fn name(&self) -> PortName {
         self.name.clone()

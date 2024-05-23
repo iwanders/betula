@@ -4,8 +4,6 @@ pub type PatternError = CaptureError;
 pub mod nodes;
 pub mod pattern_match;
 
-use betula_common::callback::CallbacksBlackboard;
-
 use serde::{Deserialize, Deserializer, Serialize};
 
 use std::sync::Arc;
@@ -108,6 +106,7 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
 
     #[cfg(feature = "betula_enigo")]
     {
+        use betula_common::callback::CallbacksBlackboard;
         ui_support.add_value_default_named::<ImageCursor>("ImageCursor");
         ui_support.add_value_default_named::<CallbacksBlackboard<ImageCursor>>("ImageCursorCB");
         ui_support

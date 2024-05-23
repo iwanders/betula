@@ -139,7 +139,7 @@ impl BasicTree {
         // First check if we only got outputs...
         for c in connections {
             if c.node.direction() == PortDirection::Input {
-                return Err(format!("got input port for output setup").into());
+                return Err("got input port for output setup".to_string().into());
             }
         }
 
@@ -184,7 +184,7 @@ impl BasicTree {
                     });
                     Ok(one_setter)
                 } else {
-                    let v = |_| Err(format!("writing to disconnected port").into());
+                    let v = |_| Err("writing to disconnected port".to_string().into());
                     Ok(Box::new(v))
                 }
             }
@@ -216,7 +216,7 @@ impl BasicTree {
         // First check if we only got outputs...
         for c in connections {
             if c.node.direction() == PortDirection::Output {
-                return Err(format!("got output port for input setup").into());
+                return Err("got output port for input setup".to_string().into());
             }
         }
 
@@ -249,11 +249,11 @@ impl BasicTree {
                         let mut blackboard_mut = blackboard.blackboard.try_borrow_mut()?;
                         blackboard_mut.reader(id, &blackboard_name)
                     } else {
-                        let v = || Err(format!("reading from disconnected port").into());
+                        let v = || Err("reading from disconnected port".to_string().into());
                         Ok(Box::new(v))
                     }
                 } else {
-                    let v = || Err(format!("reading from disconnected port").into());
+                    let v = || Err("reading from disconnected port".to_string().into());
                     Ok(Box::new(v))
                 }
             }
@@ -282,7 +282,7 @@ impl BasicTree {
     ) -> Result<(), BetulaError> {
         let node = self
             .nodes
-            .get(&node_id)
+            .get(node_id)
             .ok_or_else(|| format!("node {node_id:?} does not exist").to_string())?;
         let mut node_mut = node.node.try_borrow_mut()?;
         struct Disconnecter {}
@@ -294,14 +294,14 @@ impl BasicTree {
                 default: &ValueCreator,
             ) -> Result<Write, NodeError> {
                 let _ = (id, key, default);
-                let v = |_| Err(format!("writing to disconnected port").into());
+                let v = |_| Err("writing to disconnected port".to_string().into());
                 Ok(Box::new(v))
             }
         }
         impl BlackboardInputInterface for Disconnecter {
             fn reader(&mut self, id: &TypeId, key: &PortName) -> Result<Read, NodeError> {
                 let _ = (id, key);
-                let v = || Err(format!("reading from disconnected port").into());
+                let v = || Err("reading from disconnected port".to_string().into());
                 Ok(Box::new(v))
             }
         }
@@ -386,12 +386,12 @@ impl Tree for BasicTree {
             .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
             .node
             .try_borrow_mut()?;
-        let mut context = TreeContext {
+        let context = TreeContext {
             this_node: id,
-            tree: &self,
+            tree: self,
         };
 
-        n.execute(&mut context)
+        n.execute(&context)
     }
 
     fn reset_recursive(&self, id: NodeId) -> Result<(), NodeError> {
@@ -401,12 +401,12 @@ impl Tree for BasicTree {
             .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
             .node
             .try_borrow_mut()?;
-        let mut context = TreeContext {
+        let context = TreeContext {
             this_node: id,
-            tree: &self,
+            tree: self,
         };
 
-        n.reset_recursive(&mut context)
+        n.reset_recursive(&context)
     }
 
     fn blackboards(&self) -> Vec<BlackboardId> {
@@ -445,7 +445,7 @@ impl Tree for BasicTree {
             .ok_or::<BetulaError>(format!("could not find blackboard {id:?}").into())?;
         let connections = blackboard.connections.clone();
         for connection in connections.iter() {
-            let _ = self.disconnect_port(&connection)?;
+            self.disconnect_port(connection)?;
         }
         // Then remove the blackboard and return.
         self.blackboards
@@ -532,7 +532,7 @@ impl Tree for BasicTree {
         // Verify that we have these nodes.
         let nodes = self.nodes();
         for n in new_roots {
-            if !nodes.contains(&n) {
+            if !nodes.contains(n) {
                 return Err(format!("node {n:?} not present").into());
             }
         }
@@ -615,7 +615,8 @@ impl BlackboardOutputInterface for BasicBlackboard {
         let current_type = {
             let z = temp_rc
                 .try_borrow_mut()
-                .or_else(|_| Err(format!("{key:?} was already borrowed")))?;
+                .map_err(|_| format!("{key:?} was already borrowed"))?;
+
             (**z).as_any_type_name().to_string()
         };
         let owned_key = key.to_string();
@@ -671,7 +672,7 @@ impl Blackboard for BasicBlackboard {
         Self::default()
     }
     fn ports(&self) -> Vec<PortName> {
-        self.values.keys().map(|v| v.clone()).collect::<Vec<_>>()
+        self.values.keys().cloned().collect::<Vec<_>>()
     }
 
     fn clear(&mut self) {
@@ -679,12 +680,12 @@ impl Blackboard for BasicBlackboard {
     }
 
     fn get(&self, port: &PortName) -> Option<Value> {
-        self.values.get(&port).map(|x| x.1.borrow().clone_boxed())
+        self.values.get(port).map(|x| x.1.borrow().clone_boxed())
     }
 
     fn set(&mut self, port: &PortName, value: Value) -> Result<(), BetulaError> {
         let new_value_type = (*value).as_any_type_id();
-        let old_value_type = self.values.get(&port).map(|x| (*x).type_id());
+        let old_value_type = self.values.get(port).map(|x| (*x).type_id());
         if let Some(old_value_type) = old_value_type {
             if new_value_type != old_value_type {
                 return Err("different type already on blackboard".into());

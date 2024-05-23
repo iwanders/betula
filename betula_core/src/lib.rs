@@ -221,9 +221,9 @@ impl From<String> for NodeType {
         NodeType(v.clone())
     }
 }
-impl Into<String> for NodeType {
-    fn into(self) -> std::string::String {
-        self.0.clone()
+impl From<NodeType> for String {
+    fn from(val: NodeType) -> Self {
+        val.0.clone()
     }
 }
 
