@@ -17,6 +17,7 @@ image = { version ="0.25.1", default-features=false, features=["png"]}
 toml = {version = "0.8.12" }
 
 threadpool = "1.8.1"
+serde_json = "1.0.115"
 
 betula_enigo = { workspace = true, default-features = false, optional=true}
 
