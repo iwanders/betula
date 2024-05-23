@@ -127,7 +127,22 @@ the color space conversion.
 
 The outputs `capture_time` and `capture_duration` are optional.
 
-If the crate is compiled with the `betula_enigo` feature, the `ImageCaptureCursorNode` is also created. This node is a superset of the `ImageCaptureNode` and can capture the cursor position at the exact time the threaded capturer starts the screen capture, ensuring that the cursor position is captured at the moment of screen capture.
+#### ImageCaptureCursorNode
+If the crate is compiled with the `betula_enigo` feature, the `ImageCaptureCursorNode` is also created.
+
+This node is a superset of the `ImageCaptureNode` and can capture the cursor position at the exact time the threaded capturer starts the screen capture, ensuring that the cursor position is captured at the moment of screen capture.
+
+This node also features a callback mechanism (setup through the blackboard) that allows other nodes to register a callback when new frames are available. This happens in the background, regardless of whether the blackboard is running. This is useful if the screen state and cursor needs to be processed, but one still wishes to configure through the editor.
+
+#### ImageWriteCursorNode
+If the crate is compiled with the `betula_enigo` feature, the `ImageCaptureCursorNode` is also created. It is the example consumer for the callbacks provided by the `ImageCaptureCursorNode`.
+
+Whenever this node is executed, the frame save counter is set to the value as specified in the configuration, and - if not yet configured -  a callback is registered.
+
+While the counter is not zero, this node writes the frames and their sidecar json files (that hold cursor position) to the disk. This happens asynchronously, regardless of whether the blackboard is being ticket.
+
+Frames are always saved as `png`, the `{c}` string is replaced with the frame counter (since the start of the capturer), the `{t}` string is replaced with the unix timestamp in ms.
+
 
 
 ### ImageMatchNode
