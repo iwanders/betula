@@ -374,7 +374,7 @@ impl BetulaEditor {
                 }
                 let r = ui.add(
                     egui::DragValue::new(&mut self.run_state.interval.0)
-                        .clamp_range(20..=10000)
+                        .clamp_range(1..=10000)
                         .suffix("ms")
                         .update_while_editing(false),
                 );
