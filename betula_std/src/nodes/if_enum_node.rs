@@ -4,26 +4,59 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "betula_editor")]
 use betula_editor::UiNodeCategory;
 
+/// Trait that enums that want to use this node must implement.
+pub trait IfEnumNodeEnum:
+    PartialEq + Serialize + DeserializeOwned + Clone + std::fmt::Debug + 'static + Send + Sized
+{
+    /// This is the snake case representation of the type.
+    ///
+    /// This is both used in the title, as well as in the node's static type used for serialization.
+    fn enum_node_name() -> &'static str;
+
+    /// The enums as selectable from the drop down.
+    fn enum_node_enumeration() -> &'static [Self];
+
+    /// The default value used for the configuration.
+    fn enum_node_default() -> Self;
+
+    /// The node category in the ui.
+    #[cfg(feature = "betula_editor")]
+    fn enum_node_category() -> Vec<UiNodeCategory> {
+        vec![
+            UiNodeCategory::Folder("decorator".to_owned()),
+            UiNodeCategory::Name(format!("if_{}", Self::enum_node_name())),
+        ]
+    }
+}
+
+/// Example node for the [`ExecutionStatus`] type.
+pub type IfExecutionStatusNode = IfEnumNode<ExecutionStatus>;
+/// Example node config for the [`ExecutionStatus`] type.
+pub type IfExecutionStatusNodeConfig = IfEnumNodeConfig<ExecutionStatus>;
+
+/// And its trait implementation.
+impl IfEnumNodeEnum for ExecutionStatus {
+    fn enum_node_name() -> &'static str {
+        "execution_status"
+    }
+    fn enum_node_default() -> Self {
+        ExecutionStatus::Running
+    }
+    fn enum_node_enumeration() -> &'static [Self] {
+        &[
+            ExecutionStatus::Running,
+            ExecutionStatus::Success,
+            ExecutionStatus::Failure,
+        ]
+    }
+}
+
+/// The comparison type for the node enum.
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Default)]
 pub enum IfEnumNodeComparison {
     #[default]
     Equal,
     NotEqual,
-}
-
-pub trait IfEnumNodeEnum:
-    PartialEq + Serialize + DeserializeOwned + Clone + std::fmt::Debug + 'static + Send
-{
-    fn enum_node_name() -> &'static str
-    where
-        Self: Sized;
-    fn enum_node_enumeration() -> &'static [Self];
-    fn enum_node_default() -> Self;
-
-    #[cfg(feature = "betula_editor")]
-    fn enum_node_category() -> Vec<UiNodeCategory> {
-        vec![UiNodeCategory::Folder("decorator".to_owned())]
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,33 +135,6 @@ impl<T: IfEnumNodeEnum> Node for IfEnumNode<T> {
         Self::static_type()
     }
 }
-
-pub type IfExecutionStatusNode = IfEnumNode<ExecutionStatus>;
-pub type IfExecutionStatusNodeConfig = IfEnumNodeConfig<ExecutionStatus>;
-impl IfEnumNodeEnum for ExecutionStatus {
-    fn enum_node_name() -> &'static str {
-        "execution_status"
-    }
-    fn enum_node_default() -> Self {
-        ExecutionStatus::Running
-    }
-    fn enum_node_enumeration() -> &'static [Self] {
-        &[
-            ExecutionStatus::Running,
-            ExecutionStatus::Success,
-            ExecutionStatus::Failure,
-        ]
-    }
-
-    #[cfg(feature = "betula_editor")]
-    fn enum_node_category() -> Vec<UiNodeCategory> {
-        vec![
-            UiNodeCategory::Folder("decorator".to_owned()),
-            UiNodeCategory::Name("if_execution_status".to_owned()),
-        ]
-    }
-}
-
 #[cfg(feature = "betula_editor")]
 pub mod ui_support {
     use super::*;
