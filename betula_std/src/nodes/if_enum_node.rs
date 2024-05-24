@@ -4,8 +4,15 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "betula_editor")]
 use betula_editor::UiNodeCategory;
 
+#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Default)]
+pub enum IfEnumNodeComparison {
+    #[default]
+    Equal,
+    NotEqual,
+}
+
 pub trait IfEnumNodeEnum:
-    std::cmp::PartialEq + Serialize + DeserializeOwned + Clone + std::fmt::Debug + 'static + Send
+    PartialEq + Serialize + DeserializeOwned + Clone + std::fmt::Debug + 'static + Send
 {
     fn enum_node_name() -> &'static str
     where
@@ -23,11 +30,13 @@ pub trait IfEnumNodeEnum:
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct IfEnumNodeConfig<T: IfEnumNodeEnum> {
     pub value: T,
+    pub comparison: IfEnumNodeComparison,
 }
 impl<T: IfEnumNodeEnum> Default for IfEnumNodeConfig<T> {
     fn default() -> Self {
         Self {
             value: T::enum_node_default(),
+            comparison: Default::default(),
         }
     }
 }
@@ -51,7 +60,12 @@ impl<T: IfEnumNodeEnum> Default for IfEnumNode<T> {
 impl<T: IfEnumNodeEnum> Node for IfEnumNode<T> {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let value = self.input.get()?;
-        if value == self.config.value {
+        let boolean_value = if self.config.comparison == IfEnumNodeComparison::Equal {
+            value == self.config.value
+        } else {
+            value != self.config.value
+        };
+        if boolean_value {
             ctx.decorate_or(ExecutionStatus::Success)
         } else {
             Ok(ExecutionStatus::Failure)
@@ -126,7 +140,7 @@ pub mod ui_support {
         }
         fn ui_icon(&self, ui: &mut egui::Ui, desired_size: egui::Vec2) {
             let _ = desired_size;
-            ui.add(egui::Label::new("🔁").selectable(false));
+            ui.add(egui::Label::new("🔱").selectable(false));
         }
 
         fn ui_config(
@@ -138,6 +152,25 @@ pub mod ui_support {
             let _ = ctx;
             let mut ui_response = UiConfigResponse::UnChanged;
 
+            let mut cmp_options = vec![];
+            let cmp_order = [IfEnumNodeComparison::Equal, IfEnumNodeComparison::NotEqual];
+            let cmp_str = ["==", "!="];
+            let mut index = 0;
+            for (i, v) in cmp_order.iter().enumerate() {
+                cmp_options.push((i, cmp_str[i], *v));
+                if *v == self.config.comparison {
+                    index = i;
+                }
+            }
+            let z = egui::ComboBox::from_id_source(0)
+                .width(0.0)
+                .selected_text(cmp_str[index])
+                .show_index(ui, &mut index, cmp_options.len(), |i| cmp_options[i].1);
+            if z.changed() {
+                self.config.comparison = cmp_options[index].2.clone();
+                ui_response = UiConfigResponse::Changed;
+            }
+
             let mut options = vec![];
             let mut index = 0;
             for (i, v) in T::enum_node_enumeration().iter().enumerate() {
@@ -147,7 +180,7 @@ pub mod ui_support {
                 }
             }
 
-            let z = egui::ComboBox::from_id_source(0)
+            let z = egui::ComboBox::from_id_source(1)
                 .width(0.0)
                 .selected_text(format!("{:?}", options[index].1))
                 .show_index(ui, &mut index, options.len(), |i| &options[i].1);
