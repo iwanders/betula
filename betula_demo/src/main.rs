@@ -1,4 +1,4 @@
-use betula_common::{control::InProcessControl, create_server_thread};
+use betula_common::{control::internal_server_client, create_server_thread};
 use betula_core::basic::{BasicBlackboard, BasicTree};
 use betula_editor::{editor::BetulaEditor, UiSupport};
 
@@ -20,7 +20,7 @@ fn create_ui_support() -> UiSupport {
 
 fn main() -> eframe::Result<()> {
     // Create the control pipes.
-    let (server, client) = InProcessControl::new();
+    let (server, client) = internal_server_client();
 
     // Create the background runner.
     let _background_runner = create_server_thread::<BasicTree, BasicBlackboard>(

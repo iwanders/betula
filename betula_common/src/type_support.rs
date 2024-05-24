@@ -20,16 +20,22 @@ impl<T: DefaultNodeFactoryRequirements> std::fmt::Debug for DefaultNodeFactory<T
     }
 }
 
-impl<T: DefaultNodeFactoryRequirements> DefaultNodeFactory<T> {
-    pub fn new() -> Self {
+impl<T: DefaultNodeFactoryRequirements> Default for DefaultNodeFactory<T> {
+    fn default() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
     }
 }
+
+impl<T: DefaultNodeFactoryRequirements> DefaultNodeFactory<T> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
 impl<T: DefaultNodeFactoryRequirements> NodeFactory for DefaultNodeFactory<T> {
     fn create(&self) -> Result<Box<dyn Node>, BetulaError> {
-        Ok(Box::new(T::default()))
+        Ok(Box::<T>::default())
     }
 }
 
@@ -74,11 +80,17 @@ impl<T: DefaultConfigRequirements> std::fmt::Debug for DefaultConfigConverter<T>
     }
 }
 
-impl<T: DefaultConfigRequirements> DefaultConfigConverter<T> {
-    pub fn new() -> Self {
+impl<T: DefaultConfigRequirements> Default for DefaultConfigConverter<T> {
+    fn default() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
+    }
+}
+
+impl<T: DefaultConfigRequirements> DefaultConfigConverter<T> {
+    pub fn new() -> Self {
+        Default::default()
     }
 }
 impl<T: DefaultConfigRequirements> ConfigConverter for DefaultConfigConverter<T> {
@@ -130,11 +142,17 @@ impl<T: DefaultValueRequirements> std::fmt::Debug for DefaultValueConverter<T> {
     }
 }
 
-impl<T: DefaultValueRequirements> DefaultValueConverter<T> {
-    pub fn new() -> Self {
+impl<T: DefaultValueRequirements> Default for DefaultValueConverter<T> {
+    fn default() -> Self {
         Self {
             _z: std::marker::PhantomData,
         }
+    }
+}
+
+impl<T: DefaultValueRequirements> DefaultValueConverter<T> {
+    pub fn new() -> Self {
+        Default::default()
     }
 }
 impl<T: DefaultValueRequirements> ValueConverter for DefaultValueConverter<T> {

@@ -2,7 +2,7 @@ use eframe::{App, CreationContext};
 
 use crate::{BetulaViewer, BetulaViewerNode, UiSupport};
 use betula_common::{
-    control::{InProcessControl, InteractionCommand, TreeClient, TreeServer},
+    control::{internal_server_client, InteractionCommand, TreeClient, TreeServer},
     tree_support::TreeConfig,
 };
 use betula_core::BetulaError;
@@ -97,7 +97,7 @@ impl BetulaEditor {
     pub fn new(client: Box<dyn TreeClient>, ui_support: UiSupport, cx: &CreationContext) -> Self {
         let snarl = Snarl::<BetulaViewerNode>::new();
 
-        let (viewer_server, viewer_client) = InProcessControl::new();
+        let (viewer_server, viewer_client) = internal_server_client();
 
         let viewer = BetulaViewer::new(Box::new(viewer_client), ui_support);
 

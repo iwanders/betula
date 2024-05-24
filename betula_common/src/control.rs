@@ -43,7 +43,7 @@ pub struct TreeCallWrapper<
 impl<TT: Fn(&mut dyn Tree) -> Result<(), BetulaError> + std::marker::Send + Clone + 'static>
     TreeCallWrapper<TT>
 {
-    pub fn new(f: TT) -> Box<dyn TreeCall> {
+    pub fn make(f: TT) -> Box<dyn TreeCall> {
         Box::new(Self { f })
     }
 }
@@ -87,15 +87,14 @@ mod option_duration_serde {
     where
         S: Serializer,
     {
-        let v = value.as_ref().and_then(|v| Some(v.as_secs_f64()));
+        let v = value.as_ref().map(|v| v.as_secs_f64());
         Option::<f64>::serialize(&v, serializer)
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<std::time::Duration>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        Option::<f64>::deserialize(deserializer)
-            .and_then(|v| Ok(v.and_then(|v| Some(std::time::Duration::from_secs_f64(v)))))
+        Option::<f64>::deserialize(deserializer).map(|v| v.map(std::time::Duration::from_secs_f64))
     }
 }
 
@@ -209,19 +208,19 @@ impl InteractionCommand {
     pub fn set_directory(path: Option<&std::path::Path>) -> Self {
         let path = path.map(|v| {
             v.canonicalize()
-                .expect(&format!("path {path:?} could not be made canonical"))
+                .unwrap_or_else(|_| panic!("path {path:?} could not be made canonical"))
                 .into_os_string()
                 .into_string()
-                .expect(&format!("path {path:?} could not be made made into string"))
+                .unwrap_or_else(|_| panic!("path {path:?} could not be made made into string"))
         });
         InteractionCommand::SetDirectory(path)
     }
 
     pub fn connect_port(port_connection: PortConnection) -> Self {
-        Self::port_disconnect_connect(&vec![], &vec![port_connection])
+        Self::port_disconnect_connect(&[], &[port_connection])
     }
     pub fn disconnect_port(port_connection: PortConnection) -> Self {
-        Self::port_disconnect_connect(&vec![port_connection], &vec![])
+        Self::port_disconnect_connect(&[port_connection], &[])
     }
 
     pub fn port_disconnect_connect(
@@ -246,7 +245,7 @@ impl InteractionCommand {
     >(
         f: F,
     ) -> Self {
-        InteractionCommand::TreeCall(TreeCallWrapper::new(f))
+        InteractionCommand::TreeCall(TreeCallWrapper::make(f))
     }
 
     pub fn set_config(id: NodeId, config: SerializedConfig) -> Self {
@@ -339,7 +338,7 @@ impl InteractionCommand {
                 ])
             }
             InteractionCommand::SetChildren(ref v) => {
-                let _modified = tree.set_children(v.parent, &v.children)?;
+                tree.set_children(v.parent, &v.children)?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
                         command: self.clone(),
@@ -376,7 +375,7 @@ impl InteractionCommand {
             InteractionCommand::AddBlackboard(v) => {
                 let blackboard = tree_support
                     .create_blackboard()
-                    .ok_or(format!("cannot create blackboard, no factory"))?;
+                    .ok_or("cannot create blackboard, no factory".to_string())?;
                 tree.add_blackboard_boxed(*v, blackboard)?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
@@ -463,7 +462,7 @@ impl InteractionCommand {
                 ])
             }
             InteractionCommand::SetRoots(roots) => {
-                tree.set_roots(&roots)?;
+                tree.set_roots(roots)?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {
                         command: self.clone(),
@@ -560,7 +559,7 @@ impl InteractionCommand {
             }
             InteractionCommand::SetDirectory(dir) => {
                 let dir = dir.as_ref().map(|s| std::path::PathBuf::from(&s));
-                let dir = dir.as_ref().map(|v| v.as_path());
+                let dir = dir.as_deref();
                 tree.set_directory(dir);
                 Ok(vec![InteractionEvent::CommandResult(CommandResult {
                     command: self.clone(),
@@ -717,20 +716,17 @@ impl TreeClient for InProcessControlClient {
     }
 }
 
-pub struct InProcessControl {}
-impl InProcessControl {
-    pub fn new() -> (InProcessControlServer, InProcessControlClient) {
-        let (command_sender, command_receiver) = std::sync::mpsc::channel();
-        let (event_sender, event_receiver) = std::sync::mpsc::channel();
-        (
-            InProcessControlServer {
-                sender: event_sender,
-                receiver: command_receiver,
-            },
-            InProcessControlClient {
-                sender: command_sender,
-                receiver: event_receiver,
-            },
-        )
-    }
+pub fn internal_server_client() -> (InProcessControlServer, InProcessControlClient) {
+    let (command_sender, command_receiver) = std::sync::mpsc::channel();
+    let (event_sender, event_receiver) = std::sync::mpsc::channel();
+    (
+        InProcessControlServer {
+            sender: event_sender,
+            receiver: command_receiver,
+        },
+        InProcessControlClient {
+            sender: command_sender,
+            receiver: event_receiver,
+        },
+    )
 }

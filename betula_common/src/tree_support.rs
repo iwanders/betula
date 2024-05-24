@@ -155,12 +155,7 @@ impl TreeSupport {
     }
 
     fn get_value_type_support(&self, name: &str) -> Option<&ValueTypeSupport> {
-        for (_, v) in self.value_support.iter() {
-            if v.name == name {
-                return Some(v);
-            }
-        }
-        None
+        self.value_support.values().find(|&v| v.name == name)
     }
 
     fn add_node_factory(&mut self, node_type: NodeType, factory: Box<dyn NodeFactory>) {
@@ -232,8 +227,7 @@ impl TreeSupport {
             let config: Option<SerializableHolder> = if let Some(config) = config {
                 let converter = self.node_support.get(&node_type);
                 let converter = converter
-                    .map(|v| v.config_converter.as_ref())
-                    .flatten()
+                    .and_then(|v| v.config_converter.as_ref())
                     .ok_or(format!("could not get support for {node_type:?}"))?;
                 let serialize_erased = converter.config_serialize(&*config)?;
                 Some(
@@ -302,7 +296,7 @@ impl TreeSupport {
         let config = self
             .export_tree_config(tree)
             .map_err(|e| S::Error::custom(format!("serialize failed with {e:?}")))?;
-        Ok(config.serialize(serializer)?)
+        config.serialize(serializer)
     }
 
     pub fn import_tree_config(
@@ -372,7 +366,7 @@ impl TreeSupport {
                     let id = blackboard.id;
                     let mut bb = self
                         .create_blackboard()
-                        .ok_or::<BetulaError>(format!("no blackboard factory function").into())?;
+                        .ok_or::<BetulaError>("no blackboard factory function".into())?;
                     for (k, v) in blackboard.values {
                         bb.set(&k, v.clone())?;
                     }
@@ -419,9 +413,9 @@ impl TreeSupport {
             .ok_or(format!(
                 "config_serialize: could not get config serializer for {node_type:?}"
             ))?;
-        let serialize_erased = converter.config_serialize(&*config)?;
+        let serialize_erased = converter.config_serialize(config)?;
         Ok(SerializedConfig {
-            node_type: node_type,
+            node_type,
             data: serde_json::to_value(serialize_erased)
                 .map_err(|e| format!("json serialize error {e:?}"))?,
         })
@@ -432,7 +426,7 @@ impl TreeSupport {
         config: SerializedConfig,
     ) -> Result<Box<dyn NodeConfig>, BetulaError> {
         let node_type = &config.node_type;
-        let converter = self.node_support.get(&node_type);
+        let converter = self.node_support.get(node_type);
         let converter = converter
             .map(|v| v.config_converter.as_ref())
             .ok_or(format!(
@@ -442,7 +436,7 @@ impl TreeSupport {
                 "config_deserialize: could not get config serializer for {node_type:?}"
             ))?;
         let mut erased = Box::new(<dyn erased_serde::Deserializer>::erase(config.data));
-        Ok(converter.config_deserialize(&mut erased)?)
+        converter.config_deserialize(&mut erased)
     }
 
     pub fn value_serialize(&self, value: &dyn Chalkable) -> Result<SerializedValue, BetulaError> {
@@ -454,7 +448,7 @@ impl TreeSupport {
 
         let serialize_erased = converter
             .value_converter
-            .value_serialize(&*value)
+            .value_serialize(value)
             .map_err(|e| format!("failed with {e}"))?;
         Ok(SerializedValue {
             type_id: converter.name.clone(),
@@ -509,7 +503,7 @@ impl<'a, 'b> TreeSerializer<'a, 'b> {
 }
 
 impl<'a, 'b> serde::Serialize for TreeSerializer<'a, 'b> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {

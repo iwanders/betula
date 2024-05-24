@@ -5,11 +5,11 @@ use std::sync::{Arc, Weak};
 pub trait CallbackValueRequirements: Send + 'static + Clone + Sync {}
 impl<T: Send + 'static + Clone + Sync> CallbackValueRequirements for T {}
 
-type CallbackFun<T> = Weak<Arc<dyn Fn(T) -> () + Send + Sync>>;
+type CallbackFun<T> = Weak<Arc<dyn Fn(T) + Send + Sync>>;
 
 /// The ticket is returned after registration, keep this around to ensure the registration stays active.
 pub struct Ticket<T> {
-    _registration: Arc<Arc<dyn Fn(T) -> () + Send + Sync>>,
+    _registration: Arc<Arc<dyn Fn(T) + Send + Sync>>,
 }
 impl<T> std::fmt::Debug for Ticket<T> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -58,12 +58,12 @@ impl<T: CallbackValueRequirements> Callbacks<T> {
     }
 
     /// Register a callback with this callbacks object.
-    pub fn register<F: Fn(T) -> () + 'static + Send + Sync>(&self, f: F) -> Ticket<T> {
+    pub fn register<F: Fn(T) + 'static + Send + Sync>(&self, f: F) -> Ticket<T> {
         self.register_arc(Arc::new(f))
     }
 
     /// Register a callback with this callbacks object.
-    pub fn register_arc(&self, f: Arc<dyn Fn(T) -> () + Send + Sync>) -> Ticket<T> {
+    pub fn register_arc(&self, f: Arc<dyn Fn(T) + Send + Sync>) -> Ticket<T> {
         // Wrap the function in a new arc, of which we keep the weak pointer.
         // We hand the strong pointer back in the ticket, that way if the ticket goes out of
         // scope, we know the registration has become invalid.

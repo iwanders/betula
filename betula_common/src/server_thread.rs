@@ -27,7 +27,7 @@ impl RunContext for TrackedTreeContext<'_, '_> {
         for s in all {
             status.push(s);
         }
-        Ok(v?)
+        v
     }
     fn reset_recursive(&self, index: usize) -> Result<(), NodeError> {
         let ids = self.tree.children(self.this_node)?;
@@ -46,13 +46,13 @@ pub fn execute_tracked(
         .ok_or_else(|| format!("node {id:?} does not exist").to_string())?
         .try_borrow_mut()?;
 
-    let mut context = TrackedTreeContext {
+    let context = TrackedTreeContext {
         this_node: id,
-        tree: tree,
+        tree,
         status: &mut res,
     };
 
-    let v = n.execute(&mut context);
+    let v = n.execute(&context);
     if let Err(e) = v {
         {
             let e_string = format!("{}", e);
@@ -106,7 +106,7 @@ fn run_nodes(
     // Dump all blackboard values to the frontend for now.
     if !roots.is_empty() {
         events.push(InteractionEvent::BlackboardValues(
-            BlackboardValues::from_tree(&tree_support, tree)?,
+            BlackboardValues::from_tree(tree_support, tree)?,
         ));
     }
     Ok(events)
@@ -139,8 +139,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                             sleep_interval = new_duration;
                         }
                         if !run_settings.specific.is_empty() {
-                            let events =
-                                run_nodes(&tree_support, &mut tree, &run_settings.specific)?;
+                            let events = run_nodes(&tree_support, &tree, &run_settings.specific)?;
                             for e in events {
                                 server.send_event(e)?;
                             }
@@ -157,7 +156,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
                         Err(e) => {
                             println!("failed to execute: {e:?}");
                             server.send_event(InteractionEvent::CommandResult(CommandResult {
-                                command: command,
+                                command,
                                 error: Some(format!("{e:?}")),
                             }))?;
                         }
@@ -169,7 +168,7 @@ pub fn create_server_thread<T: betula_core::Tree, B: betula_core::Blackboard + '
 
             if run_roots {
                 let roots = tree.roots();
-                let events = run_nodes(&tree_support, &mut tree, &roots)?;
+                let events = run_nodes(&tree_support, &tree, &roots)?;
                 for e in events {
                     server.send_event(e)?;
                 }
