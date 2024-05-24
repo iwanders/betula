@@ -154,7 +154,7 @@ impl Node for ImageCaptureCursorNode {
         let _ = self.output_cb.set(self.callbacks.clone());
         if let Some(full_data) = full_data {
             let _ = self.node.output.set(full_data.image_cursor.image.clone());
-            let _ = self.output.set(full_data.image_cursor)?;
+            let _ = self.output.set(full_data.image_cursor);
             let _ = self.node.output_time.set(full_data.time);
             let _ = self.node.output_duration.set(full_data.duration);
             Ok(ExecutionStatus::Success)
