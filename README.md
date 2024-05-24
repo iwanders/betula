@@ -68,6 +68,7 @@ Decorators:
   - `RunningNode`: Always returns `Running`, may be a decorator.
   - `FailureNode`: Always returns `Failure`, may be a decorator.
   - `RetryNode`: Retries a node up to a specified time limit, turning failure into success while the time limit is not reached.
+  - `IfEnumNode<T: IfEnumNodeEnum>`: Generic node that allows `==` and `!=` with an enum from the blackboard. Maybe be a decorator.
 
 
 ## betula_enigo
