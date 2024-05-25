@@ -233,3 +233,43 @@ mod test {
         let z: IfEnumNode<Foo> = Default::default();
     }
 }
+
+/*
+
+#[derive(Clone)]
+struct LocationLevelParser;
+
+impl clap::builder::TypedValueParser for LocationLevelParser {
+    type Value = LocationLevel;
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let normal_string: String = value.to_str().unwrap().to_string();
+        let localizer_config: LocationLevel =
+            serde_yaml::from_str(&normal_string).map_err(|e| {
+                let mut err = clap::Error::new(ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    err.insert(
+                        ContextKind::InvalidArg,
+                        ContextValue::String(arg.to_string()),
+                    );
+                }
+                err.insert(
+                    ContextKind::InvalidValue,
+                    ContextValue::String(e.to_string()),
+                );
+                err
+            })?;
+        Ok(localizer_config)
+    }
+}
+
+.arg(
+    arg!([zone] "The zone to map")
+        .required(true)
+        .value_parser(LocationLevelParser),
+)
+*/

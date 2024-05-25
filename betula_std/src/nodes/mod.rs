@@ -33,6 +33,3 @@ pub use if_then_else_node::{IfThenElseNode, IfThenElseNodeConfig};
 mod if_enum_node;
 pub use if_enum_node::{IfEnumNode, IfEnumNodeConfig, IfEnumNodeEnum};
 pub use if_enum_node::{IfExecutionStatusNode, IfExecutionStatusNodeConfig};
-
-#[cfg(feature = "betula_editor")]
-pub use time_node::ui_support;
