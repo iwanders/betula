@@ -31,10 +31,7 @@ impl GlobalHotKeyBackend {
                 } else {
                     KeyState::Up
                 };
-                let event = HotkeyEvent {
-                    state,
-                    hotkey: hk.clone(),
-                };
+                let event = HotkeyEvent { state, hotkey: *hk };
                 v.push(event);
             }
         }
@@ -45,7 +42,7 @@ impl GlobalHotKeyBackend {
         let hotkey = global_hotkey::hotkey::HotKey::new(Some(key.modifiers), key.key);
         {
             let mut locked = self.id_to_hotkey_map.lock().unwrap();
-            locked.insert(hotkey.id(), key.clone());
+            locked.insert(hotkey.id(), key);
         }
         self.manager.register(hotkey)?;
         Ok(())

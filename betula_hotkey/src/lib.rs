@@ -98,17 +98,10 @@ impl Drop for HotkeyRunner {
 }
 
 /// Reference counted state.
+#[derive(Default, Debug)]
 struct CountedState {
     count: usize,
     state: StatePtr,
-}
-impl Default for CountedState {
-    fn default() -> Self {
-        Self {
-            count: 0,
-            state: Default::default(),
-        }
-    }
 }
 
 /// Raii object to call a lambda on deletion.
@@ -254,20 +247,20 @@ impl HotkeyInterface {
         // lock the map
         let (new_registration, state) = {
             let mut locked = self.key_map.lock().unwrap();
-            let value = locked.entry(key.clone()).or_default();
+            let value = locked.entry(key).or_default();
             value.count += 1;
             (value.count == 1, Arc::clone(&value.state))
         };
 
         if new_registration {
             // lets also let the backend know.
-            self.sender.send(RegistrationTask::Register(key.clone()))?;
+            self.sender.send(RegistrationTask::Register(key))?;
         }
 
         // Now, create the removal function.
         let removal_fun = {
             let map = Arc::clone(&self.key_map);
-            let key_t = key.clone();
+            let key_t = key;
             let sender_t = self.sender.clone();
             move || {
                 let mut locked = map.lock().unwrap();
@@ -286,7 +279,7 @@ impl HotkeyInterface {
                     // println!("removing {key_t:?} from the map");
                     locked.remove(&key_t);
                     // and lets tell the backend about it.
-                    let _ = sender_t.send(RegistrationTask::Unregister(key.clone()));
+                    let _ = sender_t.send(RegistrationTask::Unregister(key));
                 }
             }
         };
@@ -322,7 +315,7 @@ impl HotkeyBlackboard {
         let interface = self
             .interface
             .as_ref()
-            .ok_or(format!("no interface present in value"))?;
+            .ok_or("no interface present in value".to_string())?;
         interface.register(key)
     }
 }

@@ -5,13 +5,13 @@ use crate::HotkeyBlackboard;
 use crate::{Code, Hotkey, HotkeyToken, Modifiers};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
-enum ModeType {
+pub enum ModeType {
     Held,
     Toggle,
     OneShot,
 }
 impl ModeType {
-    fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             ModeType::Held => "Held",
             ModeType::Toggle => "Toggle",
@@ -68,6 +68,7 @@ pub struct HotkeyNode {
     token: Option<HotkeyToken>,
     last_count: usize,
 
+    #[cfg(feature = "betula_editor")]
     text_edit: Option<String>,
 }
 
@@ -83,7 +84,7 @@ impl Node for HotkeyNode {
             let hotkey = self.config.to_hotkey();
             self.token = Some(self.input.get()?.register(hotkey)?);
         }
-        let token = self.token.as_ref().ok_or(format!("no token"))?;
+        let token = self.token.as_ref().ok_or("no token".to_string())?;
         let new_count = token.state.depress_usize();
         let active = match self.config.mode {
             ModeType::Held => token.is_pressed(),
@@ -119,7 +120,7 @@ impl Node for HotkeyNode {
     }
 
     fn get_config(&self) -> Result<Option<Box<dyn NodeConfig>>, NodeError> {
-        Ok(Some(Box::new(self.config.clone())))
+        Ok(Some(Box::new(self.config)))
     }
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
