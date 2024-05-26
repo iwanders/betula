@@ -77,6 +77,7 @@ Betula nodes for [enigo](https://crates.io/crates/enigo): `Cross platform input 
 - `EnigoInstanceNode`: Provides an `Enigo` instance to the blackboard.
 - `EnigoCursorNode`: Provides the position of the cursor to the blackboard.
 - `EnigoNode`: Sends `Enigo::Token` to the `Enigo` instance to simulate events. 
+- `CursorScannerNode`: Moves the cursor in a spiral pattern around the specified coordinates, more of an example node.
 
 The `EnigoNode` can load presets from files.
 - All `toml` files in the `PROJECT/enigo_node/` directory are parsed.
