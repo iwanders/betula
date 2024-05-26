@@ -212,6 +212,8 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
         .add_node_default_with_config::<nodes::EnigoInstanceNode, nodes::EnigoInstanceNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::EnigoNode, nodes::EnigoNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::EnigoReadNode, nodes::EnigoReadNodeConfig>();
+    ui_support
+        .add_node_default_with_config::<nodes::CursorScannerNode, nodes::CursorScannerNodeConfig>();
     ui_support.add_node_default::<nodes::EnigoCursorNode>();
     ui_support.add_value_default_named::<EnigoBlackboard>("Enigo");
     ui_support.add_value_default_named::<CursorPosition>("Cursor");

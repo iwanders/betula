@@ -11,4 +11,4 @@ mod enigo_cursor_node;
 pub use enigo_cursor_node::EnigoCursorNode;
 
 mod cursor_scanner_node;
-pub use cursor_scanner_node::CursorScannerNode;
+pub use cursor_scanner_node::{CursorScannerNode, CursorScannerNodeConfig};

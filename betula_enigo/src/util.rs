@@ -24,7 +24,7 @@ impl Spiral {
     /// Create a new spiral with a max radius.
     pub fn new(c: (f64, f64), a: f64, b: f64, speed: f64, max_radius: f64) -> Self {
         let (x, y) = c;
-        Self {
+        let mut v = Self {
             x,
             y,
             speed,
@@ -34,7 +34,14 @@ impl Spiral {
             parameter: 0.0,
             min_radius: 0.0,
             min_radius_dt: 0.01, // prevent footgun for infinite loops.
-        }
+        };
+        v.reset();
+        v
+    }
+
+    pub fn reset(&mut self) {
+        self.parameter = 0.0;
+        self.advance_to_radius(self.min_radius, self.min_radius_dt);
     }
 
     /// Advance the spiral to a certain radius.
@@ -65,7 +72,6 @@ impl Spiral {
         //    f(t) = r = a + b*t
         //    w(t) = v / (2 * pi * (a + b * t));
         // The above is ignored for now, I didn't really need it just yet.
-
         self.parameter = self.parameter + dt * self.speed;
         let t = self.parameter;
         let fv = self.a + self.b * t;
@@ -75,8 +81,7 @@ impl Spiral {
         let r = (x * x + y * y).sqrt();
 
         if r >= self.max_radius {
-            self.parameter = 0.0;
-            self.advance_to_radius(self.min_radius, self.min_radius_dt);
+            self.reset();
         }
 
         (x + self.x, y + self.y)

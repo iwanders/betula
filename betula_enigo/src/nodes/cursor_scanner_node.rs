@@ -20,13 +20,13 @@ impl IsNodeConfig for CursorScannerNodeConfig {}
 impl Default for CursorScannerNodeConfig {
     fn default() -> Self {
         Self {
-            a: 35.0,
+            a: 0.0,
             b: 10.0,
-            max_radius: 400.0,
-            min_radius: 0.0,
+            max_radius: 200.0,
+            min_radius: 30.0,
 
             x: 1000.0,
-            y: 1000.0,
+            y: 500.0,
 
             speed: 2.0,
             interval: 0.05,
@@ -61,16 +61,18 @@ impl Node for CursorScannerNode {
         let time = self.time.get()?;
 
         if self.spiral.is_none() {
-            let mut spiral = Spiral::new(
-                (self.config.x, self.config.y),
-                self.config.a,
-                self.config.b,
-                self.config.speed,
-                self.config.max_radius,
-            );
-            // println!("Advancing to {}, with {}, ", self.config.min_radius, self.config.interval);
-            spiral.advance_to_radius(self.config.min_radius, self.config.interval.max(0.01));
-
+            let mut spiral = Spiral {
+                x: self.config.x,
+                y: self.config.y,
+                a: self.config.a,
+                b: self.config.b,
+                speed: self.config.speed,
+                max_radius: self.config.max_radius,
+                min_radius: self.config.min_radius,
+                min_radius_dt: 0.01,
+                parameter: 0.0,
+            };
+            spiral.reset();
             self.spiral = Some(spiral);
             self.last_time = time;
         }
@@ -81,7 +83,6 @@ impl Node for CursorScannerNode {
 
         let spiral_mut = self.spiral.as_mut().unwrap();
         let dt = time - self.last_time;
-        spiral_mut.advance_to_radius(self.config.min_radius, self.config.interval.max(0.01));
 
         let (x, y) = spiral_mut.advance(dt as f64);
 
@@ -93,10 +94,6 @@ impl Node for CursorScannerNode {
             enigo::Coordinate::Abs,
         )];
         enigo_instance.execute_async(&tokens)?;
-
-        let (x, y) = (x - self.config.x, y - self.config.y);
-        let r = (x * x + y * y).sqrt();
-        // println!("   current: {x}, {y} -> {r}");
 
         return Ok(ExecutionStatus::Running);
     }
@@ -117,7 +114,7 @@ impl Node for CursorScannerNode {
     }
 
     fn static_type() -> NodeType {
-        "cursor_scanner".into()
+        "enigo_cursor_scanner".into()
     }
 
     fn node_type(&self) -> NodeType {
@@ -227,9 +224,8 @@ mod ui_support {
 
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("d2".to_owned()),
-                UiNodeCategory::Group("action".to_owned()),
-                UiNodeCategory::Name("scanner".to_owned()),
+                UiNodeCategory::Folder("action".to_owned()),
+                UiNodeCategory::Name("enigo_cursor_scanner".to_owned()),
             ]
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
