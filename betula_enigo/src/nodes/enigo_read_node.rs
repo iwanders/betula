@@ -6,11 +6,17 @@ use crate::{EnigoBlackboard, EnigoTokens};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnigoReadNodeConfig {
     execute_async: bool,
+    #[serde(default)]
+    print_tokens: bool,
+    #[serde(default)]
+    dry_run: bool,
 }
 impl Default for EnigoReadNodeConfig {
     fn default() -> Self {
         Self {
             execute_async: true,
+            print_tokens: false,
+            dry_run: false,
         }
     }
 }
@@ -34,10 +40,17 @@ impl Node for EnigoReadNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         let interface = self.input.get()?;
         let tokens = self.tokens.get()?;
-        if self.config.execute_async {
-            interface.execute_async(&tokens.0)?;
-        } else {
-            interface.execute(&tokens.0)?;
+        if self.config.print_tokens {
+            for (i, t) in tokens.0.iter().enumerate() {
+                println!("{i} {t:?}");
+            }
+        }
+        if !self.config.dry_run {
+            if self.config.execute_async {
+                interface.execute_async(&tokens.0)?;
+            } else {
+                interface.execute(&tokens.0)?;
+            }
         }
         Ok(ExecutionStatus::Success)
     }
@@ -82,7 +95,7 @@ mod ui_support {
     impl UiNode for EnigoReadNode {
         fn ui_icon(&self, ui: &mut egui::Ui, desired_size: egui::Vec2) {
             let _ = desired_size;
-            ui.add(egui::Label::new("🖱🖮👓").selectable(false));
+            ui.add(egui::Label::new("🕹").selectable(false));
         }
 
         fn ui_config(
@@ -92,18 +105,24 @@ mod ui_support {
             scale: f32,
         ) -> UiConfigResponse {
             let _ = (scale, ctx);
-            let mut non_preset_modified = false;
+            let mut modified = false;
+
+            let r = ui.checkbox(&mut self.config.dry_run, "Dry");
+            modified |= r
+                .on_hover_text("Discard the tokens instead of sending them.")
+                .changed();
+
+            let r = ui.checkbox(&mut self.config.print_tokens, "Print");
+            modified |= r.on_hover_text("Print tokens using println!").changed();
 
             let r = ui.checkbox(&mut self.config.execute_async, "Async");
-            if r.on_hover_text(
-                "Send tokens to background thread, required for absolute offsets to take effect.",
-            )
-            .changed()
-            {
-                non_preset_modified = true;
-            }
+            modified |= r
+                .on_hover_text(
+                    "Send tokens to background thread instead of blocking until completion.",
+                )
+                .changed();
 
-            if non_preset_modified {
+            if modified {
                 UiConfigResponse::Changed
             } else {
                 UiConfigResponse::UnChanged
