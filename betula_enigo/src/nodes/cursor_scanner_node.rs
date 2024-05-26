@@ -1,6 +1,6 @@
 use betula_core::node_prelude::*;
 
-use crate::{enigo, EnigoBlackboard};
+use crate::{enigo, EnigoTokens};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -40,8 +40,8 @@ use crate::util::Spiral;
 pub struct CursorScannerNode {
     pub config: CursorScannerNodeConfig,
 
-    enigo: Input<EnigoBlackboard>,
     time: Input<f64>,
+    tokens: Output<EnigoTokens>,
 
     spiral: Option<Spiral>,
     last_time: f64,
@@ -55,9 +55,6 @@ impl std::fmt::Debug for CursorScannerNode {
 
 impl Node for CursorScannerNode {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
-        let _ = ctx;
-
-        let enigo_instance = self.enigo.get()?;
         let time = self.time.get()?;
 
         if self.spiral.is_none() {
@@ -93,23 +90,35 @@ impl Node for CursorScannerNode {
             y as i32,
             enigo::Coordinate::Abs,
         )];
-        enigo_instance.execute_async(&tokens)?;
+
+        self.tokens.set(EnigoTokens(tokens))?;
+
+        if ctx.children() == 1 {
+            let _ = ctx.run(0)?;
+        }
 
         return Ok(ExecutionStatus::Running);
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
         Ok(vec![
-            Port::input::<EnigoBlackboard>("enigo"),
             Port::input::<f64>("time"),
+            Port::output::<EnigoTokens>("tokens"),
         ])
     }
     fn setup_inputs(
         &mut self,
         interface: &mut dyn BlackboardInputInterface,
     ) -> Result<(), NodeError> {
-        self.enigo = interface.input::<EnigoBlackboard>("enigo")?;
         self.time = interface.input::<f64>("time")?;
+        Ok(())
+    }
+
+    fn setup_outputs(
+        &mut self,
+        interface: &mut dyn BlackboardOutputInterface,
+    ) -> Result<(), NodeError> {
+        self.tokens = interface.output::<EnigoTokens>("tokens", Default::default())?;
         Ok(())
     }
 
@@ -229,7 +238,7 @@ mod ui_support {
             ]
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
-            0..0
+            0..1
         }
     }
 }
