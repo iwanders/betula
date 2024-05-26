@@ -9,3 +9,6 @@ pub use enigo_read_node::{EnigoReadNode, EnigoReadNodeConfig};
 
 mod enigo_cursor_node;
 pub use enigo_cursor_node::EnigoCursorNode;
+
+mod cursor_scanner_node;
+pub use cursor_scanner_node::CursorScannerNode;
