@@ -1,21 +1,17 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{load_preset_directory, EnigoBlackboard, EnigoPreset};
+use crate::{load_preset_directory, EnigoPreset, EnigoTokens};
 
 use enigo::agent::Token;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnigoNodeConfig {
-    execute_async: bool,
-
     tokens: Vec<Token>,
-
     preset: Option<Vec<String>>,
 }
 impl Default for EnigoNodeConfig {
     fn default() -> Self {
         Self {
-            execute_async: true,
             tokens: vec![],
             preset: None,
         }
@@ -26,7 +22,8 @@ impl IsNodeConfig for EnigoNodeConfig {}
 
 #[derive(Debug, Default)]
 pub struct EnigoNode {
-    input: Input<EnigoBlackboard>,
+    output: Output<EnigoTokens>,
+
     pub config: EnigoNodeConfig,
 
     /// The directory from which the patterns are loaded.
@@ -66,29 +63,26 @@ impl EnigoNode {
 }
 
 impl Node for EnigoNode {
-    fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+    fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.preset_dirty {
             self.load_presets()?;
             self.apply_preset()?;
             self.preset_dirty = false;
         }
-        let interface = self.input.get()?;
-        if self.config.execute_async {
-            interface.execute_async(&self.config.tokens)?;
-        } else {
-            interface.execute(&self.config.tokens)?;
-        }
-        Ok(ExecutionStatus::Success)
+        self.output.set(EnigoTokens(self.config.tokens.clone()))?;
+
+        ctx.decorate_or(ExecutionStatus::Success)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
-        Ok(vec![Port::input::<EnigoBlackboard>("enigo")])
+        Ok(vec![Port::output::<EnigoTokens>("tokens")])
     }
-    fn setup_inputs(
+
+    fn setup_outputs(
         &mut self,
-        interface: &mut dyn BlackboardInputInterface,
+        interface: &mut dyn BlackboardOutputInterface,
     ) -> Result<(), NodeError> {
-        self.input = interface.input::<EnigoBlackboard>("enigo")?;
+        self.output = interface.output::<EnigoTokens>("tokens", Default::default())?;
         Ok(())
     }
 
@@ -325,19 +319,25 @@ mod ui_support {
 
                     ui.menu_button(label, |ui| {
                         // Convert the pattern library to the menu tree.
-                        type MenuType<'a>  = UiMenuNode::<String, &'a EnigoPreset>;
-                        type TreeType<'a>  = UiMenuTree::<String, &'a EnigoPreset>;
+                        type MenuType<'a> = UiMenuNode<String, &'a EnigoPreset>;
+                        type TreeType<'a> = UiMenuTree<String, &'a EnigoPreset>;
                         let mut root = TreeType::new();
                         for pattern in self.presets.iter() {
-                            let index_into = &pattern.index[0.. pattern.index.len() - 1];
+                            let index_into = &pattern.index[0..pattern.index.len() - 1];
                             let element = {
                                 let mut element = &mut root;
                                 for sub in index_into {
-                                    element = element.entry(sub.clone()).or_insert_with(|| MenuType::SubElements(TreeType::new())).sub_elements();
+                                    element = element
+                                        .entry(sub.clone())
+                                        .or_insert_with(|| MenuType::SubElements(TreeType::new()))
+                                        .sub_elements();
                                 }
                                 element
                             };
-                            element.insert(pattern.index.last().unwrap().clone(), MenuType::Value(pattern));
+                            element.insert(
+                                pattern.index.last().unwrap().clone(),
+                                MenuType::Value(pattern),
+                            );
                         }
 
                         if let Some(entry) = menu_node_recurser(&root, ui) {
@@ -348,7 +348,11 @@ mod ui_support {
                         }
                     });
 
-                    if ui.button("🔃").on_hover_text("Reload presets from directory.").clicked() {
+                    if ui
+                        .button("🔃")
+                        .on_hover_text("Reload presets from directory.")
+                        .clicked()
+                    {
                         let patterns = self.load_presets();
                         if let Err(e) = patterns {
                             println!("Error loading presets: {:?}", e)
@@ -360,17 +364,13 @@ mod ui_support {
                         self.config
                             .tokens
                             .push(enigo::agent::Token::Text("".to_owned()));
-                            non_preset_modified = true;
+                        non_preset_modified = true;
                     }
                     if ui.add(egui::Button::new("➖")).clicked() {
                         if !self.config.tokens.is_empty() {
                             self.config.tokens.truncate(self.config.tokens.len() - 1);
                             non_preset_modified = true;
                         }
-                    }
-                    let r = ui.checkbox(&mut self.config.execute_async, "Async");
-                    if r.on_hover_text("Send tokens to background thread, required for absolute offsets to take effect.").changed() {
-                        non_preset_modified = true;
                     }
                 });
 
@@ -379,7 +379,10 @@ mod ui_support {
                     let total = self.config.tokens.len();
                     for (i, t) in self.config.tokens.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
-                            if ui.add_enabled(i != total - 1, egui::Button::new("⮋")).clicked() {
+                            if ui
+                                .add_enabled(i != total - 1, egui::Button::new("⮋"))
+                                .clicked()
+                            {
                                 change_token_position = Some((i, 1));
                             }
                             if ui.add_enabled(i != 0, egui::Button::new("⮉")).clicked() {
@@ -601,7 +604,7 @@ mod ui_support {
             ]
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
-            0..0
+            0..1
         }
     }
 }
