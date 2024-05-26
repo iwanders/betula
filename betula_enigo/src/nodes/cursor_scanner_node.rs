@@ -58,7 +58,7 @@ impl Node for CursorScannerNode {
         let time = self.time.get()?;
 
         if self.spiral.is_none() {
-            let mut spiral = Spiral {
+            let spiral = Spiral {
                 x: self.config.x,
                 y: self.config.y,
                 a: self.config.a,
@@ -68,8 +68,8 @@ impl Node for CursorScannerNode {
                 min_radius: self.config.min_radius,
                 min_radius_dt: 0.01,
                 parameter: 0.0,
-            };
-            spiral.reset();
+            }
+            .initialised();
             self.spiral = Some(spiral);
             self.last_time = time;
         }

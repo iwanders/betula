@@ -39,6 +39,15 @@ impl Spiral {
         v
     }
 
+    /// Consume the value and return an initialised value.
+    ///
+    /// Commonly used after constructing one.
+    pub fn initialised(mut self) -> Self {
+        self.reset();
+        self
+    }
+
+    /// Reset the spiral to its minimum radius.
     pub fn reset(&mut self) {
         self.parameter = 0.0;
         self.advance_to_radius(self.min_radius, self.min_radius_dt);
