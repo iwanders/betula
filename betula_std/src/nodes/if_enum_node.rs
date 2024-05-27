@@ -226,11 +226,15 @@ mod test {
         fn enum_node_enumeration() -> &'static [Self] {
             &[Foo::Bar, Foo::Buz]
         }
+
+        fn enum_node_default() -> Self {
+            Default::default()
+        }
     }
 
     #[test]
     fn test_if_enum_foo() {
-        let z: IfEnumNode<Foo> = Default::default();
+        let _z: IfEnumNode<Foo> = Default::default();
     }
 }
 

@@ -193,7 +193,7 @@ mod test {
     use super::*;
     #[test]
     fn test_callbacks() -> Result<(), Box<dyn std::error::Error>> {
-        let mut z: Callbacks<i32> = Default::default();
+        let z: Callbacks<i32> = Default::default();
         let mut r1 = Some(z.register(|v| println!("1: {v:?}")));
         let mut r2 = Some(z.register_arc(Arc::new(|v| println!("2: {v:?}"))));
 
@@ -206,7 +206,7 @@ mod test {
 
         // test as blackboard value.
         let zbb = CallbacksBlackboard::<i32>::new();
-        let mut r1 = Some(zbb.callbacks().unwrap().register(|v| println!("1: {v:?}")));
+        let r1 = Some(zbb.callbacks().unwrap().register(|v| println!("1: {v:?}")));
         println!("r1: {r1:?}");
         println!("zbb: {zbb:?}");
         let zbb_json = serde_json::to_string(&zbb)?;

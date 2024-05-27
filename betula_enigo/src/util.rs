@@ -116,7 +116,7 @@ mod test {
 
         spiral.advance_to_radius(400.0, 0.1);
 
-        for i in 0..100 {
+        for _i in 0..100 {
             let p = spiral.advance(dt);
             points_f64.push(p);
             points_i32.push((p.0 as i32, p.1 as i32));

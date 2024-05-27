@@ -2897,8 +2897,8 @@ mod test {
 
     #[test]
     fn test_connection() -> Result<(), BetulaError> {
-        use betula_common::control::InProcessControl;
-        let (server, client) = InProcessControl::new();
+        use betula_common::control::internal_server_client;
+        let (server, client) = internal_server_client();
         use uuid::uuid;
         let delay1 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000001"));
         let delay2 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000002"));
@@ -2978,8 +2978,8 @@ mod test {
         // Create time, attach to blackboard.
         // Remove time.
         // Create new time, attach to blackboard.
-        use betula_common::control::InProcessControl;
-        let (server, client) = InProcessControl::new();
+        use betula_common::control::internal_server_client;
+        let (server, client) = internal_server_client();
         use uuid::uuid;
         let time1 = BetulaNodeId(uuid!("00000000-0000-0000-0000-ffff00000001"));
         let blackboard = BlackboardId(uuid!("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"));
