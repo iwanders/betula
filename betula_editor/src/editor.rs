@@ -170,6 +170,10 @@ impl BetulaEditor {
         if let Some(destination) = self.save_path.take() {
             if let Err(e) = std::fs::write(destination.clone(), contents.as_bytes()) {
                 println!("Failed to write to {destination:?}, error: {e:?}");
+            } else {
+                self.set_project_path(Some(destination.clone()));
+                let dir = destination.parent();
+                self.send_set_directory(dir)?;
             }
         } else {
             let send_channel = self.tree_config_save_channel.0.clone();
@@ -265,7 +269,7 @@ impl BetulaEditor {
         }
         if let Ok(new_path) = self.tree_config_save_channel.1.try_recv() {
             // Save as happened, set the new path and use it as the new directory.
-            self.set_project_path(self.path.clone());
+            self.set_project_path(Some(new_path.clone()));
             let dir = new_path.parent();
             self.send_set_directory(dir)?;
         }
