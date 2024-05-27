@@ -1,9 +1,17 @@
+// Control
 mod sequence_node;
 pub use sequence_node::{SequenceNode, SequenceNodeConfig};
 
 mod selector_node;
 pub use selector_node::{SelectorNode, SelectorNodeConfig};
 
+mod parallel_node;
+pub use parallel_node::{ParallelNode, ParallelNodeConfig};
+
+mod if_then_else_node;
+pub use if_then_else_node::{IfThenElseNode, IfThenElseNodeConfig};
+
+// Decorators
 mod failure_node;
 pub use failure_node::FailureNode;
 
@@ -13,23 +21,27 @@ pub use success_node::SuccessNode;
 mod running_node;
 pub use running_node::RunningNode;
 
-mod time_node;
-pub use time_node::TimeNode;
+// Conditionals
 mod delay_node;
 pub use delay_node::{DelayNode, DelayNodeConfig};
-mod parallel_node;
-pub use parallel_node::{ParallelNode, ParallelNodeConfig};
+
+mod time_slice_node;
+pub use time_slice_node::{TimeSliceNode, TimeSliceNodeConfig};
 
 mod retry_node;
 pub use retry_node::{RetryNode, RetryNodeConfig};
 
-mod status_write_node;
-pub use status_write_node::StatusWriteNode;
 mod status_read_node;
 pub use status_read_node::StatusReadNode;
-mod if_then_else_node;
-pub use if_then_else_node::{IfThenElseNode, IfThenElseNodeConfig};
 
+// Provider
+mod time_node;
+pub use time_node::TimeNode;
+
+mod status_write_node;
+pub use status_write_node::StatusWriteNode;
+
+// Misc
 mod if_enum_node;
 pub use if_enum_node::{IfEnumNode, IfEnumNodeConfig, IfEnumNodeEnum};
 pub use if_enum_node::{IfExecutionStatusNode, IfExecutionStatusNodeConfig};
