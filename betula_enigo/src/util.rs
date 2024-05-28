@@ -50,22 +50,32 @@ impl Spiral {
     /// Reset the spiral to its minimum radius.
     pub fn reset(&mut self) {
         self.parameter = 0.0;
-        self.advance_to_radius(self.min_radius, self.min_radius_dt);
+        self.advance_to_radius(self.min_radius);
     }
 
     /// Advance the spiral to a certain radius.
-    pub fn advance_to_radius(&mut self, radius: f64, dt: f64) -> (f64, f64) {
-        let (x, y) = self.advance(0.0);
-        let (x, y) = (x - self.x, y - self.y);
-        let mut r = (x * x + y * y).sqrt();
-        // println!("current: {x}, {y} -> {r}   {radius}");
-        while r < radius {
-            let (x, y) = self.advance(dt);
-            let (x, y) = (x - self.x, y - self.y);
-            r = (x * x + y * y).sqrt();
-            // println!("   current: {x}, {y} -> {r}");
+    pub fn advance_to_radius(&mut self, radius: f64) -> (f64, f64) {
+        // If this is a circle, nothing to advance to.
+        if self.is_circle() {
+            return self.advance(0.0);
+        }
+
+        // r = a + b * t
+        // radius -a = b * t
+        // (radius -a / b) = t
+        let radius = radius.min(self.max_radius).max(self.min_radius);
+
+        if self.b == 0.0 {
+            // it is a circle.
+            return self.advance(0.0);
+        } else {
+            self.parameter = (radius - self.a) / self.b
         }
         self.advance(0.0)
+    }
+
+    pub fn is_circle(&self) -> bool {
+        self.b.abs() == 0.0 || (self.min_radius == self.max_radius)
     }
 
     /// Advance the spiral with a dt and return the new position.
@@ -81,15 +91,21 @@ impl Spiral {
         //    f(t) = r = a + b*t
         //    w(t) = v / (2 * pi * (a + b * t));
         // The above is ignored for now, I didn't really need it just yet.
+
+        let is_circle = self.is_circle();
+
         self.parameter = self.parameter + dt * self.speed;
         let t = self.parameter;
-        let fv = self.a + self.b * t;
+        let r_calc = if is_circle {
+            self.a
+        } else {
+            self.a + self.b * t
+        };
 
-        let x = t.cos() * fv;
-        let y = t.sin() * fv;
-        let r = (x * x + y * y).sqrt();
+        let x = t.cos() * r_calc;
+        let y = t.sin() * r_calc;
 
-        if r >= self.max_radius {
+        if !is_circle && r_calc >= self.max_radius {
             self.reset();
         }
 
@@ -102,7 +118,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_spiral() {
+    fn test_spiral_outward() {
         // https://www.desmos.com/calculator/hv3yyi8bln
         let mut points_f64 = vec![];
         let mut points_i32 = vec![];
@@ -114,7 +130,33 @@ mod test {
         let mut spiral = Spiral::new((0.0, 0.0), a, b, speed, max_radius);
         let dt = 0.1;
 
-        spiral.advance_to_radius(400.0, 0.1);
+        spiral.advance_to_radius(400.0);
+
+        for _i in 0..100 {
+            let p = spiral.advance(dt);
+            points_f64.push(p);
+            points_i32.push((p.0 as i32, p.1 as i32));
+        }
+        println!("points_f64: {points_f64:?}");
+        println!("points_i32: {points_i32:?}");
+    }
+
+    #[test]
+    fn test_spiral_circle() {
+        // If a spiral is made into a circle, the min and max radius are equal, OR b is set to zero.
+        // In which case, we still want to be able to make a circle even though the actual
+        // hypotenuse may vary outside of min and max radius due to rounding.
+        let mut points_f64 = vec![];
+        let mut points_i32 = vec![];
+
+        let a = 35.0;
+        let b = 0.0;
+        let speed = 10.0;
+        let max_radius = 1000.0;
+        let mut spiral = Spiral::new((0.0, 0.0), a, b, speed, max_radius);
+        let dt = 0.1;
+
+        spiral.advance_to_radius(400.0);
 
         for _i in 0..100 {
             let p = spiral.advance(dt);
