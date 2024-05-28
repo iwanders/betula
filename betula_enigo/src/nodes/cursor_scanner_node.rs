@@ -5,15 +5,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CursorScannerNodeConfig {
-    a: f64,
-    b: f64,
-    speed: f64,
-    min_radius: f64,
-    max_radius: f64,
-    x: f64,
-    y: f64,
+    pub a: f64,
+    pub b: f64,
+    pub speed: f64,
+    pub min_radius: f64,
+    pub max_radius: f64,
+    pub x: f64,
+    pub y: f64,
 
-    interval: f64,
+    pub interval: f64,
 }
 impl IsNodeConfig for CursorScannerNodeConfig {}
 
@@ -47,6 +47,20 @@ pub struct CursorScannerNode {
     last_time: f64,
 }
 
+impl CursorScannerNode {
+    pub fn set_center(&mut self, x: f64, y: f64) {
+        if let Some(v) = self.spiral.as_mut() {
+            v.x = x;
+            v.y = y;
+        }
+    }
+
+    pub fn should_run(&self) -> Result<bool, NodeError> {
+        let time = self.time.get()?;
+        Ok(!(time < (self.last_time + self.config.interval)))
+    }
+}
+
 impl std::fmt::Debug for CursorScannerNode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "CursorScannerNode")
@@ -55,8 +69,11 @@ impl std::fmt::Debug for CursorScannerNode {
 
 impl Node for CursorScannerNode {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
-        let time = self.time.get()?;
+        if !self.should_run()? {
+            return Ok(ExecutionStatus::Running);
+        }
 
+        let time = self.time.get()?;
         if self.spiral.is_none() {
             let spiral = Spiral {
                 x: self.config.x,
@@ -72,10 +89,6 @@ impl Node for CursorScannerNode {
             .initialised();
             self.spiral = Some(spiral);
             self.last_time = time;
-        }
-
-        if time < (self.last_time + self.config.interval) {
-            return Ok(ExecutionStatus::Running);
         }
 
         let spiral_mut = self.spiral.as_mut().unwrap();
