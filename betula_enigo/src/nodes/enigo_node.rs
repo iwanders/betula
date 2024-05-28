@@ -22,6 +22,8 @@ impl IsNodeConfig for EnigoNodeConfig {}
 
 #[derive(Debug, Default)]
 pub struct EnigoNode {
+    input: Input<EnigoTokens>,
+
     output: Output<EnigoTokens>,
 
     pub config: EnigoNodeConfig,
@@ -69,13 +71,33 @@ impl Node for EnigoNode {
             self.apply_preset()?;
             self.preset_dirty = false;
         }
-        self.output.set(EnigoTokens(self.config.tokens.clone()))?;
+        let tokens = if let Ok(mut tokens) = self.input.get() {
+            tokens
+                .0
+                .drain(..)
+                .chain(self.config.tokens.iter().cloned())
+                .collect()
+        } else {
+            self.config.tokens.clone()
+        };
+        self.output.set(EnigoTokens(tokens))?;
 
         ctx.decorate_or(ExecutionStatus::Success)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {
-        Ok(vec![Port::output::<EnigoTokens>("tokens")])
+        Ok(vec![
+            Port::output::<EnigoTokens>("tokens"),
+            Port::input::<EnigoTokens>("tokens"),
+        ])
+    }
+
+    fn setup_inputs(
+        &mut self,
+        interface: &mut dyn BlackboardInputInterface,
+    ) -> Result<(), NodeError> {
+        self.input = interface.input::<EnigoTokens>("tokens")?;
+        Ok(())
     }
 
     fn setup_outputs(
