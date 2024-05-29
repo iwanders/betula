@@ -51,7 +51,7 @@ impl Node for WindowFocusNode {
         self.config.load_node_config(config)?;
         self.matches.clear();
         for v in self.config.matches.iter() {
-            self.matches.push(Regex::new(&v)?);
+            self.matches.push(Regex::new(v)?);
         }
 
         Ok(())

@@ -247,7 +247,7 @@ impl X11FocusHandler {
         let mut locked = self
             .handle
             .lock()
-            .map_err(|_| format!("failed to lock mutex"))?;
+            .map_err(|_| "failed to lock mutex".to_string())?;
         if locked.is_none() {
             let instance = xlib::Xlib::open()?;
             let display = unsafe { (instance.XOpenDisplay)(std::ptr::null()) };
@@ -272,7 +272,7 @@ impl X11FocusHandler {
         let locked = self
             .handle
             .lock()
-            .map_err(|_| format!("failed to lock mutex"))?;
+            .map_err(|_| "failed to lock mutex".to_string())?;
         if let Some(v) = locked.as_ref() {
             return Ok(v.focussed_window_pid()?.1);
         }
@@ -284,7 +284,7 @@ impl X11FocusHandler {
         let locked = self
             .handle
             .lock()
-            .map_err(|_| format!("failed to lock mutex"))?;
+            .map_err(|_| "failed to lock mutex".to_string())?;
         if let Some(v) = locked.as_ref() {
             return v.focussed_window_id();
         }
@@ -296,7 +296,7 @@ impl X11FocusHandler {
         let locked = self
             .handle
             .lock()
-            .map_err(|_| format!("failed to lock mutex"))?;
+            .map_err(|_| "failed to lock mutex".to_string())?;
         if let Some(v) = locked.as_ref() {
             let (cache_key, pid) = v.focussed_window_pid()?;
             return Ok((cache_key, self.process_name(pid)?));
@@ -310,7 +310,7 @@ impl X11FocusHandler {
         let locked = self
             .handle
             .lock()
-            .map_err(|_| format!("failed to lock mutex"))?;
+            .map_err(|_| "failed to lock mutex".to_string())?;
         if let Some(v) = locked.as_ref() {
             return v.cursor_position();
         }
