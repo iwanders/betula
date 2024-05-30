@@ -21,6 +21,9 @@ pub use success_node::SuccessNode;
 mod running_node;
 pub use running_node::RunningNode;
 
+mod block_reset_node;
+pub use block_reset_node::BlockResetNode;
+
 // Conditionals
 mod delay_node;
 pub use delay_node::{DelayNode, DelayNodeConfig};
