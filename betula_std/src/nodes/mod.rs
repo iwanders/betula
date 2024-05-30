@@ -20,6 +20,8 @@ pub use success_node::SuccessNode;
 
 mod running_node;
 pub use running_node::RunningNode;
+mod negate_node;
+pub use negate_node::NegateNode;
 
 mod block_reset_node;
 pub use block_reset_node::BlockResetNode;
