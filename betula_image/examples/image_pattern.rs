@@ -1,6 +1,6 @@
 use betula_image::pattern_match::{PatternMetadata, PatternName};
 use betula_image::PatternError;
-use clap::{arg, value_parser, Arg, Command};
+use clap::{arg, value_parser, Arg, ArgAction, Command};
 use image::io::Reader as ImageReader;
 use std::path::PathBuf;
 
@@ -75,6 +75,9 @@ fn main() -> Result<(), PatternError> {
                 )
                 .arg(
                     clap::arg!(--"description" <DESCRIPTION> "A longer description of this pattern." ).value_parser(clap::builder::NonEmptyStringValueParser::new()),
+                )
+                .arg(
+                    clap::arg!(-'c' --"crop" "Whether or not to crop the final image, removing transparent pixels.").action(ArgAction::SetTrue)
                 ),
         )
         .get_matches();
@@ -108,11 +111,13 @@ fn main() -> Result<(), PatternError> {
             .copied()
             .collect();
         let description = matches.get_one::<String>("description");
+        let crop = matches.get_one::<bool>("crop").unwrap();
         // println!("output_dir: {output_dir:?}");
         // println!("name: {name:?}");
         // println!("segments: {segments:?}");
         // println!("description: {description:?}");
         // println!("filename: {filename:?}");
+        // println!("crop: {crop:?}");
 
         let mut output_path = output_dir.clone();
         output_path.push(filename);
@@ -163,7 +168,27 @@ fn main() -> Result<(), PatternError> {
                 }
             }
         }
-        mask_img.as_ref().unwrap().save(&output_path)?;
+        let mut xmin = u32::MAX;
+        let mut xmax = u32::MIN;
+        let mut ymin = u32::MAX;
+        let mut ymax = u32::MIN;
+        let mask_img = mask_img.as_ref().unwrap();
+        use image::GenericImageView;
+        for (x, y, p) in GenericImageView::pixels(mask_img) {
+            if p.0[3] != 0 {
+                xmin = xmin.min(x);
+                ymin = ymin.min(y);
+                xmax = xmax.max(x);
+                ymax = ymax.max(y);
+            }
+        }
+        if *crop {
+            let view = mask_img.view(xmin, ymin, xmax - xmin, ymax - ymin);
+            view.to_image().save(&output_path)?;
+        } else {
+            mask_img.save(&output_path)?;
+        }
+
         output_path.set_extension("toml");
         metadata.save(&output_path)?;
     }
