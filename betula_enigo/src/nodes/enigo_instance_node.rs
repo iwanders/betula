@@ -1,7 +1,7 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{EnigoBlackboard, EnigoRunner};
+use crate::{EnigoBlackboard, EnigoInterface};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnigoInstanceNodeConfig {
@@ -36,7 +36,7 @@ impl EnigoInstanceNode {
 impl Node for EnigoInstanceNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.instance.is_none() {
-            let v = EnigoRunner::new()?;
+            let v = EnigoInterface::new()?;
             let instance = EnigoBlackboard { interface: Some(v) };
             instance.set_cursor_offset(self.cursor_offset())?;
             self.instance = Some(instance.clone());

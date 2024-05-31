@@ -94,7 +94,7 @@ impl Spiral {
 
         let is_circle = self.is_circle();
 
-        self.parameter = self.parameter + dt * self.speed;
+        self.parameter += dt * self.speed;
         let t = self.parameter;
         let r_calc = if is_circle {
             self.a

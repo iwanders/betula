@@ -57,7 +57,8 @@ impl CursorScannerNode {
 
     pub fn should_run(&self) -> Result<bool, NodeError> {
         let time = self.time.get()?;
-        Ok(!(time < (self.last_time + self.config.interval)))
+        let should_wait = time < (self.last_time + self.config.interval);
+        Ok(!should_wait)
     }
 }
 
@@ -94,7 +95,7 @@ impl Node for CursorScannerNode {
         let spiral_mut = self.spiral.as_mut().unwrap();
         let dt = time - self.last_time;
 
-        let (x, y) = spiral_mut.advance(dt as f64);
+        let (x, y) = spiral_mut.advance(dt);
 
         self.last_time = time;
 
@@ -110,7 +111,7 @@ impl Node for CursorScannerNode {
             let _ = ctx.run(0)?;
         }
 
-        return Ok(ExecutionStatus::Running);
+        Ok(ExecutionStatus::Running)
     }
 
     fn ports(&self) -> Result<Vec<Port>, NodeError> {

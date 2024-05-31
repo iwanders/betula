@@ -4,20 +4,11 @@ use serde::{Deserialize, Serialize};
 use crate::{load_preset_directory, EnigoPreset, EnigoTokens};
 
 use enigo::agent::Token;
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct EnigoNodeConfig {
     tokens: Vec<Token>,
     preset: Option<Vec<String>>,
 }
-impl Default for EnigoNodeConfig {
-    fn default() -> Self {
-        Self {
-            tokens: vec![],
-            preset: None,
-        }
-    }
-}
-
 impl IsNodeConfig for EnigoNodeConfig {}
 
 #[derive(Debug, Default)]
@@ -55,7 +46,7 @@ impl EnigoNode {
     pub fn apply_preset(&mut self) -> Result<(), NodeError> {
         if let Some(desired) = self.config.preset.as_ref() {
             if let Some(entry) = self.presets.iter().find(|z| &z.index == desired) {
-                self.config.tokens = entry.info.actions.clone();
+                self.config.tokens.clone_from(&entry.info.actions);
             } else {
                 return Err(format!("Could not find desired preset: {desired:?}").into());
             }
@@ -123,7 +114,7 @@ impl Node for EnigoNode {
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
         let preset_before = self.config.preset.clone();
         let r = self.config.load_node_config(config);
-        self.preset_dirty = preset_before != self.config.preset && !self.config.preset.is_none();
+        self.preset_dirty = preset_before != self.config.preset && self.config.preset.is_some();
         let _ = self.apply_preset();
         r
     }

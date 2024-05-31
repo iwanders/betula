@@ -29,7 +29,28 @@ pub struct EnigoRunner {
     running: std::sync::Arc<AtomicBool>,
 }
 
-impl EnigoRunner {
+impl Drop for EnigoRunner {
+    fn drop(&mut self) {
+        self.running.store(false, Relaxed);
+        let t = self.thread.take();
+        t.unwrap().join().expect("join should succeed");
+    }
+}
+
+use std::sync::{Arc, Mutex};
+#[derive(Clone)]
+pub struct EnigoInterface {
+    sender: Sender<EnigoTask>,
+    enigo: Arc<Mutex<Enigo>>,
+
+    cursor_offset: std::sync::Arc<(AtomicI32, AtomicI32)>,
+
+    // dead code allowed, it contains the execution thread.
+    #[allow(dead_code)]
+    runner: Arc<EnigoRunner>,
+}
+
+impl EnigoInterface {
     pub fn new() -> Result<EnigoInterface, enigo::NewConError> {
         let running = std::sync::Arc::new(AtomicBool::new(true));
         let cursor_offset: std::sync::Arc<(AtomicI32, AtomicI32)> =
@@ -67,7 +88,7 @@ impl EnigoRunner {
                                 //// Don't really know how to handle this Result, lets panic?
                                 locked
                                     .execute(&t)
-                                    .expect(&format!("failed to execute {t:?}"));
+                                    .unwrap_or_else(|_| panic!("failed to execute {t:?}"));
                             }
                         }
                     }
@@ -84,27 +105,6 @@ impl EnigoRunner {
             cursor_offset,
         })
     }
-}
-
-impl Drop for EnigoRunner {
-    fn drop(&mut self) {
-        self.running.store(false, Relaxed);
-        let t = self.thread.take();
-        t.unwrap().join().expect("join should succeed");
-    }
-}
-
-use std::sync::{Arc, Mutex};
-#[derive(Clone)]
-pub struct EnigoInterface {
-    sender: Sender<EnigoTask>,
-    enigo: Arc<Mutex<Enigo>>,
-
-    cursor_offset: std::sync::Arc<(AtomicI32, AtomicI32)>,
-
-    // dead code allowed, it contains the execution thread.
-    #[allow(dead_code)]
-    runner: Arc<EnigoRunner>,
 }
 
 impl std::fmt::Debug for EnigoInterface {
@@ -128,7 +128,7 @@ impl EnigoBlackboard {
         let interface = self
             .interface
             .as_ref()
-            .ok_or(format!("no interface present in value"))?;
+            .ok_or("no interface present in value".to_string())?;
         let mut locked = interface.enigo.lock().expect("should not be poisoned");
         for t in tokens {
             locked.execute(t)?;
@@ -139,7 +139,7 @@ impl EnigoBlackboard {
         let interface = self
             .interface
             .as_ref()
-            .ok_or(format!("no interface present in value"))?;
+            .ok_or("no interface present in value".to_string())?;
         interface.sender.send(EnigoTask::Tokens(tokens.to_vec()))?;
         Ok(())
     }
@@ -148,7 +148,7 @@ impl EnigoBlackboard {
         let interface = self
             .interface
             .as_ref()
-            .ok_or(format!("no interface present in value"))?;
+            .ok_or("no interface present in value".to_string())?;
         interface
             .sender
             .send(EnigoTask::SetAbsolutePosOffset(offset.0, offset.1))?;
@@ -158,7 +158,7 @@ impl EnigoBlackboard {
         let interface = self
             .interface
             .as_ref()
-            .ok_or(format!("no interface present in value"))?;
+            .ok_or("no interface present in value".to_string())?;
         let locked = interface.enigo.lock().expect("should not be poisoned");
         use enigo::Mouse;
         Ok(locked.location().map(|v| CursorPosition {

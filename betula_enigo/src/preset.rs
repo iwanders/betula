@@ -48,8 +48,7 @@ pub fn load_preset_directory(
 ) -> Result<Vec<EnigoPreset>, betula_core::BetulaError> {
     let mut patterns = vec![];
     let mut stack: Vec<(Vec<String>, std::path::PathBuf)> = std::fs::read_dir(path)?
-        .map(|v| v.ok())
-        .flatten()
+        .filter_map(|v| v.ok())
         .map(|v| (vec![], v.path()))
         .collect::<Vec<_>>();
 
