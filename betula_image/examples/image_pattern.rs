@@ -8,7 +8,8 @@ use std::path::PathBuf;
 struct SegmentSpec {
     x: u32,
     y: u32,
-    length: usize,
+    width: usize,
+    height: usize,
 }
 
 impl std::str::FromStr for SegmentSpec {
@@ -26,16 +27,22 @@ impl std::str::FromStr for SegmentSpec {
             .ok_or(format!("y not provided"))?
             .parse::<u32>()
             .map_err(|_| format!("y couldn't convert to i32"))?;
-        let len_fromstr = d
+        let width_fromstr = d
             .get(2)
             .ok_or(format!("length not provided"))?
             .parse::<usize>()
-            .map_err(|_| format!("length couldn't convert to usize"))?;
+            .map_err(|_| format!("width couldn't convert to usize"))?;
+        let height_fromstr = d
+            .get(3)
+            .unwrap_or(&"1")
+            .parse::<usize>()
+            .map_err(|_| format!("height couldn't convert to usize"))?;
 
         Ok(SegmentSpec {
             x: x_fromstr,
             y: y_fromstr,
-            length: len_fromstr,
+            width: width_fromstr,
+            height: height_fromstr,
         })
     }
 }
@@ -59,7 +66,7 @@ fn main() -> Result<(), PatternError> {
                 .arg(Arg::new("segments")
                       .action(clap::ArgAction::Append)
                       .value_name("SEGMENTS")
-                      .help("Provide segments as x,y,len  x2,y2,len2")
+                      .help("Provide segments as x,y,width[,height=1]  x2,y2,width2[,height=1]")
                       .value_parser(value_parser!(SegmentSpec))
                       // .last(true)
                       .num_args(1..).required(true))
@@ -148,22 +155,24 @@ fn main() -> Result<(), PatternError> {
                 );
             }
             for spec in &segments {
-                for i in 0..spec.length {
-                    use image::GenericImageView;
-                    if !mask_img.in_bounds(spec.x + i as u32, spec.y) {
-                        panic!("Segment is out of bounds: {spec:?}, bounds are {:?}, at this position max length is {}.", mask_img.dimensions(), mask_img.width() - spec.x);
-                    }
-                    let original_in_mask = mask_img.get_pixel(spec.x + i as u32, spec.y);
-                    let new_in_mask = img.get_pixel(spec.x + i as u32, spec.y);
-                    let should_clear = (original_in_mask != new_in_mask) && !first_image;
-                    if should_clear {
-                        // Not consistent, clear the pixel.
-                        *mask_img.get_pixel_mut(spec.x + i as u32, spec.y) =
-                            image::Rgba([0, 0, 0, 0]);
-                    } else {
-                        // Copy the pixel.
-                        *mask_img.get_pixel_mut(spec.x + i as u32, spec.y) =
-                            *img.get_pixel(spec.x + i as u32, spec.y);
+                for iy in 0..=spec.height {
+                    for ix in 0..=spec.width {
+                        let x = spec.x + ix as u32;
+                        let y = spec.y + iy as u32;
+                        use image::GenericImageView;
+                        if !mask_img.in_bounds(x, y) {
+                            panic!("Segment is out of bounds: {spec:?}, bounds are {:?}, at this position max length is {}.", mask_img.dimensions(), mask_img.width() - spec.x);
+                        }
+                        let original_in_mask = mask_img.get_pixel(x, y);
+                        let new_in_mask = img.get_pixel(x, y);
+                        let should_clear = (original_in_mask != new_in_mask) && !first_image;
+                        if should_clear {
+                            // Not consistent, clear the pixel.
+                            *mask_img.get_pixel_mut(x, y) = image::Rgba([0, 0, 0, 0]);
+                        } else {
+                            // Copy the pixel.
+                            *mask_img.get_pixel_mut(x, y) = *img.get_pixel(x, y);
+                        }
                     }
                 }
             }
