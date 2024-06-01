@@ -54,7 +54,9 @@ impl Node for SequenceNode {
                     // println!("current_position: {id}");
                     self.current_position = id + 1;
                     // We stop executing this previous branch, so reset it.
-                    ctx.reset_recursive(id)?;
+                    if !self.config.memory {
+                        ctx.reset_recursive(id)?;
+                    }
                 }
                 ExecutionStatus::Failure => {
                     // Reset the sequence if we are not using retry.
