@@ -71,6 +71,7 @@ Decorators:
   - `IfEnumNode<T: IfEnumNodeEnum>`: Generic node that allows `==` and `!=` with an enum from the blackboard. Maybe be a decorator.
   - `BlockResetNode`: Blocks propagation of node reset, may be helpful if a node is reachable through two paths.
   - `NegateNode`: Negates the execution status of its one child node, turning `Success` into `Failure` and `Failure` into `Success`.
+  - `ForceSuccessNode`: Turns `Failure` into `Success` and passes `Running` through unmodified.
 
 
 ## betula_enigo
