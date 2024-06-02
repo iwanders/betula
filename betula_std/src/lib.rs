@@ -13,6 +13,8 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_node_default::<nodes::ForceSuccessNode>();
 
     ui_support.add_node_default_with_config::<nodes::DelayNode, nodes::DelayNodeConfig>();
+    ui_support
+        .add_node_default_with_config::<nodes::IfTimeExceedsNode, nodes::IfTimeExceedsNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::ParallelNode, nodes::ParallelNodeConfig>();
     ui_support.add_node_default_with_config::<nodes::RetryNode, nodes::RetryNodeConfig>();
     ui_support.add_node_default::<nodes::TimeNode>();

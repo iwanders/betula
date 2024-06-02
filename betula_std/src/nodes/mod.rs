@@ -34,6 +34,9 @@ pub use block_reset_node::BlockResetNode;
 mod delay_node;
 pub use delay_node::{DelayNode, DelayNodeConfig};
 
+mod if_time_exceeds_node;
+pub use if_time_exceeds_node::{IfTimeExceedsNode, IfTimeExceedsNodeConfig};
+
 mod time_slice_node;
 pub use time_slice_node::{TimeSliceNode, TimeSliceNodeConfig};
 

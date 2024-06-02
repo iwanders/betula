@@ -56,6 +56,7 @@ Provider:
 Conditional:
   - `DelayNode`: Delays execution of the child node with the specified interval.
   - `StatusReadNode`: Reads an execution status off the blackboard and returns this, regardless of the optional child's status.
+  - `IfTimeExceedsNode`: Compares whether one time exceeds another time by a value.
 
 Control:
   - `ParallelNode`: A node that executes all children and determines status based on their return, may resume running nodes from previous cycle.
