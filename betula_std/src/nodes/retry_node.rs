@@ -23,15 +23,6 @@ pub struct RetryNode {
     pub config: RetryNodeConfig,
 }
 
-impl RetryNode {
-    pub fn new(time_limit: f64) -> Self {
-        RetryNode {
-            config: RetryNodeConfig { time_limit },
-            ..Default::default()
-        }
-    }
-}
-
 impl Node for RetryNode {
     fn execute(&mut self, ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if ctx.children() != 1 {
