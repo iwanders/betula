@@ -30,7 +30,7 @@ impl Pattern {
         let img = img
             .as_rgba8()
             .ok_or("image could not be converted to rgba8")?;
-        Ok(Self::from_image(&img))
+        Ok(Self::from_image(img))
     }
 
     pub fn from_image(img: &RgbaImage) -> Pattern {
@@ -165,7 +165,7 @@ pub struct PatternEntry {
 
 impl PatternEntry {
     pub fn load_pattern(&self) -> Result<Pattern, crate::PatternError> {
-        Ok(Pattern::from_path(&self.path)?)
+        Pattern::from_path(&self.path)
     }
 }
 
@@ -175,8 +175,7 @@ pub fn load_patterns_directory(
     let mut patterns = vec![];
     let mut stack: Vec<(Vec<String>, std::path::PathBuf)> = std::fs::read_dir(path)
         .map_err(|e| format!("failed to open {}: {e:?}", path.display()))?
-        .map(|v| v.ok())
-        .flatten()
+        .filter_map(|v| v.ok())
         .map(|v| (vec![], v.path()))
         .collect::<Vec<_>>();
 
@@ -204,7 +203,7 @@ pub fn load_patterns_directory(
                         if let Some(name) = metadata.name {
                             info.name = name;
                         }
-                        info.description = metadata.description.clone();
+                        info.description.clone_from(&metadata.description);
                     }
 
                     patterns.push(PatternEntry {
@@ -233,7 +232,7 @@ pub fn load_patterns_directory(
         }
     }
 
-    patterns.sort_by(|a, b| a.partial_cmp(&b).unwrap());
+    patterns.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     Ok(patterns)
 }
@@ -312,7 +311,7 @@ impl<T: std::fmt::Debug + Copy + std::cmp::PartialEq<T>> EnumMatcher<T> {
     ) -> Result<EnumMatcher<T>, crate::PatternError> {
         let mut matchers = vec![];
         for entry in match_entries.iter() {
-            let pattern = Self::find_pattern(&patterns, &entry.pattern)?;
+            let pattern = Self::find_pattern(patterns, &entry.pattern)?;
             matchers.push(EnumPattern {
                 value: entry.value,
                 pattern,

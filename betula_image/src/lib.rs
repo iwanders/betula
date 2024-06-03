@@ -29,7 +29,7 @@ impl Image {
 impl std::ops::Deref for Image {
     type Target = image::RgbaImage;
     fn deref(&self) -> &Self::Target {
-        &*self.image
+        &self.image
     }
 }
 
