@@ -86,6 +86,7 @@ impl Node for CursorScannerNode {
                 min_radius: self.config.min_radius,
                 min_radius_dt: 0.01,
                 parameter: 0.0,
+                path_velocity: false,
             }
             .initialised();
             self.spiral = Some(spiral);
