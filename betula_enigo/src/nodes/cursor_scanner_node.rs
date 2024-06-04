@@ -13,6 +13,9 @@ pub struct CursorScannerNodeConfig {
     pub x: f64,
     pub y: f64,
 
+    #[serde(default)]
+    pub path_velocity: bool,
+
     pub interval: f64,
 }
 impl IsNodeConfig for CursorScannerNodeConfig {}
@@ -30,6 +33,8 @@ impl Default for CursorScannerNodeConfig {
 
             speed: 2.0,
             interval: 0.05,
+
+            path_velocity: false,
         }
     }
 }
@@ -86,7 +91,7 @@ impl Node for CursorScannerNode {
                 min_radius: self.config.min_radius,
                 min_radius_dt: 0.01,
                 parameter: 0.0,
-                path_velocity: false,
+                path_velocity: self.config.path_velocity,
             }
             .initialised();
             self.spiral = Some(spiral);
@@ -223,6 +228,11 @@ mod ui_support {
                             .clamp_range(0.0..=1080.0),
                     );
                     modified |= r.changed();
+
+                    let r = ui.checkbox(&mut self.config.path_velocity, "Path Vel");
+                    modified |= r
+                        .on_hover_text("If checked, velocity is along path instead of arc.")
+                        .changed();
                 });
 
                 ui.horizontal(|ui| {
@@ -230,7 +240,7 @@ mod ui_support {
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.speed)
                             .speed(0.1)
-                            .clamp_range(0.0..=100.0),
+                            .clamp_range(0.0..=1000.0),
                     );
                     modified |= r.changed();
                     ui.label("Interval: ");

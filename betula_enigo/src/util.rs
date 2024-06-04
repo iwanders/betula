@@ -84,7 +84,7 @@ impl Spiral {
 
     /// Advance the spiral with a dt and return the new position.
     pub fn advance(&mut self, dt: f64) -> (f64, f64) {
-        use std::f64::consts::PI;
+        // use std::f64::consts::PI;
         // https://gamedev.stackexchange.com/a/16756
         //   spiral fun: (cos(t) * f(t), sin(t) * f(t))
         //   w(t) = V / (2 * pi * f (t))
