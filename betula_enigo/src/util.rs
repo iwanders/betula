@@ -66,14 +66,14 @@ impl Spiral {
 
         // r = a + b * t
         // radius -a = b * t
-        // (radius -a / b) = t
+        // (radius -a) / b = t
         let radius = radius.min(self.max_radius).max(self.min_radius);
 
         if self.b == 0.0 {
             // it is a circle.
             return self.advance(0.0);
         } else {
-            self.parameter = (radius - self.a) / self.b
+            self.parameter = ((radius - self.a) / self.b).max(0.0);
         }
         self.advance(0.0)
     }
@@ -96,7 +96,8 @@ impl Spiral {
         //    w(t) = v / (2 * pi * (a + b * t));
 
         let speed = if self.path_velocity {
-            let denom = 2.0 * PI * (self.a + self.b * self.parameter);
+            // let denom = 2.0 * PI * (self.a + self.b * self.parameter);
+            let denom = self.a + self.b * self.parameter;
             if denom == 0.0 {
                 self.min_radius_dt
             } else {
@@ -115,6 +116,10 @@ impl Spiral {
         } else {
             self.a + self.b * t
         };
+        println!(
+            "At param {}, with r: {}, speed: {}",
+            self.parameter, r_calc, speed
+        );
 
         let x = t.cos() * r_calc;
         let y = t.sin() * r_calc;
@@ -157,21 +162,24 @@ mod test {
 
     #[test]
     fn test_spiral_path_velocity() {
-        // https://www.desmos.com/calculator/hv3yyi8bln
+        // https://www.desmos.com/calculator/thgpfv3fpp
         let mut points_f64 = vec![];
         let mut points_i32 = vec![];
 
         let a = 35.0;
         let b = 10.0;
-        let speed = 10000.0;
+        let speed = 1000.0;
         let max_radius = 1000.0;
         let mut spiral = Spiral::new((0.0, 0.0), a, b, speed, max_radius);
         spiral.path_velocity = true;
         let dt = 0.1;
 
-        spiral.advance_to_radius(400.0);
+        spiral.advance_to_radius(40.0);
 
-        for _i in 0..100 {
+        let imax = 100;
+        // 100 steps with a dt of 0.1, with speed of 1000, gives 100 px between points.
+
+        for _i in 0..imax {
             let p = spiral.advance(dt);
             points_f64.push(p);
             points_i32.push((p.0 as i32, p.1 as i32));
