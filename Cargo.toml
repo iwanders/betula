@@ -11,6 +11,7 @@ members = [
     "betula_demo",
     "betula_wm",
     "betula_image",
+    "betula_overlay",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html

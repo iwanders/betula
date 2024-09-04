@@ -1,0 +1,22 @@
+[package]
+name = "betula_overlay"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-3-Clause"
+
+
+[dependencies]
+betula_core = { workspace = true, default-features = false }
+betula_common = { workspace = true, default-features = false }
+betula_editor = { workspace = true, default-features = false, optional=true}
+serde =  { version = "1.0", features = ["derive"] }
+
+screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="9f3aee672d748ad1dc7ddcf51cce73740d65d30f" }
+
+image = { version ="0.25.1", default-features=false, features=["png"]}
+toml = {version = "0.8.12" }
+
+
+
+#[dev-dependencies]
+#clap = {version="4.5.4", features=["std"]}
