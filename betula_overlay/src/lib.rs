@@ -2,11 +2,11 @@ pub type OverlayError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub mod nodes;
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use screen_overlay::{Overlay, OverlayConfig};
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 #[derive(Clone)]
 pub struct OverlayInterface {
     overlay: Arc<Overlay>,
@@ -53,5 +53,5 @@ impl std::fmt::Debug for OverlayBlackboard {
 #[cfg(feature = "betula_editor")]
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_value_default_named::<OverlayBlackboard>("OverlayBlackboard");
-    // ui_support.add_node_default_with_config::<nodes::ImageMatchNode, nodes::ImageMatchNodeConfig>();
+    ui_support.add_node_default_with_config::<nodes::OverlayInstanceNode, nodes::OverlayInstanceNodeConfig>();
 }

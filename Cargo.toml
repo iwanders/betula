@@ -33,3 +33,4 @@ betula_std = { version = "0.0.1", path = "betula_std", default-features = false 
 betula_hotkey = { version = "0.0.1", path = "betula_hotkey", default-features = false }
 betula_demo = { version = "0.0.1", path = "betula_demo", default-features = false }
 betula_wm = { version = "0.0.1", path = "betula_wm", default-features = false }
+betula_overlay = { version = "0.0.1", path = "betula_overlay", default-features = false }

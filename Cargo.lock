@@ -625,6 +625,7 @@ dependencies = [
  "betula_enigo",
  "betula_hotkey",
  "betula_image",
+ "betula_overlay",
  "betula_std",
  "betula_wm",
  "eframe",

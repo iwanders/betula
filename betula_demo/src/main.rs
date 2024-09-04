@@ -15,6 +15,7 @@ fn create_ui_support() -> UiSupport {
     betula_wm::add_ui_support(&mut ui_support);
     betula_hotkey::add_ui_support(&mut ui_support);
     betula_image::add_ui_support(&mut ui_support);
+    betula_overlay::add_ui_support(&mut ui_support);
     ui_support
 }
 

@@ -1,7 +1,7 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-use std::sync::Arc;
+// use std::sync::Arc;
 
 use crate::{OverlayBlackboard, OverlayInterface};
 
@@ -63,9 +63,9 @@ impl Node for OverlayInstanceNode {
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
         let r = self.config.load_node_config(config);
-        if let Some(instance) = &self.instance {
-            // instance.set_cursor_offset(self.cursor_offset())?;
-        }
+        // if let Some(instance) = &self.instance {
+        // instance.set_cursor_offset(self.cursor_offset())?;
+        // }
         r
     }
 
@@ -85,7 +85,7 @@ mod ui_support {
 
     impl UiNode for OverlayInstanceNode {
         fn ui_title(&self) -> String {
-            "overlay ⌨".to_owned()
+            "overlay 🎞".to_owned()
         }
 
         fn ui_config(
@@ -94,8 +94,9 @@ mod ui_support {
             ui: &mut egui::Ui,
             _scale: f32,
         ) -> UiConfigResponse {
-            let _ = ctx;
+            let _ = (ctx, ui);
             // let mut ui_response = UiConfigResponse::UnChanged;
+            /*
             let mut modified = false;
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -123,6 +124,8 @@ mod ui_support {
             } else {
                 UiConfigResponse::UnChanged
             }
+            */
+            UiConfigResponse::UnChanged
         }
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![

@@ -13,5 +13,6 @@ betula_wm = { workspace = true, features=["betula_editor"] }
 betula_std = { workspace = true, features=["betula_editor"] }
 betula_hotkey = { workspace = true, features=["betula_editor"] }
 betula_image = { workspace = true, features=["betula_editor", "betula_enigo"] }
+betula_overlay = { workspace = true, features=["betula_editor"] }
 eframe = { version = "0.26", features = ["serde", "persistence"] }
 egui = { version = "0.26" }
