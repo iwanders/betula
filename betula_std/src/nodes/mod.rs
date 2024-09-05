@@ -57,3 +57,6 @@ pub use status_write_node::StatusWriteNode;
 mod if_enum_node;
 pub use if_enum_node::{IfEnumNode, IfEnumNodeConfig, IfEnumNodeEnum};
 pub use if_enum_node::{IfExecutionStatusNode, IfExecutionStatusNodeConfig};
+
+mod string_write_node;
+pub use string_write_node::{StringWriteNode, StringWriteNodeConfig};

@@ -24,6 +24,9 @@ pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_node_default_with_config::<nodes::TimeSliceNode, nodes::TimeSliceNodeConfig>();
     ui_support.add_value_default::<f64>();
     ui_support.add_value_default::<i64>();
+    ui_support.add_value_default_named::<String>("String");
     ui_support.add_value_default_named::<betula_core::ExecutionStatus>("status");
     ui_support.add_node_default_with_config::<nodes::IfExecutionStatusNode, nodes::IfExecutionStatusNodeConfig>();
+    ui_support
+        .add_node_default_with_config::<nodes::StringWriteNode, nodes::StringWriteNodeConfig>();
 }
