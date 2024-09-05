@@ -9,11 +9,18 @@ use screen_overlay::{Overlay, OverlayConfig};
 use std::sync::Arc;
 #[derive(Clone)]
 pub struct OverlayInterface {
-    overlay: Arc<Overlay>,
+    pub overlay: Arc<Overlay>,
 }
 impl std::fmt::Debug for OverlayInterface {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "OverlayInterface")
+    }
+}
+
+impl std::ops::Deref for OverlayInterface {
+    type Target = Overlay;
+    fn deref(&self) -> &Self::Target {
+        &*self.overlay
     }
 }
 
