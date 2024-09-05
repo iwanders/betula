@@ -61,4 +61,6 @@ impl std::fmt::Debug for OverlayBlackboard {
 pub fn add_ui_support(ui_support: &mut betula_editor::UiSupport) {
     ui_support.add_value_default_named::<OverlayBlackboard>("OverlayBlackboard");
     ui_support.add_node_default_with_config::<nodes::OverlayInstanceNode, nodes::OverlayInstanceNodeConfig>();
+    ui_support
+        .add_node_default_with_config::<nodes::OverlayTextNode, nodes::OverlayTextNodeConfig>();
 }

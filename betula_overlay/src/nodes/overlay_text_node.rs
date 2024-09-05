@@ -176,28 +176,60 @@ mod ui_support {
             ui: &mut egui::Ui,
             _scale: f32,
         ) -> UiConfigResponse {
-            let _ = (ctx, ui);
+            let _ = ctx;
             // let mut ui_response = UiConfigResponse::UnChanged;
             /*
+                position: (0, 0),
+                size: (100, 100),
+                draw_border: true,
+                font_size: 32.0,
+                text_color: Default::default(),
+            */
             let mut modified = false;
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label("linux Δ: ");
+                    ui.label("pos: ");
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.linux_offset.0))
+                        .add(egui::DragValue::new(&mut self.config.position.0))
                         .changed();
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.linux_offset.1))
+                        .add(egui::DragValue::new(&mut self.config.position.1))
                         .changed();
                 });
                 ui.horizontal(|ui| {
-                    ui.label("windows Δ: ");
+                    ui.label("size: ");
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.windows_offset.0))
+                        .add(egui::DragValue::new(&mut self.config.size.0))
                         .changed();
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.windows_offset.1))
+                        .add(egui::DragValue::new(&mut self.config.size.1))
                         .changed();
+                });
+                ui.horizontal(|ui| {
+                    modified |= ui
+                        .add(egui::Checkbox::new(&mut self.config.draw_border, "Border?"))
+                        .changed();
+                    ui.label("size: ");
+                    modified |= ui
+                        .add(egui::DragValue::new(&mut self.config.font_size))
+                        .changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("color: ");
+                    let mut rgba = [
+                        self.config.text_color.r as f32 / 255.0,
+                        self.config.text_color.g as f32 / 255.0,
+                        self.config.text_color.b as f32 / 255.0,
+                        self.config.text_color.a as f32 / 255.0,
+                    ];
+                    let color_changed = ui.color_edit_button_rgba_unmultiplied(&mut rgba).changed();
+                    if color_changed {
+                        self.config.text_color.r = (rgba[0] * 255.0) as u8;
+                        self.config.text_color.g = (rgba[1] * 255.0) as u8;
+                        self.config.text_color.b = (rgba[2] * 255.0) as u8;
+                        self.config.text_color.a = (rgba[3] * 255.0) as u8;
+                    }
+                    modified |= color_changed;
                 });
             });
 
@@ -206,13 +238,11 @@ mod ui_support {
             } else {
                 UiConfigResponse::UnChanged
             }
-            */
-            UiConfigResponse::UnChanged
         }
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![
-                UiNodeCategory::Folder("provider".to_owned()),
-                UiNodeCategory::Name("overlay".to_owned()),
+                UiNodeCategory::Folder("consumer".to_owned()),
+                UiNodeCategory::Name("overlay_text".to_owned()),
             ]
         }
         fn ui_child_range(&self) -> std::ops::Range<usize> {
