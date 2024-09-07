@@ -11,7 +11,7 @@ betula_common = { workspace = true, default-features = false }
 betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
-screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="3525889197de4671903a35d3f0d1f378cc89dc58" }
+screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="ca1b60bfbf6427887f1081274e2e919d94d14539" }
 
 image = { version ="0.25.1", default-features=false, features=["png"]}
 toml = {version = "0.8.12" }

@@ -2942,7 +2942,7 @@ dependencies = [
 [[package]]
 name = "screen_overlay"
 version = "0.1.0"
-source = "git+https://github.com/iwanders/screen_overlay?rev=3525889197de4671903a35d3f0d1f378cc89dc58#3525889197de4671903a35d3f0d1f378cc89dc58"
+source = "git+https://github.com/iwanders/screen_overlay?rev=ca1b60bfbf6427887f1081274e2e919d94d14539#ca1b60bfbf6427887f1081274e2e919d94d14539"
 dependencies = [
  "parking_lot",
  "serde",
