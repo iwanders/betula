@@ -198,6 +198,8 @@ So to get platform agnostic capture & cursor coordinates for complete right moni
 
 With this all cursors are expressed in the right monitor coordinate frame, and the right monitor is the only image captured.
 
+## betula_overlay
+This utilises my [screen_overlay](https://github.com/iwanders/screen_overlay) crate to overlay text on fullscreen applications.
 
 # License
 License is [`BSD-3-Clause`](./LICENSE).

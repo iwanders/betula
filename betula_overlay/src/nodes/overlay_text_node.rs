@@ -190,10 +190,16 @@ mod ui_support {
                 ui.horizontal(|ui| {
                     ui.label("pos: ");
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.position.0).clamp_range(0..=10000))
+                        .add(
+                            egui::DragValue::new(&mut self.config.position.0)
+                                .clamp_range(0..=10000),
+                        )
                         .changed();
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.position.1).clamp_range(0..=10000))
+                        .add(
+                            egui::DragValue::new(&mut self.config.position.1)
+                                .clamp_range(0..=10000),
+                        )
                         .changed();
                 });
                 ui.horizontal(|ui| {
@@ -211,7 +217,10 @@ mod ui_support {
                         .changed();
                     ui.label("size: ");
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.font_size).clamp_range(0.0..=10000.0))
+                        .add(
+                            egui::DragValue::new(&mut self.config.font_size)
+                                .clamp_range(0.0..=10000.0),
+                        )
                         .changed();
                 });
                 ui.horizontal(|ui| {
