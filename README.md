@@ -52,6 +52,7 @@ A collection of standard nodes, that don't have any additional dependencies.
 Provider:
   - `TimeNode`: Write the unix time to a blackboard as `f64`.
   - `StatusWriteNode`: Writes the execution status of the child node to the blackboard.
+  - `StringWriteNode`: Writes a fixed string to the blackboard.
 
 Conditional:
   - `DelayNode`: Delays execution of the child node with the specified interval.
@@ -200,6 +201,7 @@ With this all cursors are expressed in the right monitor coordinate frame, and t
 
 ## betula_overlay
 This utilises my [screen_overlay](https://github.com/iwanders/screen_overlay) crate to overlay text on fullscreen applications.
+This writes a string from the blackboard to the screen, the overlay is click through and transparent by default.
 
 # License
 License is [`BSD-3-Clause`](./LICENSE).
