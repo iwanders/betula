@@ -174,7 +174,7 @@ struct DefaultUiValueHandler<T: Chalkable + std::fmt::Debug> {
 }
 impl<T: Chalkable + std::fmt::Debug + Clone + 'static> UiValue for DefaultUiValueHandler<T> {
     fn ui(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
-        ui.label(format!("{:.?}", self.data));
+        ui.label(format!("{:?}", self.data));
         UiConfigResponse::UnChanged
     }
     fn value(&self) -> Box<dyn Chalkable> {
