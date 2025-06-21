@@ -93,8 +93,18 @@ pub struct BetulaEditor {
     viewer_hidden: bool,
 }
 
+#[derive(Debug, Default)]
+pub struct EditorOptions {
+    pub open_file: Option<std::path::PathBuf>,
+}
+
 impl BetulaEditor {
-    pub fn new(client: Box<dyn TreeClient>, ui_support: UiSupport, cx: &CreationContext) -> Self {
+    pub fn new(
+        client: Box<dyn TreeClient>,
+        ui_support: UiSupport,
+        cx: &CreationContext,
+        options: &EditorOptions,
+    ) -> Self {
         let snarl = Snarl::<BetulaViewerNode>::new();
 
         let (viewer_server, viewer_client) = internal_server_client();
@@ -108,7 +118,7 @@ impl BetulaEditor {
         // Lets just force dark mode for now, the colors are made for that.
         cx.egui_ctx.set_visuals(egui::Visuals::dark());
 
-        BetulaEditor {
+        let editor = BetulaEditor {
             viewer,
             snarl,
             pending_snarl: None,
@@ -121,7 +131,16 @@ impl BetulaEditor {
             path: None,
             save_path: None,
             viewer_hidden: false,
+        };
+
+        // Now that the editor exist, we can process the options.
+        if let Some(path) = &options.open_file {
+            editor
+                .load_editor_config_file(&path)
+                .expect(&format!("failed to open {path:?}"));
         }
+
+        editor
     }
     pub fn client(&self) -> &dyn TreeClient {
         &*self.client
@@ -217,6 +236,18 @@ impl BetulaEditor {
         let config: EditorConfig = serde_json::de::from_slice(content)?;
         Ok(config)
     }
+
+    pub fn load_editor_config_file(&self, path: &std::path::Path) -> Result<(), BetulaError> {
+        let sender = self.tree_config_load_channel.0.clone();
+        let content = std::fs::read(path)?;
+        let config: EditorConfig = serde_json::de::from_slice(&content)?;
+
+        let path = path.to_owned();
+        let pathconfig = PathConfig { config, path };
+        let _ = sender.send(pathconfig);
+        Ok(())
+    }
+
     fn load_editor_config_dialog(&self) {
         let sender = self.tree_config_load_channel.0.clone();
         let task = rfd::AsyncFileDialog::new()

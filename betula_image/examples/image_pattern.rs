@@ -1,7 +1,7 @@
 use betula_image::pattern_match::{PatternMetadata, PatternName};
 use betula_image::PatternError;
 use clap::{arg, value_parser, Arg, ArgAction, Command};
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Clone, Copy)]

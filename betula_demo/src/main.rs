@@ -41,9 +41,29 @@ fn main() -> eframe::Result<()> {
     };
     native_options.viewport.icon = Some(std::sync::Arc::new(betula_editor::betula_icon()));
 
+    // Populate the options.
+    let mut options = betula_editor::editor::EditorOptions::default();
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(fpath) = args.get(1) {
+        if fpath == "--help" {
+            eprintln!("./betula_demo path_to_tree.json");
+            std::process::exit(1);
+        }
+        let path = std::path::PathBuf::from(fpath);
+        if path.is_file() {
+            options.open_file = Some(path);
+        } else {
+            eprintln!("File path to {fpath} did not exist, or unknown argument");
+            std::process::exit(1);
+        }
+    }
+
     eframe::run_native(
         "Betula Interface",
         native_options,
-        Box::new(|cx| Box::new(BetulaEditor::new(Box::new(client), ui_support, cx))),
+        Box::new(move |cx| {
+            let editor = BetulaEditor::new(Box::new(client), ui_support, cx, &options);
+            Box::new(editor)
+        }),
     )
 }
