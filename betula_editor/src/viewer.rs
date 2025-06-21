@@ -1424,8 +1424,8 @@ impl BetulaViewer {
         }
     }
 
-    fn get_node_data_mut<'a>(
-        &'a self,
+    fn get_node_data_mut(
+        &self,
         node_id: BetulaNodeId,
     ) -> Result<RefMut<'_, NodeData>, BetulaError> {
         if let Some(node) = self.nodes.get(&node_id) {

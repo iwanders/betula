@@ -2,16 +2,16 @@
 resolver = "2"
 
 members = [
-    "betula_core",
-    "betula_common",
-    "betula_editor",
-    "betula_enigo",
-    "betula_hotkey",
-    "betula_std",
-    "betula_demo",
-    "betula_wm",
-    "betula_image",
-    "betula_overlay",
+  "betula_core",
+  "betula_common",
+  "betula_editor",
+  "betula_enigo",
+  "betula_hotkey",
+  "betula_std",
+  "betula_demo",
+  "betula_wm",
+  "betula_image",
+  "betula_overlay",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html

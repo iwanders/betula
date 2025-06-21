@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 // use std::sync::Arc;
 
-use crate::{OverlayBlackboard, OverlayInterface};
+use crate::OverlayBlackboard;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OverlayTextNodeConfig {
