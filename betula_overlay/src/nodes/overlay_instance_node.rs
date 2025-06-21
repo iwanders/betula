@@ -30,12 +30,12 @@ impl OverlayInstanceNode {
 impl Node for OverlayInstanceNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.instance.is_none() {
-            let instance = OverlayInterface::new()?;
+            self.instance = Some(OverlayInterface::new()?);
+        }
+        if let Some(instance) = self.instance.as_ref() {
             let value = OverlayBlackboard {
                 interface: Some(instance.clone()),
             };
-            // instance.set_cursor_offset(self.cursor_offset())?;
-            self.instance = Some(instance.clone());
             self.output.set(value)?;
         }
         Ok(ExecutionStatus::Success)
@@ -62,20 +62,14 @@ impl Node for OverlayInstanceNode {
     }
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
-        let r = self.config.load_node_config(config);
-        // if let Some(instance) = &self.instance {
-        // instance.set_cursor_offset(self.cursor_offset())?;
-        // }
-        r
+        self.config.load_node_config(config)
     }
 
     fn node_type(&self) -> NodeType {
         Self::static_type()
     }
 
-    fn reset(&mut self) {
-        self.instance = None;
-    }
+    fn reset(&mut self) {}
 }
 
 #[cfg(feature = "betula_editor")]

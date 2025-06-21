@@ -30,7 +30,7 @@ impl Default for OverlayTextNodeConfig {
             position: (0, 0),
             size: (100, 100),
             draw_border: true,
-            font_size: 32.0,
+            font_size: 64.0,
             text_color: Default::default(),
         }
     }
