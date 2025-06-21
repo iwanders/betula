@@ -50,6 +50,8 @@ pub struct OverlayTextNode {
 
     text_label: Option<CurrentLabel>,
 
+    needs_update: bool,
+
     pub config: OverlayTextNodeConfig,
 }
 
@@ -72,9 +74,11 @@ impl Node for OverlayTextNode {
             .text_label
             .as_ref()
             .map(|a| a.text != desired_text)
-            .unwrap_or(true);
+            .unwrap_or(true)
+            || self.needs_update;
 
         if needs_update {
+            self.needs_update = false;
             use screen_overlay::{
                 Color, DashStyle, DrawGeometry, LineStyle, Rect, Stroke, TextAlignment,
                 TextProperties,
@@ -134,6 +138,7 @@ impl Node for OverlayTextNode {
     ) -> Result<(), NodeError> {
         self.input_instance = interface.input::<OverlayBlackboard>("overlay")?;
         self.input_text = interface.input::<String>("text")?;
+        self.needs_update = true;
         Ok(())
     }
 
@@ -157,6 +162,7 @@ impl Node for OverlayTextNode {
 
     fn reset(&mut self) {
         self.text_label.take();
+        self.needs_update = true;
     }
 }
 

@@ -3226,11 +3226,12 @@ dependencies = [
 [[package]]
 name = "screen_overlay"
 version = "0.1.0"
-source = "git+https://github.com/iwanders/screen_overlay?rev=ca1b60bfbf6427887f1081274e2e919d94d14539#ca1b60bfbf6427887f1081274e2e919d94d14539"
+source = "git+https://github.com/iwanders/screen_overlay?rev=401f2312ceee42d7ead9302f6b0ba12010a1ff62#401f2312ceee42d7ead9302f6b0ba12010a1ff62"
 dependencies = [
  "parking_lot",
  "serde",
  "windows 0.58.0",
+ "x11-dl",
 ]
 
 [[package]]
