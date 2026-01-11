@@ -143,12 +143,7 @@ mod ui_support {
             "hotkey 🔥🔑".to_owned()
         }
 
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let _ = ctx;
             let mut modified = false;
 
@@ -202,7 +197,7 @@ mod ui_support {
                     let response = ui.add(
                         egui::TextEdit::singleline(edit_string)
                             .hint_text(hint_text)
-                            .min_size(egui::vec2(100.0 * scale, 0.0))
+                            .min_size(egui::vec2(100.0, 0.0))
                             .text_color_opt(text_color),
                     );
                     if response.on_hover_text(hint_text).lost_focus() {

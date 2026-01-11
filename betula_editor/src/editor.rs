@@ -112,7 +112,10 @@ impl BetulaEditor {
         let viewer = BetulaViewer::new(Box::new(viewer_client), ui_support);
 
         let mut style = SnarlStyle::new();
-        style.simple_wire = true;
+        style.bg_pattern = Some(egui_snarl::ui::BackgroundPattern::Grid(
+            egui_snarl::ui::Grid::default(),
+        ));
+        // style.simple_wire = true;
         // style.collapsible = false;
 
         // Lets just force dark mode for now, the colors are made for that.

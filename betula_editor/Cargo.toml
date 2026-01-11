@@ -5,14 +5,15 @@ edition = "2021"
 license = "BSD-3-Clause"
 
 [dependencies]
-egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "5def797fc5396b68c2824da645c8f0993ed6c593", features=["serde"]}
+#egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "5def797fc5396b68c2824da645c8f0993ed6c593", features=["serde"]}
 #egui-snarl = { path="../../../egui-snarl/", features=["serde"]}
+egui-snarl = { workspace = true}
 betula_common = { workspace = true, default-features = false }
 betula_core = { workspace = true, default-features = false }
-egui = { version = "0.26" }
+egui = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 uuid = {version = "1.8.0", features=["v4"]}
-eframe = { version = "0.26", features = ["serde", "persistence"] }
+eframe = { workspace=true }
 rfd = "0.14.1"
 smol = "2.0.0"
 serde_json = { version = "1.0" }

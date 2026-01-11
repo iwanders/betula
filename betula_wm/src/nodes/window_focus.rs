@@ -75,12 +75,7 @@ pub mod ui_support {
             "window_focus 🗖".to_owned()
         }
 
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let _ = ctx;
             let mut ui_response = UiConfigResponse::UnChanged;
 
@@ -119,7 +114,7 @@ pub mod ui_support {
                                 let response = ui.add(
                                     egui::TextEdit::singleline(edit_t)
                                         .hint_text(hint_text)
-                                        .min_size(egui::vec2(100.0 * scale, 0.0))
+                                        .min_size(egui::vec2(100.0, 0.0))
                                         .text_color_opt(text_color),
                                 );
                                 if response.lost_focus() {
@@ -135,8 +130,7 @@ pub mod ui_support {
                                 egui::Label::new(format!(
                                     "{}",
                                     if t.is_empty() { "/regex/" } else { &t }
-                                ))
-                                .wrap(false),
+                                )), //.wrap(false),
                             );
                             if r.clicked() {
                                 self.regex_editor = Some((i, t.to_owned()));

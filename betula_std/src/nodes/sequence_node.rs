@@ -120,12 +120,7 @@ pub mod ui_support {
         fn ui_title(&self) -> String {
             "sequence ⮊".to_owned()
         }
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            _scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let _ = ctx;
             let mut modified = false;
             ui.horizontal(|ui| {

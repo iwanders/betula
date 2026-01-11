@@ -81,7 +81,7 @@ impl SVGPaths {
                                 points: [current, c1, c2, end],
                                 closed: false,
                                 fill: Color32::PLACEHOLDER,
-                                stroke: Stroke::NONE,
+                                stroke: epaint::PathStroke::NONE,
                             };
                             this_path.extend(this_bezier.flatten(bezier_tolerance));
                             cursor = end;
@@ -137,7 +137,11 @@ impl SVGPaths {
                             .collect(),
                         closed: true,
                         fill: self.fill,
-                        stroke: self.stroke,
+                        stroke: epaint::PathStroke {
+                            width: self.stroke.width,
+                            color: epaint::ColorMode::Solid(self.stroke.color),
+                            kind: egui::StrokeKind::Inside,
+                        },
                     };
                     painter.add(shape);
                 }

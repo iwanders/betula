@@ -163,12 +163,7 @@ mod ui_support {
             "image cursor writer ✏ ".to_owned()
         }
 
-        fn ui_config(
-            &mut self,
-            _ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, _ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let mut token_modified = false;
 
             ui.vertical(|ui| {
@@ -180,7 +175,7 @@ mod ui_support {
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut self.config.path)
                         .hint_text(text)
-                        .min_size(egui::vec2(100.0 * scale, 0.0)),
+                        .min_size(egui::vec2(100.0 , 0.0)),
                 );
                 token_modified |= response.on_hover_text(text).on_hover_text(text2).on_hover_text(text3).changed();
                 });

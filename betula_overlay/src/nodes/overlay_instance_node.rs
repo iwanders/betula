@@ -82,12 +82,7 @@ mod ui_support {
             "overlay 🎞".to_owned()
         }
 
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            _scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let _ = (ctx, ui);
             // let mut ui_response = UiConfigResponse::UnChanged;
             /*

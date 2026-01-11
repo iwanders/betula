@@ -102,13 +102,8 @@ mod ui_support {
             "capture 📷 ".to_owned()
         }
 
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            scale: f32,
-        ) -> UiConfigResponse {
-            let _ = (ctx, scale);
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
+            let _ = (ctx);
 
             let mut modified = false;
             ui.vertical(|ui| {

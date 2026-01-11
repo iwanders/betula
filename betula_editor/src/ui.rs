@@ -55,8 +55,8 @@ pub trait UiNode: Node {
     ///
     /// This should also update the configuration appropriately when the context
     /// changes.
-    fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut Ui, scale: f32) -> UiConfigResponse {
-        let _ = (ctx, ui, scale);
+    fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut Ui) -> UiConfigResponse {
+        let _ = (ctx, ui);
         UiConfigResponse::UnChanged
     }
 
@@ -154,7 +154,7 @@ impl UiNodeCategory {
 
 pub trait UiValue: std::fmt::Debug {
     /// Function to render the ui, responds whether changes were made.
-    fn ui(&mut self, _ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+    fn ui(&mut self, _ui: &mut Ui) -> UiConfigResponse {
         UiConfigResponse::UnChanged
     }
 
@@ -173,7 +173,7 @@ struct DefaultUiValueHandler<T: Chalkable + std::fmt::Debug> {
     data: T,
 }
 impl<T: Chalkable + std::fmt::Debug + Clone + 'static> UiValue for DefaultUiValueHandler<T> {
-    fn ui(&mut self, ui: &mut Ui, _scale: f32) -> UiConfigResponse {
+    fn ui(&mut self, ui: &mut Ui) -> UiConfigResponse {
         ui.label(format!("{:?}", self.data));
         UiConfigResponse::UnChanged
     }

@@ -605,9 +605,9 @@ impl BlackboardData {
     }
 
     /// Render a port name.
-    pub fn ui_show_input(&mut self, port: &PortName, ui: &mut Ui, scale: f32) {
+    pub fn ui_show_input(&mut self, port: &PortName, ui: &mut Ui) {
         if let Some(ui_value) = self.ui_values.get_mut(port) {
-            ui_value.ui(ui, scale);
+            ui_value.ui(ui);
         }
     }
 
@@ -775,7 +775,7 @@ impl ViewerBlackboard {
         }
     }
 
-    pub fn ui_show_input(&mut self, input: &InPinId, ui: &mut Ui, scale: f32) -> PinInfo {
+    pub fn ui_show_input(&mut self, input: &InPinId, ui: &mut Ui) -> PinInfo {
         if let Some(name) = self.port_name(input.input) {
             let mut do_rename = None;
             if let Some(bb_port) = self.ports.get_mut(&name) {
@@ -805,13 +805,11 @@ impl ViewerBlackboard {
 
             // And actually render the ui node.
             if let Some(data) = self.data.as_ref() {
-                data.borrow_mut().ui_show_input(&name, ui, scale);
+                data.borrow_mut().ui_show_input(&name, ui);
             }
             PinInfo::circle().with_fill(BLACKBOARD_COLOR)
         } else {
-            PinInfo::circle()
-                .with_fill(BLACKBOARD_COLOR)
-                .with_gamma(0.5)
+            PinInfo::circle().with_fill(BLACKBOARD_COLOR.gamma_multiply(0.5))
         }
     }
 
@@ -1133,6 +1131,29 @@ pub struct BetulaViewer {
 
     /// The current selection
     selection: std::collections::HashSet<SnarlNodeId>,
+}
+
+trait SnarlSupport {
+    /// Returns OutPinIds for the provided node that are connected to some input.
+    fn out_pins_connected(&self, idx: SnarlNodeId) -> impl Iterator<Item = OutPinId> + '_;
+
+    /// Returns InPinId for the provided node that are connected to some output.
+    fn in_pins_connected(&self, idx: SnarlNodeId) -> impl Iterator<Item = InPinId> + '_;
+}
+impl SnarlSupport for Snarl<BetulaViewerNode> {
+    /// Returns OutPinIds for the provided node that are connected to some input.
+    #[track_caller]
+    fn out_pins_connected(&self, idx: SnarlNodeId) -> impl Iterator<Item = OutPinId> + '_ {
+        self.wires()
+            .filter(move |wire| wire.0.node == idx)
+            .map(|wire| wire.0)
+    }
+
+    fn in_pins_connected(&self, idx: SnarlNodeId) -> impl Iterator<Item = InPinId> + '_ {
+        self.wires()
+            .filter(move |wire| wire.1.node == idx)
+            .map(|wire| (wire.1))
+    }
 }
 
 impl BetulaViewer {
@@ -2389,6 +2410,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
+    /*
     fn vertical_output(
         &mut self,
         pin: &OutPin,
@@ -2417,13 +2439,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
             _ => None,
         }
-    }
+    }*/
 
     fn show_output(
         &mut self,
         pin: &OutPin,
         ui: &mut Ui,
-        _: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
         match snarl[pin.id.node] {
@@ -2433,13 +2454,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     .unwrap_or(RELATION_COLOR);
                 if data.is_child_output(&pin.id) {
                     if pin.remotes.is_empty() {
-                        PinInfo::triangle()
-                            .with_fill(color)
-                            .vertical()
-                            // .wiring()
-                            .with_gamma(0.5)
+                        PinInfo::triangle().with_fill(color.gamma_multiply(0.5))
+                        //.vertical()
+                        // .wiring()
+                        //  .with_gamma(0.5)
                     } else {
-                        PinInfo::triangle().with_fill(color).vertical()
+                        PinInfo::triangle().with_fill(color) //.vertical()
                     }
                 } else {
                     if let Some(ui_node) = node.ui_node() {
@@ -2466,10 +2486,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 // inputs and outputs is equal
                 ui.label("");
                 if pin.remotes.is_empty() {
-                    PinInfo::circle()
-                        .with_fill(BLACKBOARD_COLOR)
-                        // .wiring()
-                        .with_gamma(0.5)
+                    PinInfo::circle().with_fill(BLACKBOARD_COLOR.gamma_multiply(0.5))
+                    // .wiring()
+                    //  .with_gamma(0.5)
                 } else {
                     PinInfo::circle().with_fill(BLACKBOARD_COLOR) //.wiring()
                 }
@@ -2484,6 +2503,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
+    /*
     fn vertical_input(
         &mut self,
         pin: &InPin,
@@ -2502,13 +2522,12 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
             _ => None,
         }
-    }
+    }*/
 
     fn show_input(
         &mut self,
         pin: &InPin,
         ui: &mut Ui,
-        scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) -> PinInfo {
         match snarl[pin.id.node] {
@@ -2517,7 +2536,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     let data = node.data().expect("can only draw inputs with data");
                     let color = color_wire_status(RELATION_COLOR, data.node_status.as_ref())
                         .unwrap_or(RELATION_COLOR);
-                    PinInfo::triangle().with_fill(color).vertical()
+                    PinInfo::triangle().with_fill(color) //.vertical()
                 } else {
                     if let Some(ui_node) = node.ui_node() {
                         if let Some(input_port) = node.pin_to_input(&pin.id) {
@@ -2537,32 +2556,36 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     }
                 }
             }
-            BetulaViewerNode::Blackboard(ref mut bb) => bb.ui_show_input(&pin.id, ui, scale),
+            BetulaViewerNode::Blackboard(ref mut bb) => bb.ui_show_input(&pin.id, ui),
         }
     }
 
-    fn input_color(
-        &mut self,
-        _: &InPin,
-        _: &egui::style::Style,
-        _: &mut Snarl<BetulaViewerNode>,
-    ) -> Color32 {
-        UNKNOWN_COLOR
-    }
-    fn output_color(
-        &mut self,
-        _: &OutPin,
-        _: &egui::style::Style,
-        _: &mut Snarl<BetulaViewerNode>,
-    ) -> Color32 {
-        UNKNOWN_COLOR
-    }
+    /*
+        fn input_color(
+            &mut self,
+            _: &InPin,
+            _: &egui::style::Style,
+            _: &mut Snarl<BetulaViewerNode>,
+        ) -> Color32 {
+            UNKNOWN_COLOR
+        }
+        fn output_color(
+            &mut self,
+            _: &OutPin,
+            _: &egui::style::Style,
+            _: &mut Snarl<BetulaViewerNode>,
+        ) -> Color32 {
+            UNKNOWN_COLOR
+        }
+    */
 
-    fn graph_menu(
+    fn has_graph_menu(&mut self, pos: egui::Pos2, snarl: &mut Snarl<BetulaViewerNode>) -> bool {
+        true
+    }
+    fn show_graph_menu(
         &mut self,
         pos: egui::Pos2,
         ui: &mut Ui,
-        _scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         ui.label("Node");
@@ -2629,13 +2652,16 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         }
     }
 
-    fn node_menu(
+    fn has_node_menu(&mut self, node: &BetulaViewerNode) -> bool {
+        true
+    }
+
+    fn show_node_menu(
         &mut self,
         node: SnarlNodeId,
         _inputs: &[InPin],
         _outputs: &[OutPin],
         ui: &mut Ui,
-        _scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         match &mut snarl[node] {
@@ -2672,7 +2698,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
     }
-
     fn has_footer(&mut self, _node: &BetulaViewerNode) -> bool {
         true
     }
@@ -2682,14 +2707,13 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         _inputs: &[InPin],
         _outputs: &[OutPin],
         ui: &mut Ui,
-        scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         match &mut snarl[node] {
             BetulaViewerNode::Node(ref mut node) => {
                 let node_context = SimpleNodeContext::new(node);
                 if let Some(mut data) = node.data_mut() {
-                    let response = data.ui_node.ui_config(&node_context, ui, scale);
+                    let response = data.ui_node.ui_config(&node_context, ui);
                     if response == UiConfigResponse::Changed {
                         data.set_config_needs_send();
                     }
@@ -2706,10 +2730,9 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         inputs: &[InPin],
         outputs: &[OutPin],
         ui: &mut Ui,
-        scale: f32,
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
-        let _ = (inputs, outputs, scale);
+        let _ = (inputs, outputs);
         // let w = 15.0;
         let r = ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
         match &mut snarl[node] {
@@ -2720,8 +2743,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     if let Some(Err(e)) = &data.node_status {
                         r.on_hover_text(e);
                     }
-                    data.ui_node
-                        .ui_icon(ui, egui::vec2(14.0 * scale, 14.0 * scale));
+                    data.ui_node.ui_icon(ui, egui::vec2(14.0, 14.0));
                 }
             }
             _ => {}
@@ -2731,85 +2753,59 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         // ui.add_sized([w * scale, w * scale], egui::Image::new(img_src).rounding(1.0));
     }
 
-    fn node_stroke(
+    fn has_node_style(
         &mut self,
+        node: SnarlNodeId,
+        inputs: &[InPin],
+        outputs: &[OutPin],
+        snarl: &Snarl<BetulaViewerNode>,
+    ) -> bool {
+        true
+    }
+
+    fn apply_node_style(
+        &mut self,
+        style: &mut egui::Style,
         id: SnarlNodeId,
-        current: &egui::Stroke,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) -> Option<egui::Stroke> {
+        inputs: &[InPin],
+        outputs: &[OutPin],
+        snarl: &Snarl<BetulaViewerNode>,
+    ) {
         if !self.color_node_status {
-            return None;
+            return;
         }
         let selection_width_multiplier = if self.selection.contains(&id) {
             Some(2.0)
         } else {
             None
         };
+        let current = style.visuals.window_stroke;
         match &snarl[id] {
             BetulaViewerNode::Node(ref node) => {
-                let data = node.data()?;
+                let data = node.data();
+                if data.is_none() {
+                    return;
+                }
+                let data = data.unwrap();
                 let node_status = data.node_status.as_ref();
                 if let Some(new_color) = color_edge_status(current.color, node_status) {
-                    Some(egui::Stroke::from((
+                    style.visuals.window_stroke = (egui::Stroke::from((
                         (current.width * selection_width_multiplier.unwrap_or(1.0) + 0.5),
                         new_color,
                     )))
                 } else {
                     if let Some(selection_width_multiplier) = selection_width_multiplier {
-                        let mut new_stroke = *current;
+                        let mut new_stroke = current;
                         new_stroke.width *= selection_width_multiplier;
-                        Some(new_stroke)
-                    } else {
-                        None
+                        style.visuals.window_stroke = new_stroke;
                     }
                 }
             }
             BetulaViewerNode::Blackboard(_) => {
                 if let Some(width_multiplier) = selection_width_multiplier {
-                    let mut new_stroke = *current;
+                    let mut new_stroke = current;
                     new_stroke.width *= width_multiplier;
-                    Some(new_stroke)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    fn node_fill(
-        &mut self,
-        id: SnarlNodeId,
-        current: &Color32,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) -> Option<Color32> {
-        let _ = (id, current, snarl);
-        None
-    }
-
-    fn selection_pending(
-        &mut self,
-        ids: &[SnarlNodeId],
-        modifiers: &egui::Modifiers,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) {
-        let _ = (ids, modifiers, snarl);
-        self.selection = ids.iter().copied().collect();
-    }
-
-    /// Called when a node is moved, to facilitate moving the selection.
-    fn node_moved(
-        &mut self,
-        id: SnarlNodeId,
-        delta: egui::Vec2,
-        new_pos: egui::Pos2,
-        snarl: &mut Snarl<BetulaViewerNode>,
-    ) {
-        let _ = new_pos;
-        if self.selection.contains(&id) {
-            // Move the entire selection.
-            for (iter_id, pos, _node) in snarl.nodes_pos_ids_mut() {
-                if self.selection.contains(&iter_id) && id != iter_id {
-                    *pos += delta;
+                    style.visuals.window_stroke = new_stroke;
                 }
             }
         }

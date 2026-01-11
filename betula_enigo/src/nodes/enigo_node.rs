@@ -310,12 +310,7 @@ mod ui_support {
             ui.add(egui::Label::new("🖱🖮").selectable(false));
         }
 
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let _ = ctx;
 
             let mut preset_modified = false;
@@ -437,7 +432,7 @@ mod ui_support {
                                     let response = ui.add(
                                         egui::TextEdit::singleline(v)
                                             .hint_text(text)
-                                            .min_size(egui::vec2(100.0 * scale, 0.0)),
+                                            .min_size(egui::vec2(100.0, 0.0)),
                                     );
                                     token_modified |= response.on_hover_text(text).changed();
                                 }

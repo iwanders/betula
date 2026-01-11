@@ -63,7 +63,7 @@ fn main() -> eframe::Result<()> {
         native_options,
         Box::new(move |cx| {
             let editor = BetulaEditor::new(Box::new(client), ui_support, cx, &options);
-            Box::new(editor)
+            Ok(Box::new(editor))
         }),
     )
 }

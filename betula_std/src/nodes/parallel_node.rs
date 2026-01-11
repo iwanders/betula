@@ -109,12 +109,7 @@ pub mod ui_support {
             "parallel 🔀".to_owned()
         }
 
-        fn ui_config(
-            &mut self,
-            ctx: &dyn UiNodeContext,
-            ui: &mut egui::Ui,
-            _scale: f32,
-        ) -> UiConfigResponse {
+        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
             let children_count = ctx.children_count();
             let mut ui_response = UiConfigResponse::UnChanged;
 
