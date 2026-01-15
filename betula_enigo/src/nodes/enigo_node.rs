@@ -432,7 +432,7 @@ mod ui_support {
                                 token_modified = true;
                             }
                             match t {
-                                Token::Text(ref mut v) => {
+                                Token::Text(v) => {
                                     let text = "text to be inserted, doesn't work for shortcuts";
                                     let response = ui.add(
                                         egui::TextEdit::singleline(v)
@@ -441,7 +441,7 @@ mod ui_support {
                                     );
                                     token_modified |= response.on_hover_text(text).changed();
                                 }
-                                Token::Key(ref mut k, ref mut d) => {
+                                Token::Key(k, d) => {
                                     let response = direction_ui(format!("keydir{i}"), d, ui);
                                     token_modified |= response.changed();
                                     // There's 96 options here :(
@@ -537,7 +537,7 @@ mod ui_support {
                                     let response = y.inner.unwrap_or(y.response);
                                     token_modified |= response.changed();
                                     match k {
-                                        enigo::Key::Unicode(ref mut c) => {
+                                        enigo::Key::Unicode(c) => {
                                             let mut buffer = format!("{c}");
                                             let output = egui::TextEdit::singleline(&mut buffer)
                                                 .hint_text("select text to edit")
@@ -558,13 +558,13 @@ mod ui_support {
                                         _ => {}
                                     }
                                 }
-                                Token::Button(ref mut b, ref mut d) => {
+                                Token::Button(b, d) => {
                                     let response = direction_ui(format!("buttondir{i}"), d, ui);
                                     token_modified |= response.changed();
                                     let response = button_ui(format!("button{i}"), b, ui);
                                     token_modified |= response.changed();
                                 }
-                                Token::MoveMouse(ref mut x, ref mut y, ref mut c) => {
+                                Token::MoveMouse(x, y, c) => {
                                     ui.label("x");
                                     let r =
                                         ui.add(egui::DragValue::new(x).update_while_editing(false));
@@ -576,7 +576,7 @@ mod ui_support {
                                     let r = coordinate_ui(format!("coordinate{i}"), c, ui);
                                     token_modified |= r.changed();
                                 }
-                                Token::Scroll(ref mut v, ref mut c) => {
+                                Token::Scroll(v, c) => {
                                     let r =
                                         ui.add(egui::DragValue::new(v).update_while_editing(false));
                                     token_modified |= r.changed();

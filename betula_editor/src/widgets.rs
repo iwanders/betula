@@ -218,7 +218,7 @@ pub fn add_name_editor(
     edit: &mut Option<String>,
     dest: &mut Option<String>,
 ) {
-    if let Some(ref mut editor_string) = edit {
+    if let Some(editor_string) = edit {
         let edit_box = egui::TextEdit::singleline(editor_string)
             .desired_width(0.0)
             .clip_text(false);

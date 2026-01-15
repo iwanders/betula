@@ -780,7 +780,7 @@ impl ViewerBlackboard {
             let mut do_rename = None;
             if let Some(bb_port) = self.ports.get_mut(&name) {
                 // Show a label if not editing, text edit if we are editing.
-                if let Some(ref mut editor_string) = &mut bb_port.port_name_editor {
+                if let Some(editor_string) = &mut bb_port.port_name_editor {
                     let edit_box = egui::TextEdit::singleline(editor_string)
                         .desired_width(0.0)
                         .clip_text(false);
@@ -1396,7 +1396,7 @@ impl BetulaViewer {
     ) -> Result<(), BetulaError> {
         let snarl_ids = self.get_blackboard_snarl_ids(blackboard_id)?;
         for id in snarl_ids {
-            if let BetulaViewerNode::Blackboard(ref mut bb) = &mut snarl[id] {
+            if let BetulaViewerNode::Blackboard(bb) = &mut snarl[id] {
                 bb.mark_dirty()
             }
         }
@@ -1939,7 +1939,7 @@ impl BetulaViewer {
                 .get(&v.id)
                 .ok_or("could not find blackboard id in map")?
             {
-                if let BetulaViewerNode::Blackboard(ref mut bb) = &mut snarl[*snarl_id] {
+                if let BetulaViewerNode::Blackboard(bb) = &mut snarl[*snarl_id] {
                     bb.update_changes();
                 }
             }
@@ -2018,7 +2018,9 @@ impl BetulaViewer {
                             AddBlackboard(blackboard_id) => {
                                 if let Some(failure_reason) = c.error {
                                     // Yikes, it failed, lets clean up the mess and remove the node.
-                                    println!("Failed to create blackboard: {failure_reason}, cleaning up.");
+                                    println!(
+                                        "Failed to create blackboard: {failure_reason}, cleaning up."
+                                    );
                                     let ids = self.remove_blackboard(blackboard_id)?;
                                     for snarl_id in ids {
                                         snarl.remove_node(snarl_id);
@@ -2328,7 +2330,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
         if let Some(to_disconnect) = child_to_disconnect {
-            if let BetulaViewerNode::Node(ref mut node) = &mut snarl[to_disconnect.node] {
+            if let BetulaViewerNode::Node(node) = &mut snarl[to_disconnect.node] {
                 node.data_mut().unwrap().child_disconnect(&to_disconnect);
             }
         }
@@ -2355,7 +2357,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             }
         }
         if let Some(to_disconnect) = to_disconnect {
-            if let BetulaViewerNode::Node(ref mut node) = &mut snarl[to_disconnect.node] {
+            if let BetulaViewerNode::Node(node) = &mut snarl[to_disconnect.node] {
                 node.data_mut().unwrap().child_disconnect(&to_disconnect);
             }
         }
@@ -2384,8 +2386,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
     fn outputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
-            BetulaViewerNode::Node(ref node) => node.total_outputs(),
-            BetulaViewerNode::Blackboard(ref bb) => bb.outputs(),
+            BetulaViewerNode::Node(node) => node.total_outputs(),
+            BetulaViewerNode::Blackboard(bb) => bb.outputs(),
         }
     }
 
@@ -2479,8 +2481,8 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
 
     fn inputs(&mut self, node: &BetulaViewerNode) -> usize {
         match &node {
-            BetulaViewerNode::Node(ref node) => node.total_inputs(),
-            BetulaViewerNode::Blackboard(ref bb) => bb.inputs(),
+            BetulaViewerNode::Node(node) => node.total_inputs(),
+            BetulaViewerNode::Blackboard(bb) => bb.inputs(),
         }
     }
 
@@ -2639,7 +2641,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         match &mut snarl[node] {
-            BetulaViewerNode::Node(ref mut node) => {
+            BetulaViewerNode::Node(node) => {
                 if node.data.is_none() {
                     return;
                 }
@@ -2667,7 +2669,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                 // let mut data = node.data_mut().unwrap();
                 node.ui_node_menu(ui);
             }
-            BetulaViewerNode::Blackboard(ref mut bb) => {
+            BetulaViewerNode::Blackboard(bb) => {
                 bb.ui_node_menu(ui);
             }
         }
@@ -2686,7 +2688,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         snarl: &mut Snarl<BetulaViewerNode>,
     ) {
         match &mut snarl[node] {
-            BetulaViewerNode::Node(ref mut node) => {
+            BetulaViewerNode::Node(node) => {
                 let node_context = SimpleNodeContext::new(node);
                 if let Some(mut data) = node.data_mut() {
                     let response = data.ui_node.ui_config(&node_context, ui, scale);
@@ -2713,7 +2715,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         // let w = 15.0;
         let r = ui.add(egui::Label::new(self.title(&snarl[node])).selectable(false));
         match &mut snarl[node] {
-            BetulaViewerNode::Node(ref node) => {
+            BetulaViewerNode::Node(node) => {
                 if let Some(data) = node.data() {
                     let r =
                         r.on_hover_text(format!("type: {}", data.ui_node.node_type().0.as_str()));
@@ -2746,7 +2748,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
             None
         };
         match &snarl[id] {
-            BetulaViewerNode::Node(ref node) => {
+            BetulaViewerNode::Node(node) => {
                 let data = node.data()?;
                 let node_status = data.node_status.as_ref();
                 if let Some(new_color) = color_edge_status(current.color, node_status) {

@@ -53,7 +53,7 @@ pub fn menu_node_recurser<K: UiMenuEntry, T: Clone>(
 ) -> Option<T> {
     for (info, element) in tree.iter() {
         match element {
-            UiMenuNode::<K, T>::Value(ref v) => {
+            UiMenuNode::<K, T>::Value(v) => {
                 let mut button = ui.button(info.label());
                 if let Some(s) = info.hover() {
                     button = button.on_hover_text(s);
@@ -63,13 +63,13 @@ pub fn menu_node_recurser<K: UiMenuEntry, T: Clone>(
                     return Some(v.clone());
                 }
             }
-            UiMenuNode::<K, T>::Groups(ref subtree) => {
+            UiMenuNode::<K, T>::Groups(subtree) => {
                 ui.label(info.label());
                 if let Some(z) = menu_node_recurser(subtree, ui) {
                     return Some(z);
                 }
             }
-            UiMenuNode::<K, T>::SubElements(ref subtree) => {
+            UiMenuNode::<K, T>::SubElements(subtree) => {
                 let z = ui.menu_button(info.label(), |ui| menu_node_recurser(subtree, ui));
                 if let Some(returned_node_type) = z.inner.flatten() {
                     return Some(returned_node_type);

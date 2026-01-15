@@ -108,7 +108,7 @@ pub mod ui_support {
                     let edit_i = self.regex_editor.as_ref().map(|z| z.0);
                     for (i, t) in self.config.matches.iter_mut().enumerate() {
                         if edit_i == Some(i) {
-                            if let Some((_i, ref mut edit_t)) = self.regex_editor.as_mut() {
+                            if let Some((_i, edit_t)) = self.regex_editor.as_mut() {
                                 let is_valid = Regex::new(&edit_t).is_ok();
                                 let text_color = if is_valid {
                                     None

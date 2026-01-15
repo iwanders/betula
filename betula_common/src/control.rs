@@ -322,7 +322,7 @@ impl InteractionCommand {
         tree: &mut dyn Tree,
     ) -> Result<Vec<InteractionEvent>, BetulaError> {
         match self {
-            InteractionCommand::AddNode(ref v) => {
+            InteractionCommand::AddNode(v) => {
                 let new_node = tree_support.create_node(&v.node_type)?;
                 tree.add_node_boxed(v.id, new_node)?;
                 Ok(vec![
@@ -337,7 +337,7 @@ impl InteractionCommand {
                     )?),
                 ])
             }
-            InteractionCommand::SetChildren(ref v) => {
+            InteractionCommand::SetChildren(v) => {
                 tree.set_children(v.parent, &v.children)?;
                 Ok(vec![
                     InteractionEvent::CommandResult(CommandResult {

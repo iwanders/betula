@@ -24,7 +24,7 @@ fn parse_toml_file(data: &str) -> Result<Vec<EnigoPreset>, betula_core::BetulaEr
         out: &mut Vec<EnigoPreset>,
     ) -> Result<(), betula_core::BetulaError> {
         for (k, v) in t.iter() {
-            if let toml::Value::Table(ref t) = v {
+            if let toml::Value::Table(t) = v {
                 let mut index = index.to_vec();
                 index.push(k.to_owned());
                 if t.contains_key("actions") {

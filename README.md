@@ -203,5 +203,15 @@ With this all cursors are expressed in the right monitor coordinate frame, and t
 This utilises my [screen_overlay](https://github.com/iwanders/screen_overlay) crate to overlay text on fullscreen applications.
 This writes a string from the blackboard to the screen, the overlay is click through and transparent by default.
 
+## Changes
+Again, mostly for myself.
+### v0.0.2 (master)
+- Has forked egui-snarl updated to egui 0.33, 
+- Todo; use the new `screen_overlay`.
+
+### [v0.0.1](https://github.com/iwanders/betula/releases/tag/v0.0.1)
+Last commit in the original development chain. Has the event  loop problem in the overlay, which is why that only works
+on x11.
+
 # License
 License is [`BSD-3-Clause`](./LICENSE).
