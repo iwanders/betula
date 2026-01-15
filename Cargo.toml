@@ -37,4 +37,6 @@ betula_overlay = { version = "0.0.1", path = "betula_overlay", default-features 
 
 egui = { version = "0.33" }
 eframe = { version = "0.33",  features = ["glow", "serde", "persistence"]  }
-egui-snarl = {version="0.9.0", features=["serde"]}
+#egui-snarl = {version="0.9.0", features=["serde"]}
+egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "2fbff0a5bcdd6be324b171fbbf0ccfa4e4d0764b", features=["serde"]}
+#egui-snarl = {version="0.9.0", features=["serde"]}

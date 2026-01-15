@@ -175,8 +175,13 @@ mod ui_support {
             "cursor scanner 📻".to_owned()
         }
 
-        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
-            let _ = (ctx);
+        fn ui_config(
+            &mut self,
+            ctx: &dyn UiNodeContext,
+            ui: &mut egui::Ui,
+            scale: f32,
+        ) -> UiConfigResponse {
+            let _ = (ctx, scale);
 
             let mut modified = false;
 

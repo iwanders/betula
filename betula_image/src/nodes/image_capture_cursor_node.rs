@@ -223,8 +223,13 @@ mod ui_support {
             "capture cursor 📷 ".to_owned()
         }
 
-        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
-            self.node.ui_config(ctx, ui)
+        fn ui_config(
+            &mut self,
+            ctx: &dyn UiNodeContext,
+            ui: &mut egui::Ui,
+            scale: f32,
+        ) -> UiConfigResponse {
+            self.node.ui_config(ctx, ui, scale)
         }
 
         fn ui_category() -> Vec<UiNodeCategory> {

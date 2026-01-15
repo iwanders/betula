@@ -6,6 +6,7 @@ license = "BSD-3-Clause"
 
 [dependencies]
 #egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "5def797fc5396b68c2824da645c8f0993ed6c593", features=["serde"]}
+#egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "2fbff0a5bcdd6be324b171fbbf0ccfa4e4d0764b", features=["serde"]}
 #egui-snarl = { path="../../../egui-snarl/", features=["serde"]}
 egui-snarl = { workspace = true}
 betula_common = { workspace = true, default-features = false }

@@ -112,9 +112,7 @@ impl BetulaEditor {
         let viewer = BetulaViewer::new(Box::new(viewer_client), ui_support);
 
         let mut style = SnarlStyle::new();
-        style.bg_pattern = Some(egui_snarl::ui::BackgroundPattern::Grid(
-            egui_snarl::ui::Grid::default(),
-        ));
+        style.bg_pattern = egui_snarl::ui::BackgroundPattern::Grid(egui_snarl::ui::Grid::default());
         // style.simple_wire = true;
         // style.collapsible = false;
 

@@ -94,7 +94,12 @@ pub mod ui_support {
             ui.add(egui::Label::new("⏱").selectable(false));
         }
 
-        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
+        fn ui_config(
+            &mut self,
+            ctx: &dyn UiNodeContext,
+            ui: &mut egui::Ui,
+            _scale: f32,
+        ) -> UiConfigResponse {
             let _ = ctx;
             let mut ui_response = UiConfigResponse::UnChanged;
             ui.horizontal(|ui| {

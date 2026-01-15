@@ -98,8 +98,13 @@ mod ui_support {
             ui.add(egui::Label::new("🕹").selectable(false));
         }
 
-        fn ui_config(&mut self, ctx: &dyn UiNodeContext, ui: &mut egui::Ui) -> UiConfigResponse {
-            let _ = (ctx);
+        fn ui_config(
+            &mut self,
+            ctx: &dyn UiNodeContext,
+            ui: &mut egui::Ui,
+            scale: f32,
+        ) -> UiConfigResponse {
+            let _ = (scale, ctx);
             let mut modified = false;
 
             let r = ui.checkbox(&mut self.config.dry_run, "Dry");

@@ -1183,25 +1183,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "egui-scale"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7964ad2697e2b2df7157e5a0104c812c3773172c2a7b7dea95b57d9b5fd285f"
-dependencies = [
- "egui",
-]
-
-[[package]]
 name = "egui-snarl"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6358986338c35fe268c0647b410725babd5de772010e8e739e88cb11f5665da"
+version = "0.2.1"
+source = "git+https://github.com/iwanders/egui-snarl.git?rev=2fbff0a5bcdd6be324b171fbbf0ccfa4e4d0764b#2fbff0a5bcdd6be324b171fbbf0ccfa4e4d0764b"
 dependencies = [
  "egui",
- "egui-scale",
  "serde",
  "slab",
- "smallvec",
+ "tiny-fn",
 ]
 
 [[package]]
@@ -3466,6 +3455,12 @@ dependencies = [
  "jpeg-decoder",
  "weezl",
 ]
+
+[[package]]
+name = "tiny-fn"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9659b108631d1e1cf3e8e489f894bee40bc9d68fd6cc67ec4d4ce9b72d565228"
 
 [[package]]
 name = "tiny-skia"
