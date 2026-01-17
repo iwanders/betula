@@ -14,13 +14,14 @@ pub struct OverlayTextNodeConfig {
     #[serde(default)]
     pub size: (u32, u32),
 
-    // #[serde(default)]
-    // pub draw_border: bool,
     #[serde(default)]
     pub font_size: f32,
 
     #[serde(default)]
     pub text_color: Color32,
+
+    #[serde(default)]
+    pub fill_color: Color32,
 }
 impl IsNodeConfig for OverlayTextNodeConfig {}
 
@@ -31,7 +32,8 @@ impl Default for OverlayTextNodeConfig {
             size: (100, 100),
             // draw_border: true,
             font_size: 64.0,
-            text_color: Default::default(),
+            text_color: Color32::BLACK,
+            fill_color: Color32::TRANSPARENT,
         }
     }
 }
@@ -63,6 +65,7 @@ impl OverlayTextNode {
 
 impl Node for OverlayTextNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
+        // Todo... we don't actually detect changes in the instance here... currently that requires a reset / update.
         let interface = self.input_instance.get()?;
         let interface = interface
             .interface
@@ -80,7 +83,7 @@ impl Node for OverlayTextNode {
 
         if needs_update {
             self.needs_update = false;
-            use screen_overlay::{egui::Color32, PositionedElements};
+            use screen_overlay::PositionedElements;
 
             let font_size = self.config.font_size;
             let text_color = self.config.text_color;
@@ -93,7 +96,7 @@ impl Node for OverlayTextNode {
                     self.config.size.0 as f32,
                     self.config.size.1 as f32,
                 ))
-                .fill(Color32::TRANSPARENT)
+                .fill(self.config.fill_color)
                 .add_closure(move |ui| {
                     let text = egui::widget_text::RichText::new(format!("{}", desired_text_lambda))
                         .size(font_size)
@@ -168,38 +171,24 @@ mod ui_support {
             _scale: f32,
         ) -> UiConfigResponse {
             let _ = ctx;
-            // let mut ui_response = UiConfigResponse::UnChanged;
-            /*
-                position: (0, 0),
-                size: (100, 100),
-                draw_border: true,
-                font_size: 32.0,
-                text_color: Default::default(),
-            */
             let mut modified = false;
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     ui.label("pos: ");
                     modified |= ui
-                        .add(
-                            egui::DragValue::new(&mut self.config.position.0)
-                                .clamp_range(0..=10000),
-                        )
+                        .add(egui::DragValue::new(&mut self.config.position.0).range(0..=10000))
                         .changed();
                     modified |= ui
-                        .add(
-                            egui::DragValue::new(&mut self.config.position.1)
-                                .clamp_range(0..=10000),
-                        )
+                        .add(egui::DragValue::new(&mut self.config.position.1).range(0..=10000))
                         .changed();
                 });
                 ui.horizontal(|ui| {
                     ui.label("size: ");
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.size.0).clamp_range(1..=10000))
+                        .add(egui::DragValue::new(&mut self.config.size.0).range(1..=10000))
                         .changed();
                     modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.size.1).clamp_range(1..=10000))
+                        .add(egui::DragValue::new(&mut self.config.size.1).range(1..=10000))
                         .changed();
                 });
                 ui.horizontal(|ui| {
@@ -208,31 +197,18 @@ mod ui_support {
                     //     .changed();
                     ui.label("size: ");
                     modified |= ui
-                        .add(
-                            egui::DragValue::new(&mut self.config.font_size)
-                                .clamp_range(0.0..=10000.0),
-                        )
+                        .add(egui::DragValue::new(&mut self.config.font_size).range(0.0..=10000.0))
                         .changed();
                 });
                 ui.horizontal(|ui| {
                     ui.label("color: ");
-                    let color_changed = ui
+                    modified |= ui
                         .color_edit_button_srgba(&mut self.config.text_color)
                         .changed();
-                    // let mut rgba = [
-                    //     self.config.text_color.r as f32 / 255.0,
-                    //     self.config.text_color.g as f32 / 255.0,
-                    //     self.config.text_color.b as f32 / 255.0,
-                    //     self.config.text_color.a as f32 / 255.0,
-                    // ];
-                    // let color_changed = ui.color_edit_button_rgba_unmultiplied(&mut rgba).changed();
-                    // if color_changed {
-                    //     self.config.text_color.r = (rgba[0] * 255.0) as u8;
-                    //     self.config.text_color.g = (rgba[1] * 255.0) as u8;
-                    //     self.config.text_color.b = (rgba[2] * 255.0) as u8;
-                    //     self.config.text_color.a = (rgba[3] * 255.0) as u8;
-                    // }
-                    modified |= color_changed;
+                    ui.label("fill: ");
+                    modified |= ui
+                        .color_edit_button_srgba(&mut self.config.fill_color)
+                        .changed();
                 });
             });
 

@@ -45,5 +45,5 @@ eframe = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832
 egui = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df45aaf8760c29b8", features=["serde"] }
 #egui_extras = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df45aaf8760c29b8",  features=["image"]}
 
-screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="bc20df85caade1e48c9ba21d25f796cfc3f1c350"  }
+screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="ca8b35aaf4a3059edd8267ab7da5d360ba845eb4"  }
 #screen_overlay = {path="../../screen_overlay/repo/"}
