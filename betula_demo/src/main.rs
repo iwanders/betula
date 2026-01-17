@@ -19,6 +19,14 @@ fn create_ui_support() -> UiSupport {
     ui_support
 }
 
+fn service_overlays(editor: &mut BetulaEditor, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+    let _ = (editor, frame);
+    let overlays = betula_overlay::get_overlays();
+    for v in overlays {
+        v.show_viewport_deferred(ui);
+    }
+}
+
 fn main() -> eframe::Result<()> {
     // Create the control pipes.
     let (server, client) = internal_server_client();
@@ -62,7 +70,8 @@ fn main() -> eframe::Result<()> {
         "Betula Interface",
         native_options,
         Box::new(move |cx| {
-            let editor = BetulaEditor::new(Box::new(client), ui_support, cx, &options);
+            let mut editor = BetulaEditor::new(Box::new(client), ui_support, cx, &options);
+            editor.add_ui_callback(Box::new(service_overlays));
             Ok(Box::new(editor))
         }),
     )

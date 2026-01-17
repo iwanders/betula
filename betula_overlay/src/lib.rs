@@ -40,6 +40,8 @@ impl OverlayInterface {
         let overlay = Overlay::new(config);
         let overlay = OverlayHandle::new(overlay);
 
+        add_overlay(&overlay);
+
         Ok(OverlayInterface { overlay })
     }
 }
@@ -53,6 +55,30 @@ impl std::fmt::Debug for OverlayBlackboard {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "Overlay")
     }
+}
+
+type WeakOverlay = std::sync::Weak<Overlay>;
+static OVERLAYS_IN_EXISTANCE: std::sync::LazyLock<std::sync::Mutex<Vec<WeakOverlay>>> =
+    std::sync::LazyLock::<std::sync::Mutex<Vec<WeakOverlay>>>::new(|| Default::default());
+
+fn add_overlay(overlay: &OverlayHandle) {
+    let mut overlays = OVERLAYS_IN_EXISTANCE.lock().unwrap();
+    overlays.push(overlay.to_weak())
+}
+
+pub fn get_overlays() -> Vec<OverlayHandle> {
+    let mut overlays = OVERLAYS_IN_EXISTANCE.lock().unwrap();
+    let strong: Vec<OverlayHandle> = overlays
+        .drain(..)
+        .filter_map(screen_overlay::OverlayHandle::from_weak)
+        .collect();
+
+    // Re-assign the ones that still exist.
+    for s in strong.iter() {
+        overlays.push(s.to_weak());
+    }
+
+    strong
 }
 
 /// Register nodes to the ui support.

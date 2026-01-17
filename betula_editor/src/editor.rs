@@ -67,6 +67,9 @@ struct PathConfig {
     config: EditorConfig,
 }
 
+pub type EditorLogicCallback = Box<dyn Fn(&mut BetulaEditor, &egui::Context, &mut eframe::Frame)>;
+pub type EditorUICallback = Box<dyn Fn(&mut BetulaEditor, &mut egui::Ui, &mut eframe::Frame)>;
+
 pub struct BetulaEditor {
     snarl: Snarl<BetulaViewerNode>,
     style: SnarlStyle,
@@ -91,6 +94,11 @@ pub struct BetulaEditor {
 
     /// Whether the viewer is hidden
     viewer_hidden: bool,
+
+    /// Callback invoked at the start of the logic call.
+    logic_callbacks: Vec<EditorLogicCallback>,
+    /// Callback invoked at the start of the ui callback.
+    ui_callbacks: Vec<EditorUICallback>,
 }
 
 #[derive(Debug, Default)]
@@ -132,6 +140,8 @@ impl BetulaEditor {
             path: None,
             save_path: None,
             viewer_hidden: false,
+            logic_callbacks: Default::default(),
+            ui_callbacks: Default::default(),
         };
 
         // Now that the editor exist, we can process the options.
@@ -145,6 +155,14 @@ impl BetulaEditor {
     }
     pub fn client(&self) -> &dyn TreeClient {
         &*self.client
+    }
+
+    pub fn add_ui_callback(&mut self, callback: EditorUICallback) {
+        self.ui_callbacks.push(callback);
+    }
+
+    pub fn add_logic_callback(&mut self, callback: EditorLogicCallback) {
+        self.logic_callbacks.push(callback);
     }
 
     fn request_tree_config(&mut self) -> Result<(), BetulaError> {
@@ -472,12 +490,27 @@ impl App for BetulaEditor {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        {
+            let claimed: Vec<EditorLogicCallback> = self.logic_callbacks.drain(..).collect();
+            for c in claimed.iter() {
+                (*c)(self, ctx, frame);
+            }
+            self.logic_callbacks = claimed;
+        }
+
         let r = self.service(ctx);
         if r.is_err() {
             println!("Error servicing: {:?}", r.err());
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        {
+            let claimed: Vec<EditorUICallback> = self.ui_callbacks.drain(..).collect();
+            for c in claimed.iter() {
+                (*c)(self, ui, frame);
+            }
+            self.ui_callbacks = claimed;
+        }
         let ctx = ui.ctx();
         let r = self.ui_top_panel(ctx);
         if r.is_err() {
