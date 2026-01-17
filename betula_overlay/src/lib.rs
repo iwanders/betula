@@ -57,6 +57,8 @@ impl std::fmt::Debug for OverlayBlackboard {
     }
 }
 
+// We need this machinery here to track overlays that exist, such that in the ui service loop we can service the overlays.
+
 type WeakOverlay = std::sync::Weak<Overlay>;
 static OVERLAYS_IN_EXISTANCE: std::sync::LazyLock<std::sync::Mutex<Vec<WeakOverlay>>> =
     std::sync::LazyLock::<std::sync::Mutex<Vec<WeakOverlay>>>::new(|| Default::default());

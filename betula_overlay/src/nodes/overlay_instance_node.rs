@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{OverlayBlackboard, OverlayInterface};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Copy)]
 pub struct OverlayInstanceNodeConfig {
     #[serde(default)]
     pub windows_config: screen_overlay::OverlayConfig,
@@ -71,7 +71,13 @@ impl Node for OverlayInstanceNode {
     }
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
-        self.config.load_node_config(config)
+        let old_config = self.config;
+
+        self.config.load_node_config(config)?;
+        if self.config != old_config {
+            self.instance = None;
+        }
+        Ok(())
     }
 
     fn node_type(&self) -> NodeType {
@@ -127,15 +133,17 @@ mod ui_support {
                     });
                 });
                 modified
-            };
+            }
+
             let mut modified = false;
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label("linux: ");
+                    ui.label("🐧: ");
                     modified |= add_config_drawable(ui, &mut self.config.linux_config);
                 });
                 ui.horizontal(|ui| {
-                    ui.label("windows: ");
+                    let windows_logo_in_egui = char::from_u32(0xE61F).unwrap();
+                    ui.label(format!("{}: ", windows_logo_in_egui));
                     modified |= add_config_drawable(ui, &mut self.config.windows_config);
                 });
             });
