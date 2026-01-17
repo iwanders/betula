@@ -23,6 +23,7 @@ fn service_overlays(editor: &mut BetulaEditor, ui: &mut egui::Ui, frame: &mut ef
     let _ = (editor, frame);
     let overlays = betula_overlay::get_overlays();
     for v in overlays {
+        // println!("drawing {:?}", std::sync::Weak::as_ptr(&v.to_weak()));
         v.show_viewport_deferred(ui);
     }
 }
@@ -44,7 +45,8 @@ fn main() -> eframe::Result<()> {
     let mut native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])
-            .with_min_inner_size([300.0, 220.0]),
+            .with_min_inner_size([300.0, 220.0])
+            .with_transparent(true),
         ..Default::default()
     };
     native_options.viewport.icon = Some(std::sync::Arc::new(betula_editor::betula_icon()));

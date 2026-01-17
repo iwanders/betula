@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{OverlayBlackboard, OverlayInterface};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Copy)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct OverlayInstanceNodeConfig {
     #[serde(default)]
     pub windows_config: screen_overlay::OverlayConfig,
@@ -31,14 +31,15 @@ impl Node for OverlayInstanceNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.instance.is_none() {
             let config = if cfg!(target_os = "linux") {
-                self.config.linux_config
+                &self.config.linux_config
             } else {
-                self.config.windows_config
+                &self.config.windows_config
             };
 
             // This is a bit tricky, becaus eat creation we run into https://github.com/emilk/egui/issues/3632#issuecomment-3733528750
 
-            let new_instance = OverlayInterface::new(config)?;
+            println!("new with {config:#?}");
+            let new_instance = OverlayInterface::new(config.clone())?;
             self.instance = Some(new_instance);
         }
         if let Some(instance) = self.instance.as_ref() {
@@ -71,7 +72,7 @@ impl Node for OverlayInstanceNode {
     }
 
     fn set_config(&mut self, config: &dyn NodeConfig) -> Result<(), NodeError> {
-        let old_config = self.config;
+        let old_config = self.config.clone();
 
         self.config.load_node_config(config)?;
         if self.config != old_config {
@@ -129,6 +130,12 @@ mod ui_support {
                         ui.label("bg: ");
                         modified |= ui
                             .color_edit_button_srgba(&mut config.central_panel_fill)
+                            .changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("id");
+                        modified |= ui
+                            .add(egui::TextEdit::singleline(&mut config.viewport_id))
                             .changed();
                     });
                 });

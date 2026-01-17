@@ -93,7 +93,7 @@ impl Node for OverlayTextNode {
                     self.config.size.0 as f32,
                     self.config.size.1 as f32,
                 ))
-                // .debug_color()
+                .fill(Color32::TRANSPARENT)
                 .add_closure(move |ui| {
                     let text = egui::widget_text::RichText::new(format!("{}", desired_text_lambda))
                         .size(font_size)

@@ -40,7 +40,7 @@ impl OverlayInterface {
         let overlay = Overlay::new(config);
         let overlay = OverlayHandle::new(overlay);
 
-        add_overlay(&overlay);
+        register_overlay(&overlay);
 
         Ok(OverlayInterface { overlay })
     }
@@ -63,7 +63,7 @@ type WeakOverlay = std::sync::Weak<Overlay>;
 static OVERLAYS_IN_EXISTANCE: std::sync::LazyLock<std::sync::Mutex<Vec<WeakOverlay>>> =
     std::sync::LazyLock::<std::sync::Mutex<Vec<WeakOverlay>>>::new(|| Default::default());
 
-fn add_overlay(overlay: &OverlayHandle) {
+fn register_overlay(overlay: &OverlayHandle) {
     let mut overlays = OVERLAYS_IN_EXISTANCE.lock().unwrap();
     overlays.push(overlay.to_weak())
 }
