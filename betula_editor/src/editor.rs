@@ -523,6 +523,9 @@ impl App for BetulaEditor {
             });
         }
     }
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        egui::Rgba::TRANSPARENT.to_array()
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
