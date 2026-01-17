@@ -8,9 +8,9 @@ use crate::{OverlayBlackboard, OverlayInterface};
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct OverlayInstanceNodeConfig {
     #[serde(default)]
-    pub windows_offset: (i32, i32),
+    pub windows_config: screen_overlay::OverlayConfig,
     #[serde(default)]
-    pub linux_offset: (i32, i32),
+    pub linux_config: screen_overlay::OverlayConfig,
 }
 impl IsNodeConfig for OverlayInstanceNodeConfig {}
 
@@ -30,7 +30,16 @@ impl OverlayInstanceNode {
 impl Node for OverlayInstanceNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.instance.is_none() {
-            self.instance = Some(OverlayInterface::new()?);
+            let config = if cfg!(target_os = "linux") {
+                self.config.linux_config
+            } else {
+                self.config.windows_config
+            };
+
+            // This is a bit tricky, becaus eat creation we run into https://github.com/emilk/egui/issues/3632#issuecomment-3733528750
+
+            let new_instance = OverlayInterface::new(config)?;
+            self.instance = Some(new_instance);
         }
         if let Some(instance) = self.instance.as_ref() {
             let value = OverlayBlackboard {
@@ -88,28 +97,46 @@ mod ui_support {
             ui: &mut egui::Ui,
             _scale: f32,
         ) -> UiConfigResponse {
-            let _ = (ctx, ui);
-            // let mut ui_response = UiConfigResponse::UnChanged;
-            /*
+            // let _ = (ctx, ui);
+            fn add_config_drawable(
+                ui: &mut egui::Ui,
+                config: &mut screen_overlay::OverlayConfig,
+            ) -> bool {
+                let mut modified = false;
+
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("pos");
+                        modified |= ui
+                            .add(egui::DragValue::new(&mut config.position[0]))
+                            .changed();
+                        modified |= ui
+                            .add(egui::DragValue::new(&mut config.position[1]))
+                            .changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("size");
+                        modified |= ui.add(egui::DragValue::new(&mut config.size[0])).changed();
+                        modified |= ui.add(egui::DragValue::new(&mut config.size[1])).changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("bg: ");
+                        modified |= ui
+                            .color_edit_button_srgba(&mut config.central_panel_fill)
+                            .changed();
+                    });
+                });
+                modified
+            };
             let mut modified = false;
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label("linux Δ: ");
-                    modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.linux_offset.0))
-                        .changed();
-                    modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.linux_offset.1))
-                        .changed();
+                    ui.label("linux: ");
+                    modified |= add_config_drawable(ui, &mut self.config.linux_config);
                 });
                 ui.horizontal(|ui| {
-                    ui.label("windows Δ: ");
-                    modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.windows_offset.0))
-                        .changed();
-                    modified |= ui
-                        .add(egui::DragValue::new(&mut self.config.windows_offset.1))
-                        .changed();
+                    ui.label("windows: ");
+                    modified |= add_config_drawable(ui, &mut self.config.windows_config);
                 });
             });
 
@@ -118,8 +145,7 @@ mod ui_support {
             } else {
                 UiConfigResponse::UnChanged
             }
-            */
-            UiConfigResponse::UnChanged
+            // UiConfigResponse::UnChanged
         }
         fn ui_category() -> Vec<UiNodeCategory> {
             vec![

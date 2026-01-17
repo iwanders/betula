@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use screen_overlay::{Overlay, OverlayConfig, OverlayHandle};
 
-use std::sync::Arc;
 #[derive(Clone)]
 pub struct OverlayInterface {
     pub overlay: OverlayHandle,
@@ -31,13 +30,13 @@ impl std::cmp::PartialEq for OverlayInterface {
 }
 
 impl OverlayInterface {
-    pub fn new() -> Result<Self, OverlayError> {
-        let (width, height) = (1920.0, 1080.0);
-        let (x, y) = (0.0, 0.0);
-        let config = OverlayConfig::new()
-            .with_size([width, height])
-            .with_position([x, y])
-            .with_central_panel_fill(screen_overlay::egui::Color32::TRANSPARENT);
+    pub fn new(config: OverlayConfig) -> Result<Self, OverlayError> {
+        // let (width, height) = (1920.0, 1080.0);
+        // let (x, y) = (0.0, 0.0);
+        // let config = OverlayConfig::new()
+        //     .with_size([width, height])
+        //     .with_position([x, y])
+        //     .with_central_panel_fill(screen_overlay::egui::Color32::TRANSPARENT);
         let overlay = Overlay::new(config);
         let overlay = OverlayHandle::new(overlay);
 
