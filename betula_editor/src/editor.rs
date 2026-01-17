@@ -467,11 +467,18 @@ impl BetulaEditor {
 impl App for BetulaEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // egui_extras::install_image_loaders(ctx);
+    }
+
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
+
+    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let r = self.service(ctx);
         if r.is_err() {
             println!("Error servicing: {:?}", r.err());
         }
-
+    }
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        let ctx = ui.ctx();
         let r = self.ui_top_panel(ctx);
         if r.is_err() {
             println!("Error top pannel: {:?}", r.err());
@@ -483,8 +490,6 @@ impl App for BetulaEditor {
             });
         }
     }
-
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 }
 
 #[cfg(not(target_arch = "wasm32"))]

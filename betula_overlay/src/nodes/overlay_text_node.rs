@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 // use std::sync::Arc;
 
 use crate::OverlayBlackboard;
+use egui::Color32;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OverlayTextNodeConfig {
@@ -13,14 +14,13 @@ pub struct OverlayTextNodeConfig {
     #[serde(default)]
     pub size: (u32, u32),
 
-    #[serde(default)]
-    pub draw_border: bool,
-
+    // #[serde(default)]
+    // pub draw_border: bool,
     #[serde(default)]
     pub font_size: f32,
 
     #[serde(default)]
-    pub text_color: screen_overlay::Color,
+    pub text_color: Color32,
 }
 impl IsNodeConfig for OverlayTextNodeConfig {}
 
@@ -29,7 +29,7 @@ impl Default for OverlayTextNodeConfig {
         OverlayTextNodeConfig {
             position: (0, 0),
             size: (100, 100),
-            draw_border: true,
+            // draw_border: true,
             font_size: 64.0,
             text_color: Default::default(),
         }
@@ -39,8 +39,8 @@ impl Default for OverlayTextNodeConfig {
 #[derive(Debug)]
 struct CurrentLabel {
     text: String,
-    _text_token: screen_overlay::VisualToken,
-    _border_token: Option<screen_overlay::VisualToken>,
+    _text_token: screen_overlay::VisualHandle,
+    _border_token: Option<screen_overlay::VisualHandle>,
 }
 
 #[derive(Debug, Default)]
@@ -70,6 +70,7 @@ impl Node for OverlayTextNode {
             .map(|v| &v.overlay)
             .ok_or("missing interface")?;
         let desired_text = self.input_text.get()?;
+        let desired_text_lambda = desired_text.clone();
         let needs_update = self
             .text_label
             .as_ref()
@@ -79,48 +80,32 @@ impl Node for OverlayTextNode {
 
         if needs_update {
             self.needs_update = false;
-            use screen_overlay::{
-                Color, DashStyle, DrawGeometry, LineStyle, Rect, Stroke, TextAlignment,
-                TextProperties,
-            };
-            let bounding_box =
-                Rect::from(self.config.position.0 as f32, self.config.position.1 as f32)
-                    .sized(self.config.size.0 as f32, self.config.size.1 as f32);
-            let geometry = DrawGeometry::new().rectangle(&bounding_box);
+            use screen_overlay::{egui::Color32, PositionedElements};
 
-            let border_token = if self.config.draw_border {
-                let color = Color {
-                    r: 255,
-                    g: 0,
-                    b: 255,
-                    a: 255,
-                };
-                let stroke = Stroke { color, width: 1.0 };
-                let text_box_style = LineStyle {
-                    dash_style: DashStyle::Dash,
-                    // line_join: LineJoin::Round,
-                    ..Default::default()
-                };
+            let font_size = self.config.font_size;
+            let text_color = self.config.text_color;
+            let drawable = PositionedElements::new()
+                .fixed_pos(egui::pos2(
+                    self.config.position.0 as f32,
+                    self.config.position.1 as f32,
+                ))
+                .default_size(egui::vec2(
+                    self.config.size.0 as f32,
+                    self.config.size.1 as f32,
+                ))
+                // .debug_color()
+                .add_closure(move |ui| {
+                    let text = egui::widget_text::RichText::new(format!("{}", desired_text_lambda))
+                        .size(font_size)
+                        .color(text_color);
+                    ui.label(text);
+                });
 
-                Some(interface.draw_geometry(&geometry, &stroke, &text_box_style)?)
-            } else {
-                None
-            };
-
-            let font = interface.prepare_font(&TextProperties {
-                size: self.config.font_size,
-                horizontal_align: TextAlignment::Min,
-                vertical_align: TextAlignment::Min,
-                ..Default::default()
-            })?;
-
-            let text_token = interface
-                .draw_text(&desired_text, &bounding_box, &self.config.text_color, &font)
-                .expect("create image failed");
+            let text_token = interface.add_drawable(drawable.into());
             self.text_label = Some(CurrentLabel {
                 text: desired_text,
                 _text_token: text_token,
-                _border_token: border_token,
+                _border_token: None,
             });
         }
         Ok(ExecutionStatus::Success)
@@ -218,9 +203,9 @@ mod ui_support {
                         .changed();
                 });
                 ui.horizontal(|ui| {
-                    modified |= ui
-                        .add(egui::Checkbox::new(&mut self.config.draw_border, "Border?"))
-                        .changed();
+                    // modified |= ui
+                    //     .add(egui::Checkbox::new(&mut self.config.draw_border, "Border?"))
+                    //     .changed();
                     ui.label("size: ");
                     modified |= ui
                         .add(
@@ -231,19 +216,22 @@ mod ui_support {
                 });
                 ui.horizontal(|ui| {
                     ui.label("color: ");
-                    let mut rgba = [
-                        self.config.text_color.r as f32 / 255.0,
-                        self.config.text_color.g as f32 / 255.0,
-                        self.config.text_color.b as f32 / 255.0,
-                        self.config.text_color.a as f32 / 255.0,
-                    ];
-                    let color_changed = ui.color_edit_button_rgba_unmultiplied(&mut rgba).changed();
-                    if color_changed {
-                        self.config.text_color.r = (rgba[0] * 255.0) as u8;
-                        self.config.text_color.g = (rgba[1] * 255.0) as u8;
-                        self.config.text_color.b = (rgba[2] * 255.0) as u8;
-                        self.config.text_color.a = (rgba[3] * 255.0) as u8;
-                    }
+                    let color_changed = ui
+                        .color_edit_button_srgba(&mut self.config.text_color)
+                        .changed();
+                    // let mut rgba = [
+                    //     self.config.text_color.r as f32 / 255.0,
+                    //     self.config.text_color.g as f32 / 255.0,
+                    //     self.config.text_color.b as f32 / 255.0,
+                    //     self.config.text_color.a as f32 / 255.0,
+                    // ];
+                    // let color_changed = ui.color_edit_button_rgba_unmultiplied(&mut rgba).changed();
+                    // if color_changed {
+                    //     self.config.text_color.r = (rgba[0] * 255.0) as u8;
+                    //     self.config.text_color.g = (rgba[1] * 255.0) as u8;
+                    //     self.config.text_color.b = (rgba[2] * 255.0) as u8;
+                    //     self.config.text_color.a = (rgba[3] * 255.0) as u8;
+                    // }
                     modified |= color_changed;
                 });
             });

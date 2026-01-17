@@ -35,8 +35,14 @@ betula_demo = { version = "0.0.2", path = "betula_demo", default-features = fals
 betula_wm = { version = "0.0.2", path = "betula_wm", default-features = false }
 betula_overlay = { version = "0.0.2", path = "betula_overlay", default-features = false }
 
-egui = { version = "0.33" }
-eframe = { version = "0.33",  features = ["glow", "serde", "persistence"]  }
+#egui = { version = "0.33", features=["serde"] }
+#eframe = { version = "0.33",  features = ["glow", "serde", "persistence"]  }
 #egui-snarl = {version="0.9.0", features=["serde"]}
-egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "2fbff0a5bcdd6be324b171fbbf0ccfa4e4d0764b", features=["serde"]}
+egui-snarl = { git = "https://github.com/iwanders/egui-snarl.git", rev = "02fa9fbe186f1f2f27f9f5d6cad4c7099c4b11ab", features=["serde"]}
 #egui-snarl = {version="0.9.0", features=["serde"]}
+
+eframe = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df45aaf8760c29b8",  features = ["glow", "serde", "persistence"]  }
+egui = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df45aaf8760c29b8", features=["serde"] }
+#egui_extras = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df45aaf8760c29b8",  features=["image"]}
+
+screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="a71069581a1014cffee5007f63b808216ee0e23d"  }

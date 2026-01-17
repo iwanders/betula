@@ -8,10 +8,11 @@ license = "BSD-3-Clause"
 [dependencies]
 betula_core = { workspace = true, default-features = false }
 betula_common = { workspace = true, default-features = false }
+egui = { workspace = true  }
 betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
-screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="7f74c01a35d30529f37684402d5122eccd274c08" }
+screen_overlay = {  workspace = true }
 
 image = { version ="0.25.1", default-features=false, features=["png"]}
 toml = {version = "0.8.12" }

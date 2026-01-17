@@ -4,12 +4,12 @@ pub mod nodes;
 
 use serde::{Deserialize, Serialize};
 
-use screen_overlay::{Overlay, OverlayConfig};
+use screen_overlay::{Overlay, OverlayConfig, OverlayHandle};
 
 use std::sync::Arc;
 #[derive(Clone)]
 pub struct OverlayInterface {
-    pub overlay: Arc<Overlay>,
+    pub overlay: OverlayHandle,
 }
 impl std::fmt::Debug for OverlayInterface {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -18,28 +18,28 @@ impl std::fmt::Debug for OverlayInterface {
 }
 
 impl std::ops::Deref for OverlayInterface {
-    type Target = Overlay;
+    type Target = OverlayHandle;
     fn deref(&self) -> &Self::Target {
-        &*self.overlay
+        &self.overlay
     }
 }
 
 impl std::cmp::PartialEq for OverlayInterface {
     fn eq(&self, other: &OverlayInterface) -> bool {
-        Arc::as_ptr(&self.overlay) == Arc::as_ptr(&other.overlay)
+        self == other
     }
 }
 
 impl OverlayInterface {
     pub fn new() -> Result<Self, OverlayError> {
-        screen_overlay::setup()?;
-        let v = Overlay::new_with_config(&OverlayConfig {
-            task_bar: false,
-            on_top: true,
-            name: "Overlay".to_owned(),
-            ..Default::default()
-        })?;
-        let overlay = Arc::new(v);
+        let (width, height) = (1920.0, 1080.0);
+        let (x, y) = (0.0, 0.0);
+        let config = OverlayConfig::new()
+            .with_size([width, height])
+            .with_position([x, y])
+            .with_central_panel_fill(screen_overlay::egui::Color32::TRANSPARENT);
+        let overlay = Overlay::new(config);
+        let overlay = OverlayHandle::new(overlay);
 
         Ok(OverlayInterface { overlay })
     }
