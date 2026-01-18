@@ -104,7 +104,7 @@ mod ui_support {
             ui: &mut egui::Ui,
             _scale: f32,
         ) -> UiConfigResponse {
-            // let _ = (ctx, ui);
+            let _ = ctx;
             fn add_config_drawable(
                 ui: &mut egui::Ui,
                 config: &mut screen_overlay::OverlayConfig,

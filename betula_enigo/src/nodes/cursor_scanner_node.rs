@@ -201,14 +201,14 @@ mod ui_support {
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.min_radius)
                             .speed(5.0)
-                            .clamp_range(0.0..=self.config.max_radius),
+                            .range(0.0..=self.config.max_radius),
                     );
                     modified |= r.changed();
                     ui.label("to");
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.max_radius)
                             .speed(5.0)
-                            .clamp_range(self.config.min_radius..=2000.0),
+                            .range(self.config.min_radius..=2000.0),
                     );
                     modified |= r.changed();
                 });
@@ -218,14 +218,14 @@ mod ui_support {
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.x)
                             .speed(5.0)
-                            .clamp_range(0.0..=1920.0),
+                            .range(0.0..=1920.0),
                     );
                     modified |= r.changed();
                     ui.label("y");
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.y)
                             .speed(5.0)
-                            .clamp_range(0.0..=1080.0),
+                            .range(0.0..=1080.0),
                     );
                     modified |= r.changed();
 
@@ -240,7 +240,7 @@ mod ui_support {
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.speed)
                             .speed(0.1)
-                            .clamp_range(0.0..=1000.0),
+                            .range(0.0..=1000.0),
                     );
                     modified |= r.changed();
                     ui.label("Interval: ");

@@ -132,7 +132,7 @@ pub mod ui_support {
                 ui.label("Threshold: ");
                 let r = ui.add(
                     egui::DragValue::new(&mut self.config.success_threshold)
-                    .clamp_range(0..=children_count)
+                    .range(0..=children_count)
                     .update_while_editing(false),
                 );
 

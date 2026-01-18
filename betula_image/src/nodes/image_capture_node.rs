@@ -116,7 +116,7 @@ mod ui_support {
                     ui.label("Rate (hz)");
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.capture.rate)
-                            .clamp_range(0.0..=360.0) // wow, new monitors are fast.
+                            .range(0.0..=360.0) // wow, new monitors are fast.
                             .update_while_editing(false),
                     );
                     modified |= r.changed();

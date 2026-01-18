@@ -125,7 +125,7 @@ pub mod ui_support {
                     let r = betula_editor::egui_util::time_drag_value_builder(
                         ui,
                         &mut self.config.duration,
-                        |a| a.clamp_range(0.0f64..=(self.config.period - self.config.offset)),
+                        |a| a.range(0.0f64..=(self.config.period - self.config.offset)),
                     );
                     modified |= r
                         .on_hover_text("The duration of the time slice in the window.")
@@ -136,7 +136,7 @@ pub mod ui_support {
                     let r = betula_editor::egui_util::time_drag_value_builder(
                         ui,
                         &mut self.config.offset,
-                        |a| a.clamp_range(0.0f64..=(self.config.period - self.config.duration)),
+                        |a| a.range(0.0f64..=(self.config.period - self.config.duration)),
                     );
                     modified |= r
                         .on_hover_text("The offset of the window in the period.")

@@ -95,7 +95,7 @@ pub fn time_drag_value_builder<F: FnOnce(egui::DragValue) -> egui::DragValue>(
     };
 
     ui.add(f(egui::DragValue::new(value)
-        .clamp_range(0.0f64..=(24.0 * 60.0 * 60.0))
+        .range(0.0f64..=(24.0 * 60.0 * 60.0))
         .speed(speed)
         .custom_formatter(|v, _| {
             if v < 10.0 {

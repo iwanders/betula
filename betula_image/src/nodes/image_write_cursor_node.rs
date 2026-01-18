@@ -188,7 +188,7 @@ mod ui_support {
                     ui.label("Save Count");
                     let r = ui.add(
                         egui::DragValue::new(&mut self.config.frames_to_save)
-                            .clamp_range(0..=600)
+                            .range(0..=600)
                             .update_while_editing(false),
                     );
                     token_modified |= r.on_hover_text("set the frame save counter to this each execution").changed();
