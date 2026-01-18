@@ -47,3 +47,9 @@ egui = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df
 
 screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="ca8b35aaf4a3059edd8267ab7da5d360ba845eb4"  }
 #screen_overlay = {path="../../screen_overlay/repo/"}
+
+
+# Patch for https://github.com/emilk/egui/issues/3632#issuecomment-3733528750
+[patch.'https://github.com/emilk/egui.git']
+egui = { git = 'https://github.com/iwanders/emilk_egui.git', rev="606a659c95440b54229796e94a0038472dee61f8" }
+eframe = { git = 'https://github.com/iwanders/emilk_egui.git', rev="606a659c95440b54229796e94a0038472dee61f8" }
