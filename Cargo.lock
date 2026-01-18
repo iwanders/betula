@@ -1270,7 +1270,7 @@ dependencies = [
 [[package]]
 name = "egui_extras"
 version = "0.33.3"
-source = "git+https://github.com/emilk/egui.git?rev=f714380b66a44dac9a3a1832df45aaf8760c29b8#f714380b66a44dac9a3a1832df45aaf8760c29b8"
+source = "git+https://github.com/emilk/egui.git?rev=606a659c95440b54229796e94a0038472dee61f8#606a659c95440b54229796e94a0038472dee61f8"
 dependencies = [
  "ahash",
  "egui",
@@ -3387,7 +3387,7 @@ dependencies = [
 [[package]]
 name = "screen_overlay"
 version = "0.1.0"
-source = "git+https://github.com/iwanders/screen_overlay?rev=ca8b35aaf4a3059edd8267ab7da5d360ba845eb4#ca8b35aaf4a3059edd8267ab7da5d360ba845eb4"
+source = "git+https://github.com/iwanders/screen_overlay?rev=6abd76d4e74ee3e4a5007de33cc2c323e95cd9fb#6abd76d4e74ee3e4a5007de33cc2c323e95cd9fb"
 dependencies = [
  "eframe",
  "egui",
