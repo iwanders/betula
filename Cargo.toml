@@ -47,6 +47,7 @@ egui = {git="https://github.com/emilk/egui.git", rev="f714380b66a44dac9a3a1832df
 
 screen_overlay = { git = "https://github.com/iwanders/screen_overlay", rev="6abd76d4e74ee3e4a5007de33cc2c323e95cd9fb"  }
 #screen_overlay = {path="../../screen_overlay/repo/"}
+#screen_overlay = {path="../../rust/windows_overlay/"}
 
 
 # Patch for https://github.com/emilk/egui/issues/3632#issuecomment-3733528750

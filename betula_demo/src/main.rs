@@ -41,12 +41,20 @@ fn main() -> eframe::Result<()> {
     // Create the viewer
     let ui_support = create_ui_support();
 
+
+    #[cfg(target_os = "windows")]
+    let renderer = eframe::Renderer::Glow;
+    #[cfg(not(target_os = "windows"))]
+    let renderer = eframe::Renderer::Wgpu;
+
     // Run the editor.
     let mut native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])
             .with_min_inner_size([300.0, 220.0])
             .with_transparent(true),
+        // multisampling: 1,
+        renderer,
         ..Default::default()
     };
     native_options.viewport.icon = Some(std::sync::Arc::new(betula_editor::betula_icon()));
