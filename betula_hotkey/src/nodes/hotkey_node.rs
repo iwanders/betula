@@ -163,7 +163,7 @@ mod ui_support {
                 ui.horizontal(|ui| {
                     modified |= ui.checkbox(&mut self.config.meta_down, "meta").changed();
                     let d = &mut self.config.mode;
-                    let z = egui::ComboBox::from_id_source("hotkey_mode")
+                    let z = egui::ComboBox::from_id_salt("hotkey_mode")
                         .width(0.0)
                         .selected_text(d.as_str())
                         .show_ui(ui, |ui| {

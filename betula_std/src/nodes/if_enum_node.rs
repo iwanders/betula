@@ -168,7 +168,7 @@ pub mod ui_support {
                     index = i;
                 }
             }
-            let z = egui::ComboBox::from_id_source(0)
+            let z = egui::ComboBox::from_id_salt(0)
                 .width(0.0)
                 .selected_text(cmp_str[index])
                 .show_index(ui, &mut index, cmp_options.len(), |i| cmp_options[i].1);
@@ -186,7 +186,7 @@ pub mod ui_support {
                 }
             }
 
-            let z = egui::ComboBox::from_id_source(1)
+            let z = egui::ComboBox::from_id_salt(1)
                 .width(0.0)
                 .selected_text(format!("{:?}", options[index].1))
                 .show_index(ui, &mut index, options.len(), |i| &options[i].1);

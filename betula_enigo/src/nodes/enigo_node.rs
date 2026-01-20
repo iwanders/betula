@@ -145,7 +145,7 @@ mod ui_support {
         d: &mut Direction,
         ui: &mut egui::Ui,
     ) -> egui::Response {
-        let z = egui::ComboBox::from_id_source(id_source)
+        let z = egui::ComboBox::from_id_salt(id_source)
             .width(0.0)
             .selected_text(format!("{:}", direction_to_str(*d)))
             .show_ui(ui, |ui| {
@@ -182,7 +182,7 @@ mod ui_support {
         d: &mut Coordinate,
         ui: &mut egui::Ui,
     ) -> egui::Response {
-        let z = egui::ComboBox::from_id_source(id_source)
+        let z = egui::ComboBox::from_id_salt(id_source)
             .width(0.0)
             .selected_text(format!("{:}", coordinate_to_str(*d)))
             .show_ui(ui, |ui| {
@@ -220,7 +220,7 @@ mod ui_support {
         d: &mut enigo::Button,
         ui: &mut egui::Ui,
     ) -> egui::Response {
-        let z = egui::ComboBox::from_id_source(id_source)
+        let z = egui::ComboBox::from_id_salt(id_source)
             .width(0.0)
             .selected_text(format!("{:}", button_to_str(*d)))
             .show_ui(ui, |ui| {
@@ -280,7 +280,7 @@ mod ui_support {
         d: &mut enigo::Axis,
         ui: &mut egui::Ui,
     ) -> egui::Response {
-        let z = egui::ComboBox::from_id_source(id_source)
+        let z = egui::ComboBox::from_id_salt(id_source)
             .width(0.0)
             .selected_text(format!("{:}", axis_to_str(*d)))
             .show_ui(ui, |ui| {
@@ -423,7 +423,7 @@ mod ui_support {
                                 Token::Scroll(_, _) => 4,
                                 _ => unreachable!(),
                             };
-                            let z = egui::ComboBox::from_id_source(i)
+                            let z = egui::ComboBox::from_id_salt(i)
                                 .width(0.0)
                                 .selected_text(format!("{:?}", selected))
                                 .show_index(ui, &mut selected, options.len(), |i| options[i].0);
@@ -447,7 +447,7 @@ mod ui_support {
                                     // There's 96 options here :(
                                     // https://docs.rs/enigo/latest/enigo/enum.Key.html#variant.Unicode
 
-                                    let y = egui::ComboBox::from_id_source(format!("key{i}"))
+                                    let y = egui::ComboBox::from_id_salt(format!("key{i}"))
                                         .selected_text(format!("{:?}", k))
                                         .height(10000.0)
                                         .show_ui(ui, |ui| {

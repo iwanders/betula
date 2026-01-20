@@ -59,12 +59,6 @@ mod v1 {
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-    pub struct TypedValue {
-        pub type_id: String,
-        pub data: SerializableHolder,
-    }
-
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub struct Blackboard {
         pub id: BlackboardId,
         pub values: BTreeMap<PortName, SerializedValue>,
