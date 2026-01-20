@@ -41,7 +41,6 @@ fn main() -> eframe::Result<()> {
     // Create the viewer
     let ui_support = create_ui_support();
 
-
     #[cfg(target_os = "windows")]
     let renderer = eframe::Renderer::Glow;
     #[cfg(not(target_os = "windows"))]

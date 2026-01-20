@@ -228,7 +228,7 @@ pub fn add_name_editor(
                 *dest = Some(editor_string.clone());
             }
             *edit = None;
-            ui.close_menu();
+            ui.close();
         }
     } else {
         let r = ui.label(format!("{}", &current));

@@ -357,7 +357,7 @@ mod ui_support {
                             self.config.preset = Some(entry.index.clone());
                             self.config.tokens = entry.info.actions.clone();
                             preset_modified |= true;
-                            ui.close_menu();
+                            ui.close();
                         }
                     });
 
@@ -370,7 +370,7 @@ mod ui_support {
                         if let Err(e) = patterns {
                             println!("Error loading presets: {:?}", e)
                         }
-                        ui.close_menu();
+                        ui.close();
                     }
 
                     if ui.add(egui::Button::new("➕")).clicked() {

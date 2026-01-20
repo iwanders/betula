@@ -59,7 +59,8 @@ pub fn menu_node_recurser<K: UiMenuEntry, T: Clone>(
                     button = button.on_hover_text(s);
                 }
                 if button.clicked() {
-                    ui.close_menu();
+                    // TODO-fix-menu-close
+
                     return Some(v.clone());
                 }
             }

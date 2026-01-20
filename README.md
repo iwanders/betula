@@ -207,7 +207,9 @@ This writes a string from the blackboard to the screen, the overlay is click thr
 Again, mostly for myself.
 ### v0.0.2 (master)
 - Has forked egui-snarl updated to egui 0.33, 
-- Todo; use the new `screen_overlay`.
+- We are using the new `screen_overlay`, but it still doesn't work on Windows.
+- All menu's autoclose when clicked, disabled this at the egui-snarl level for now, see [changelog entry for it](https://github.com/emilk/egui/blob/main/CHANGELOG.md#-improved-popups-tooltips-and-menus). `TODO-fix-menu-close`
+- Multi-connection changing is broken.
 
 ### [v0.0.1](https://github.com/iwanders/betula/releases/tag/v0.0.1)
 Last commit in the original development chain. Has the event  loop problem in the overlay, which is why that only works

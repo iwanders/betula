@@ -461,13 +461,11 @@ impl ViewerNode {
         if ui.button("Hide").clicked() {
             self.should_remove_node = true;
             data.mark_dirty();
-            ui.close_menu();
         }
 
         // Button to hide this node.
         if ui.button("Reset").clicked() {
             data.should_reset = true;
-            ui.close_menu();
         }
 
         let is_disconnected = data.children_remote.is_empty();
@@ -481,7 +479,7 @@ impl ViewerNode {
             .clicked()
         {
             data.should_remove = true;
-            ui.close_menu();
+            ui.close();
         }
     }
 }
@@ -963,7 +961,7 @@ impl ViewerBlackboard {
             if ui.button("Hide").clicked() {
                 self.should_remove_node = true;
                 self.is_dirty = true;
-                ui.close_menu();
+                ui.close();
             }
 
             // Add a button for the delete option, ONLY allow this if no
@@ -982,7 +980,7 @@ impl ViewerBlackboard {
                 .clicked()
             {
                 data.should_remove = true;
-                ui.close_menu();
+                ui.close();
             }
 
             let prunable = data.prunable_ports();
@@ -1008,7 +1006,7 @@ impl ViewerBlackboard {
             if ui.button("none").clicked() {
                 self.ports.clear();
                 self.is_dirty = true;
-                ui.close_menu();
+                ui.close();
             }
             if ui.button("all").clicked() {
                 for name in data.ui_values.keys() {
@@ -1021,7 +1019,7 @@ impl ViewerBlackboard {
                         .collect();
                 }
                 self.is_dirty = true;
-                ui.close_menu();
+                ui.close();
             }
         });
 
@@ -2578,7 +2576,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         ui.label("Blackboard");
         if ui.button("New...").clicked() {
             self.ui_create_blackboard(BlackboardId(Uuid::new_v4()), pos, snarl);
-            ui.close_menu();
         }
 
         let mut id_names = vec![];
@@ -2599,7 +2596,6 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
         for (id, name, data_rc) in id_names {
             if ui.button(name).clicked() {
                 self.ui_create_blackboard_node(id, pos, snarl, Some(data_rc));
-                ui.close_menu();
             }
         }
 
@@ -2623,7 +2619,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                     for (id, name, data_rc) in id_names {
                         if ui.button(name).clicked() {
                             self.ui_create_node(id, pos, snarl, Some(data_rc));
-                            ui.close_menu();
+                            ui.close();
                         }
                     }
                 });
@@ -2662,7 +2658,7 @@ impl SnarlViewer<BetulaViewerNode> for BetulaViewer {
                         } else {
                             self.root_remove(node_id);
                         }
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 

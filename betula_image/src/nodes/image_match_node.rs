@@ -207,7 +207,7 @@ mod ui_support {
                     if let Some(entry) = menu_node_recurser(&root, ui) {
                         self.config.use_match = Some(entry.info.name.clone());
                         modified |= true;
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -221,7 +221,7 @@ mod ui_support {
                         println!("Error loading patterns: {:?}", e)
                     }
 
-                    ui.close_menu();
+                    ui.close();
                 }
             });
 

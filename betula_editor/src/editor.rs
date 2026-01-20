@@ -388,13 +388,12 @@ impl BetulaEditor {
     }
 
     pub fn ui_top_panel(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+        egui::Panel::top("top_panel").show(ctx, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 {
                     ui.menu_button("File", |ui| {
                         if ui.button("📂 Open").clicked() {
                             self.load_editor_config_dialog();
-                            ui.close_menu();
                         }
 
                         if ui
@@ -410,7 +409,6 @@ impl BetulaEditor {
                             if let Err(e) = r {
                                 println!("Failed to request config: {e:?}");
                             }
-                            ui.close_menu();
                         }
                         if ui.button("Quit").clicked() {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close)
@@ -474,7 +472,7 @@ impl BetulaEditor {
                 ui.checkbox(&mut self.viewer_hidden, "Hide Viewer");
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    egui::widgets::global_dark_light_mode_switch(ui);
+                    egui::widgets::global_theme_preference_switch(ui);
                 });
             });
         });
@@ -484,6 +482,7 @@ impl BetulaEditor {
 
 impl App for BetulaEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let _ = ctx;
         // egui_extras::install_image_loaders(ctx);
     }
 
