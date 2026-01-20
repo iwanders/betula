@@ -387,8 +387,8 @@ impl BetulaEditor {
         Ok(())
     }
 
-    pub fn ui_top_panel(&mut self, ctx: &egui::Context) -> Result<(), BetulaError> {
-        egui::Panel::top("top_panel").show(ctx, |ui| {
+    pub fn ui_top_panel(&mut self, ui: &mut egui::Ui) -> Result<(), BetulaError> {
+        egui::Panel::top("top_panel").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 {
                     ui.menu_button("File", |ui| {
@@ -411,7 +411,7 @@ impl BetulaEditor {
                             }
                         }
                         if ui.button("Quit").clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close)
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close)
                         }
                     });
                     ui.add_space(16.0);
@@ -510,15 +510,18 @@ impl App for BetulaEditor {
             }
             self.ui_callbacks = claimed;
         }
-        let ctx = ui.ctx();
-        let r = self.ui_top_panel(ctx);
+        let r = self.ui_top_panel(ui);
         if r.is_err() {
             println!("Error top pannel: {:?}", r.err());
         }
         if !self.viewer_hidden {
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 self.snarl
                     .show(&mut self.viewer, &self.style, egui::Id::new("snarl"), ui);
+            });
+        } else {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                ui.label("Viewer hidden, enable it in the top panel");
             });
         }
     }
