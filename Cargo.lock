@@ -3246,7 +3246,7 @@ dependencies = [
 [[package]]
 name = "screen_overlay"
 version = "0.1.0"
-source = "git+https://github.com/iwanders/screen_overlay?rev=6abd76d4e74ee3e4a5007de33cc2c323e95cd9fb#6abd76d4e74ee3e4a5007de33cc2c323e95cd9fb"
+source = "git+https://github.com/iwanders/screen_overlay?rev=897b66bf06c2c4793d50f66648cfaa29b1ba8484#897b66bf06c2c4793d50f66648cfaa29b1ba8484"
 dependencies = [
  "eframe",
  "egui",

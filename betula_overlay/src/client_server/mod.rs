@@ -24,17 +24,24 @@ pub struct OverlayServer {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-enum Instruction {
+enum Command {
     Hello,
-    ClearAll,
+    RemoveAllElements,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OverlayRequest {
-    command: Instruction,
+    command: Command,
+}
+impl OverlayRequest {
+    fn to_response(&self) -> OverlayResponse {
+        OverlayResponse {
+            command: self.command,
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OverlayResponse {
-    command: Instruction,
+    command: Command,
 }
 
 // serde_json::from_reader
@@ -65,10 +72,11 @@ impl OverlayServer {
         let overlay = self.handle.borrow_mut();
         println!("process_request: {req:?}");
         match req.command {
-            Instruction::Hello => Ok(OverlayResponse {
-                command: Instruction::Hello,
-            }),
-            Instruction::ClearAll => todo!(),
+            Command::Hello => Ok(req.to_response()),
+            Command::RemoveAllElements => {
+                overlay.remove_all_elements();
+                Ok(req.to_response())
+            }
         }
     }
     pub fn service(&mut self) -> Result<(), OverlayError> {
@@ -77,7 +85,6 @@ impl OverlayServer {
                 Ok(s) => {
                     // do something with the TcpStream
                     let req: OverlayRequest = single_value_from_stream(&s)?;
-                    println!("req: {req:?}");
                     let resp = self.process_request(&req)?;
                     serde_json::to_writer(&s, &resp)?;
                     // Dropping the stream closes it.
@@ -105,20 +112,26 @@ impl OverlayClient {
     fn request(&self, req: &OverlayRequest) -> Result<OverlayResponse, OverlayError> {
         let s = TcpStream::connect(self.config.bind)?;
 
-        println!("sending req");
         serde_json::to_writer(&s, &req)?;
         let resp: OverlayResponse = serde_json::from_reader(&s)?;
         Ok(resp)
     }
-    pub fn hello(&self) -> Result<(), OverlayError> {
-        let resp = self.request(&OverlayRequest {
-            command: Instruction::Hello,
-        })?;
-        if resp.command == Instruction::Hello {
+
+    fn send_instruction(&self, command: &Command) -> Result<(), OverlayError> {
+        let resp = self.request(&OverlayRequest { command: *command })?;
+        if resp.command == *command {
             return Ok(());
         } else {
             Err(format!("got unexpected instruction back {:?}", resp.command).into())
         }
+    }
+
+    pub fn hello(&self) -> Result<(), OverlayError> {
+        self.send_instruction(&Command::Hello)
+    }
+
+    pub fn remove_all_elements(&self) -> Result<(), OverlayError> {
+        self.send_instruction(&Command::RemoveAllElements)
     }
 }
 
