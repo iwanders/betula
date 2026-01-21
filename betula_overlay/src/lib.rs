@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use screen_overlay::{Overlay, OverlayConfig, OverlayHandle};
 
+#[cfg(feature = "use_client_server")]
+pub mod client_server;
+
 #[derive(Clone)]
 pub struct OverlayInterface {
     pub overlay: OverlayHandle,

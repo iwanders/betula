@@ -626,6 +626,7 @@ dependencies = [
  "image",
  "screen_overlay",
  "serde",
+ "serde_json",
  "toml",
 ]
 
