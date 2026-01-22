@@ -7,11 +7,10 @@
 // We'll probably assume there's only a single client for now.
 
 use crate::OverlayError;
-use screen_overlay::{Overlay, OverlayConfig, OverlayHandle};
+use screen_overlay::{Overlay, OverlayConfig, OverlayHandle, VisualId};
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
-use std::io::Write as _;
 use std::net::{TcpListener, TcpStream};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -23,25 +22,71 @@ pub struct OverlayServer {
     handle: RefCell<OverlayHandle>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub mod instructions {
+    use super::*;
+    use screen_overlay::egui::Color32;
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+    pub struct Text {
+        #[serde(default)]
+        pub position: (f32, f32),
+
+        #[serde(default)]
+        pub size: (f32, f32),
+
+        #[serde(default)]
+        pub font_size: f32,
+
+        #[serde(default)]
+        pub text_color: Color32,
+
+        #[serde(default)]
+        pub fill_color: Color32,
+
+        #[serde(default)]
+        pub text: String,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+enum Payload {
+    #[default]
+    Empty,
+    Id(VisualId),
+    Text(instructions::Text),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 enum Command {
+    #[default]
     Hello,
+    Add,
     RemoveAllElements,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct OverlayRequest {
     command: Command,
+    payload: Payload,
 }
 impl OverlayRequest {
     fn to_response(&self) -> OverlayResponse {
         OverlayResponse {
             command: self.command,
+            payload: Payload::Empty,
+        }
+    }
+    fn reply_with(&self, payload: Payload) -> OverlayResponse {
+        OverlayResponse {
+            command: self.command,
+            payload,
         }
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OverlayResponse {
     command: Command,
+    payload: Payload,
 }
 
 // serde_json::from_reader
@@ -77,6 +122,32 @@ impl OverlayServer {
                 overlay.remove_all_elements();
                 Ok(req.to_response())
             }
+            Command::Add => match &req.payload {
+                Payload::Text(text) => {
+                    use screen_overlay::PositionedElements;
+                    let text_string = text.text.clone();
+
+                    let font_size = text.font_size;
+                    let text_color = text.text_color;
+                    let drawable = PositionedElements::new()
+                        .fixed_pos(egui::pos2(text.position.0, text.position.1))
+                        .default_size(egui::vec2(text.size.0, text.size.1))
+                        .fill(text.fill_color)
+                        .add_closure(move |ui| {
+                            let text = egui::widget_text::RichText::new(&text_string)
+                                .size(font_size)
+                                .color(text_color);
+                            ui.label(text);
+                        });
+
+                    let text_token = overlay.add_drawable(drawable.into());
+                    let text_id = text_token.into_id();
+                    return Ok(req.reply_with(Payload::Id(text_id)));
+                }
+                payload => {
+                    return Err(format!("got incorrect payload: {:?}", payload).into());
+                }
+            },
         }
     }
     pub fn service(&mut self) -> Result<(), OverlayError> {
@@ -117,21 +188,44 @@ impl OverlayClient {
         Ok(resp)
     }
 
-    fn send_instruction(&self, command: &Command) -> Result<(), OverlayError> {
-        let resp = self.request(&OverlayRequest { command: *command })?;
+    fn send_empty(&self, command: &Command) -> Result<(), OverlayError> {
+        let resp = self.request(&OverlayRequest {
+            command: *command,
+            payload: Payload::Empty,
+        })?;
         if resp.command == *command {
             return Ok(());
         } else {
             Err(format!("got unexpected instruction back {:?}", resp.command).into())
         }
     }
+    fn send(&self, command: &Command, payload: Payload) -> Result<Payload, OverlayError> {
+        let resp = self.request(&OverlayRequest {
+            command: *command,
+            payload: payload,
+        })?;
+        if resp.command == *command {
+            return Ok(resp.payload);
+        } else {
+            Err(format!("got unexpected instruction back {:?}", resp.command).into())
+        }
+    }
 
     pub fn hello(&self) -> Result<(), OverlayError> {
-        self.send_instruction(&Command::Hello)
+        self.send_empty(&Command::Hello)
     }
 
     pub fn remove_all_elements(&self) -> Result<(), OverlayError> {
-        self.send_instruction(&Command::RemoveAllElements)
+        self.send_empty(&Command::RemoveAllElements)
+    }
+
+    pub fn add_text(&self, text: instructions::Text) -> Result<VisualId, OverlayError> {
+        let resp = self.send(&Command::Add, Payload::Text(text))?;
+        if let Payload::Id(z) = resp {
+            Ok(z)
+        } else {
+            Err(format!("got incorrect payload for add_text {:?}", resp).into())
+        }
     }
 }
 
