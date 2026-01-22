@@ -164,7 +164,8 @@ impl OverlayServer {
                     // wait until network socket is ready, typically implemented
                     // via platform-specific APIs such as epoll or IOCP
                     // wait_for_fd();
-                    continue;
+                    //continue;
+                    return Ok(());
                 }
                 Err(e) => return Err(format!("something went wrong {e:?}").into()),
             }

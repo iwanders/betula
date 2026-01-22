@@ -9,6 +9,7 @@ license = "BSD-3-Clause"
 betula_core = { workspace = true, default-features = false }
 betula_common = { workspace = true, default-features = false }
 egui = { workspace = true  }
+eframe = { workspace = true , optional=true }
 betula_editor = { workspace = true, default-features = false, optional=true}
 serde =  { version = "1.0", features = ["derive"] }
 
@@ -19,10 +20,15 @@ toml = {version = "0.8.12" }
 
 serde_json = {version="1.0", optional=true}
 
-#[dev-dependencies]
-#clap = {version="4.5.4", features=["std"]}
 
+
+clap = { version = "4.5", features = ["derive"], optional=true }
 
 [features]
 default = ["use_client_server"]
-use_client_server  = ["dep:serde_json"]
+use_client_server  = ["dep:serde_json", "dep:clap", "dep:eframe"]
+
+[[bin]]
+name = "overlay_daemon"
+path = "src/client_server/daemon.rs"
+required-features = ["use_client_server"]
