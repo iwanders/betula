@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 
+# https://github.com/rust-lang/cargo/issues/16410 / https://github.com/rust-lang/cargo/issues/9321
+default-members = ["betula_demo"] # makes cargo r --release run the demo.
 members = [
   "betula_core",
   "betula_common",
@@ -22,6 +24,7 @@ members = [
 #debug = 1
 # Disable lto, it's slow for development
 #lto = false
+
 
 [workspace.dependencies]
 betula_core = { version = "0.0.2", path = "betula_core", default-features = false }

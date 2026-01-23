@@ -26,7 +26,7 @@ pub mod instructions {
     use super::*;
     use screen_overlay::egui::Color32;
 
-    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub struct Text {
         #[serde(default)]
         pub position: (f32, f32),
@@ -45,6 +45,18 @@ pub mod instructions {
 
         #[serde(default)]
         pub text: String,
+    }
+    impl Default for Text {
+        fn default() -> Text {
+            Text {
+                position: (0.0, 0.0),
+                size: (100.0, 100.0),
+                font_size: 10.0,
+                text_color: Color32::BLACK,
+                fill_color: Color32::TRANSPARENT,
+                text: "DummyText".to_owned(),
+            }
+        }
     }
 }
 

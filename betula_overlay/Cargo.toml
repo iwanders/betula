@@ -32,3 +32,8 @@ use_client_server  = ["dep:serde_json", "dep:clap", "dep:eframe"]
 name = "overlay_daemon"
 path = "src/client_server/daemon.rs"
 required-features = ["use_client_server"]
+
+[[bin]]
+name = "overlay_client"
+path = "src/client_server/client.rs"
+required-features = ["use_client_server"]
