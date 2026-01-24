@@ -9,8 +9,10 @@ use crate::{OverlayBlackboard, OverlayInterface};
 pub struct OverlayInstanceNodeConfig {
     #[serde(default)]
     pub windows_config: screen_overlay::OverlayConfig,
+    pub windows_remote: bool,
     #[serde(default)]
     pub linux_config: screen_overlay::OverlayConfig,
+    pub linux_remote: bool,
 }
 impl IsNodeConfig for OverlayInstanceNodeConfig {}
 
@@ -30,16 +32,26 @@ impl OverlayInstanceNode {
 impl Node for OverlayInstanceNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.instance.is_none() {
-            let config = if cfg!(target_os = "linux") {
-                &self.config.linux_config
+            let (remote, config) = if cfg!(target_os = "linux") {
+                (&self.config.linux_remote, &self.config.linux_config)
             } else {
-                &self.config.windows_config
+                (&self.config.windows_remote, &self.config.windows_config)
             };
 
             // This is a bit tricky, becaus eat creation we run into https://github.com/emilk/egui/issues/3632#issuecomment-3733528750
 
             println!("new with {config:#?}");
-            let new_instance = OverlayInterface::new(config.clone())?;
+            #[cfg(feature = "use_client_server")]
+            let new_instance = if *remote {
+                OverlayInterface::new_remote(config.clone())?
+            } else {
+                OverlayInterface::new_local(config.clone())?
+            };
+            #[cfg(not(feature = "use_client_server"))]
+            let _ = remote;
+            #[cfg(not(feature = "use_client_server"))]
+            let new_instance = OverlayInterface::new_local(config.clone())?;
+
             self.instance = Some(new_instance);
         }
         if let Some(instance) = self.instance.as_ref() {
@@ -107,11 +119,14 @@ mod ui_support {
             let _ = ctx;
             fn add_config_drawable(
                 ui: &mut egui::Ui,
+                remote: &mut bool,
                 config: &mut screen_overlay::OverlayConfig,
             ) -> bool {
                 let mut modified = false;
 
                 ui.vertical(|ui| {
+                    modified |= ui.add(egui::Checkbox::new(remote, "remote")).changed();
+
                     ui.horizontal(|ui| {
                         ui.label("pos");
                         modified |= ui
@@ -146,12 +161,20 @@ mod ui_support {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     ui.label("🐧: ");
-                    modified |= add_config_drawable(ui, &mut self.config.linux_config);
+                    modified |= add_config_drawable(
+                        ui,
+                        &mut self.config.linux_remote,
+                        &mut self.config.linux_config,
+                    );
                 });
                 ui.horizontal(|ui| {
                     let windows_logo_in_egui = char::from_u32(0xE61F).unwrap();
                     ui.label(format!("{}: ", windows_logo_in_egui));
-                    modified |= add_config_drawable(ui, &mut self.config.windows_config);
+                    modified |= add_config_drawable(
+                        ui,
+                        &mut self.config.windows_remote,
+                        &mut self.config.windows_config,
+                    );
                 });
             });
 

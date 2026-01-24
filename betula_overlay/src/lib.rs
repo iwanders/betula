@@ -4,25 +4,90 @@ pub mod nodes;
 
 use serde::{Deserialize, Serialize};
 
-use screen_overlay::{Overlay, OverlayConfig, OverlayHandle};
+use screen_overlay::{Overlay, OverlayConfig, OverlayHandle, VisualId};
 
 #[cfg(feature = "use_client_server")]
 pub mod client_server;
 
+#[derive(Clone, Debug)]
+enum OverlayImpl {
+    Local(OverlayHandle),
+    #[cfg(feature = "use_client_server")]
+    Remote(client_server::OverlayClient),
+}
+pub(crate) trait OverlaySupport {
+    fn set_text(
+        &self,
+        text_config: &nodes::OverlayTextNodeConfig,
+        text: &str,
+    ) -> Result<VisualId, OverlayError>;
+    fn remove_id(&self, id: &VisualId) -> Result<(), OverlayError>;
+}
+impl OverlaySupport for OverlayImpl {
+    fn set_text(
+        &self,
+        text_config: &nodes::OverlayTextNodeConfig,
+        text: &str,
+    ) -> Result<VisualId, OverlayError> {
+        match self {
+            OverlayImpl::Local(overlay_handle) => {
+                use screen_overlay::PositionedElements;
+
+                let font_size = text_config.font_size;
+                let text_color = text_config.text_color;
+                let text_clone = text.to_owned();
+                let drawable = PositionedElements::new()
+                    .fixed_pos(egui::pos2(
+                        text_config.position.0 as f32,
+                        text_config.position.1 as f32,
+                    ))
+                    .default_size(egui::vec2(
+                        text_config.size.0 as f32,
+                        text_config.size.1 as f32,
+                    ))
+                    .fill(text_config.fill_color)
+                    .add_closure(move |ui| {
+                        let text = egui::widget_text::RichText::new(&text_clone)
+                            .size(font_size)
+                            .color(text_color);
+                        ui.label(text);
+                    });
+
+                let text_token = overlay_handle.add_drawable(drawable.into());
+                Ok(text_token.into_id())
+            }
+            #[cfg(feature = "use_client_server")]
+            OverlayImpl::Remote(overlay_client) => {
+                let text = client_server::instructions::Text {
+                    position: (text_config.position.0 as f32, text_config.position.1 as f32),
+                    size: (text_config.size.0 as f32, text_config.size.1 as f32),
+                    font_size: text_config.font_size,
+                    text: text.to_owned(),
+                    ..Default::default()
+                };
+                overlay_client.add_text(text)
+            }
+        }
+    }
+    fn remove_id(&self, id: &VisualId) -> Result<(), OverlayError> {
+        match self {
+            OverlayImpl::Local(overlay_handle) => {
+                overlay_handle.remove_element(*id);
+                Ok(())
+            }
+            #[cfg(feature = "use_client_server")]
+            OverlayImpl::Remote(overlay_client) => overlay_client.remove(*id),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct OverlayInterface {
-    pub overlay: OverlayHandle,
+    overlay: OverlayImpl,
 }
 impl std::fmt::Debug for OverlayInterface {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "OverlayInterface")
-    }
-}
-
-impl std::ops::Deref for OverlayInterface {
-    type Target = OverlayHandle;
-    fn deref(&self) -> &Self::Target {
-        &self.overlay
     }
 }
 
@@ -33,19 +98,30 @@ impl std::cmp::PartialEq for OverlayInterface {
 }
 
 impl OverlayInterface {
-    pub fn new(config: OverlayConfig) -> Result<Self, OverlayError> {
+    pub fn new_local(config: OverlayConfig) -> Result<Self, OverlayError> {
         // let (width, height) = (1920.0, 1080.0);
         // let (x, y) = (0.0, 0.0);
         // let config = OverlayConfig::new()
         //     .with_size([width, height])
         //     .with_position([x, y])
         //     .with_central_panel_fill(screen_overlay::egui::Color32::TRANSPARENT);
+
         let overlay = Overlay::new(config);
         let overlay = OverlayHandle::new(overlay);
 
         register_overlay(&overlay);
 
-        Ok(OverlayInterface { overlay })
+        Ok(OverlayInterface {
+            overlay: OverlayImpl::Local(overlay),
+        })
+    }
+    #[cfg(feature = "use_client_server")]
+    pub fn new_remote(config: OverlayConfig) -> Result<Self, OverlayError> {
+        let overlay = client_server::OverlayClient::new(Default::default());
+        overlay.set_config(&config)?;
+        Ok(OverlayInterface {
+            overlay: OverlayImpl::Remote(overlay),
+        })
     }
 }
 

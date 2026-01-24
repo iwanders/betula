@@ -16,3 +16,6 @@ betula_image = { workspace = true, features=["betula_editor", "betula_enigo"] }
 betula_overlay = { workspace = true, features=["betula_editor"] }
 eframe = { workspace = true }
 egui = { workspace = true }
+
+[features]
+overlay_client_server = ["betula_overlay/use_client_server"]

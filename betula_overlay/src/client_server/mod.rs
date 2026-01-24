@@ -13,10 +13,18 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::net::{TcpListener, TcpStream};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct OverlayDaemonConfig {
     pub bind: std::net::SocketAddr,
 }
+impl Default for OverlayDaemonConfig {
+    fn default() -> Self {
+        Self {
+            bind: "127.0.0.1:5321".parse().unwrap(),
+        }
+    }
+}
+
 pub struct OverlayServer {
     listener: RefCell<TcpListener>,
     handle: RefCell<OverlayHandle>,
@@ -112,6 +120,12 @@ impl ResponseCommand {
     fn response_remove_all(&self) -> Result<(), OverlayError> {
         match self {
             ResponseCommand::RemoveAllElements => Ok(()),
+            other => Err(format!("incorrect response {other:?}").into()),
+        }
+    }
+    fn response_reconfigure(&self) -> Result<(), OverlayError> {
+        match self {
+            ResponseCommand::Reconfigure => Ok(()),
             other => Err(format!("incorrect response {other:?}").into()),
         }
     }
@@ -233,6 +247,7 @@ impl OverlayServer {
     }
 }
 
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct OverlayClient {
     config: OverlayDaemonConfig,
 }
@@ -283,6 +298,13 @@ impl OverlayClient {
         })?
         .command
         .response_add()
+    }
+    pub fn set_config(&self, config: &OverlayConfig) -> Result<(), OverlayError> {
+        self.request_single(&OverlayRequest {
+            command: RequestCommand::Reconfigure(config.clone()),
+        })?
+        .command
+        .response_reconfigure()
     }
 }
 

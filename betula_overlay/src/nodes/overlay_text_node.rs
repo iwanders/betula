@@ -1,6 +1,7 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::OverlaySupport;
 // use std::sync::Arc;
 
 use crate::OverlayBlackboard;
@@ -41,8 +42,7 @@ impl Default for OverlayTextNodeConfig {
 #[derive(Debug)]
 struct CurrentLabel {
     text: String,
-    _text_token: screen_overlay::VisualHandle,
-    _border_token: Option<screen_overlay::VisualHandle>,
+    text_token: screen_overlay::VisualId,
 }
 
 #[derive(Debug, Default)]
@@ -51,6 +51,8 @@ pub struct OverlayTextNode {
     input_text: Input<String>,
 
     text_label: Option<CurrentLabel>,
+
+    tokens_to_remove: Vec<screen_overlay::VisualId>,
 
     needs_update: bool,
 
@@ -65,7 +67,6 @@ impl OverlayTextNode {
 
 impl Node for OverlayTextNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
-        // Todo... we don't actually detect changes in the instance here... currently that requires a reset / update.
         let interface = self.input_instance.get()?;
         let interface = interface
             .interface
@@ -81,34 +82,17 @@ impl Node for OverlayTextNode {
             .unwrap_or(true)
             || self.needs_update;
 
+        for old_id in self.tokens_to_remove.drain(..) {
+            let _ignore_error = interface.remove_id(&old_id);
+        }
+
         if needs_update {
             self.needs_update = false;
-            use screen_overlay::PositionedElements;
+            let id = interface.set_text(&self.config, &desired_text_lambda)?;
 
-            let font_size = self.config.font_size;
-            let text_color = self.config.text_color;
-            let drawable = PositionedElements::new()
-                .fixed_pos(egui::pos2(
-                    self.config.position.0 as f32,
-                    self.config.position.1 as f32,
-                ))
-                .default_size(egui::vec2(
-                    self.config.size.0 as f32,
-                    self.config.size.1 as f32,
-                ))
-                .fill(self.config.fill_color)
-                .add_closure(move |ui| {
-                    let text = egui::widget_text::RichText::new(format!("{}", desired_text_lambda))
-                        .size(font_size)
-                        .color(text_color);
-                    ui.label(text);
-                });
-
-            let text_token = interface.add_drawable(drawable.into());
             self.text_label = Some(CurrentLabel {
                 text: desired_text,
-                _text_token: text_token,
-                _border_token: None,
+                text_token: id,
             });
         }
         Ok(ExecutionStatus::Success)
@@ -149,7 +133,9 @@ impl Node for OverlayTextNode {
     }
 
     fn reset(&mut self) {
-        self.text_label.take();
+        if let Some(old_token) = self.text_label.take() {
+            self.tokens_to_remove.push(old_token.text_token);
+        }
         self.needs_update = true;
     }
 }
