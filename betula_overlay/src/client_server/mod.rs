@@ -7,7 +7,7 @@
 // We'll probably assume there's only a single client for now.
 
 use crate::OverlayError;
-use screen_overlay::{Overlay, OverlayConfig, OverlayHandle, VisualId};
+use screen_overlay::{OverlayConfig, OverlayHandle, VisualId};
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
@@ -70,6 +70,7 @@ enum RequestCommand {
     Hello,
     Add(Drawable),
     Remove(VisualId),
+    Reconfigure(OverlayConfig),
     RemoveAllElements,
 }
 
@@ -83,6 +84,7 @@ enum ResponseCommand {
     Hello,
     Add(VisualId),
     Remove(()),
+    Reconfigure,
     RemoveAllElements,
 }
 impl ResponseCommand {
@@ -195,6 +197,12 @@ impl OverlayServer {
                     command: ResponseCommand::Remove(()),
                 });
             }
+            RequestCommand::Reconfigure(config) => {
+                overlay.set_config(config);
+                return Ok(OverlayResponse {
+                    command: ResponseCommand::Reconfigure,
+                });
+            }
         }
     }
     pub fn service(&mut self) -> Result<(), OverlayError> {
@@ -281,6 +289,7 @@ impl OverlayClient {
 #[cfg(test)]
 mod test {
     use super::*;
+    use screen_overlay::{Overlay, OverlayConfig};
 
     #[test]
     fn test_overlay_interaction() -> Result<(), OverlayError> {
@@ -298,7 +307,7 @@ mod test {
         };
         let mut server = OverlayServer::new(daemon_config, overlay).unwrap();
 
-        let z = std::thread::spawn(move || {
+        let _z = std::thread::spawn(move || {
             use std::time::Duration;
             let start_time = std::time::Instant::now();
             loop {

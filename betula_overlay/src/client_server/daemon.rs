@@ -38,6 +38,7 @@ struct OverlayDaemon {
 
 impl eframe::App for OverlayDaemon {
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        let _ = (ctx, frame);
         let z = self.server.service();
         if let Err(e) = z {
             println!("Something went wrong: {e:?}");
