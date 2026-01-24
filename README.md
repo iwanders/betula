@@ -203,6 +203,21 @@ With this all cursors are expressed in the right monitor coordinate frame, and t
 This utilises my [screen_overlay](https://github.com/iwanders/screen_overlay) crate to overlay text on fullscreen applications.
 This writes a string from the blackboard to the screen, the overlay is click through and transparent by default.
 
+To work around [this issue](https://github.com/emilk/egui/issues/3632#issuecomment-3733528750), the overlay can now use a client/server architecture.
+To use that, the editor needs to be compiled with
+```
+cargo r --release --features "overlay_client_server"
+```
+
+The daemon needs to be started from the `betula_overlay` crate with:
+```
+cargo r --release --bin overlay_daemon
+```
+
+This uses a very simple json-over-tcp rcp system, this does mean that it introduces additional delay in the execution of the behaviour tree.
+Each change to the text results in a tcp connection being created, the rpc happening and the connection being closed again, this is blocking.
+
+
 ## Changes
 Again, mostly for myself.
 ### v0.0.2 (master)
