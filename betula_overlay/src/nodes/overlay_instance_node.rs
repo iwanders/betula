@@ -1,18 +1,22 @@
 use betula_core::node_prelude::*;
 use serde::{Deserialize, Serialize};
 
-// use std::sync::Arc;
-
 use crate::{OverlayBlackboard, OverlayInterface};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct OverlayInstanceNodeConfig {
     #[serde(default)]
     pub windows_config: screen_overlay::OverlayConfig,
+    #[serde(default)]
     pub windows_remote: bool,
     #[serde(default)]
+    pub windows_clear: bool,
+    #[serde(default)]
     pub linux_config: screen_overlay::OverlayConfig,
+    #[serde(default)]
     pub linux_remote: bool,
+    #[serde(default)]
+    pub linux_clear: bool,
 }
 impl IsNodeConfig for OverlayInstanceNodeConfig {}
 
@@ -32,23 +36,30 @@ impl OverlayInstanceNode {
 impl Node for OverlayInstanceNode {
     fn execute(&mut self, _ctx: &dyn RunContext) -> Result<ExecutionStatus, NodeError> {
         if self.instance.is_none() {
-            let (remote, config) = if cfg!(target_os = "linux") {
-                (&self.config.linux_remote, &self.config.linux_config)
+            let (remote, clear, config) = if cfg!(target_os = "linux") {
+                (
+                    &self.config.linux_remote,
+                    &self.config.linux_clear,
+                    &self.config.linux_config,
+                )
             } else {
-                (&self.config.windows_remote, &self.config.windows_config)
+                (
+                    &self.config.windows_remote,
+                    &self.config.windows_clear,
+                    &self.config.windows_config,
+                )
             };
 
             // This is a bit tricky, becaus eat creation we run into https://github.com/emilk/egui/issues/3632#issuecomment-3733528750
 
-            println!("new with {config:#?}");
             #[cfg(feature = "use_client_server")]
             let new_instance = if *remote {
-                OverlayInterface::new_remote(config.clone())?
+                OverlayInterface::new_remote(*clear, config.clone())?
             } else {
                 OverlayInterface::new_local(config.clone())?
             };
             #[cfg(not(feature = "use_client_server"))]
-            let _ = remote;
+            let _ = (remote, clear);
             #[cfg(not(feature = "use_client_server"))]
             let new_instance = OverlayInterface::new_local(config.clone())?;
 
@@ -120,13 +131,16 @@ mod ui_support {
             fn add_config_drawable(
                 ui: &mut egui::Ui,
                 remote: &mut bool,
+                clear: &mut bool,
                 config: &mut screen_overlay::OverlayConfig,
             ) -> bool {
                 let mut modified = false;
 
                 ui.vertical(|ui| {
-                    modified |= ui.add(egui::Checkbox::new(remote, "remote")).changed();
-
+                    ui.horizontal(|ui| {
+                        modified |= ui.add(egui::Checkbox::new(remote, "remote")).changed();
+                        modified |= ui.add(egui::Checkbox::new(clear, "clear")).changed();
+                    });
                     ui.horizontal(|ui| {
                         ui.label("pos");
                         modified |= ui
@@ -164,6 +178,7 @@ mod ui_support {
                     modified |= add_config_drawable(
                         ui,
                         &mut self.config.linux_remote,
+                        &mut self.config.linux_clear,
                         &mut self.config.linux_config,
                     );
                 });
@@ -173,6 +188,7 @@ mod ui_support {
                     modified |= add_config_drawable(
                         ui,
                         &mut self.config.windows_remote,
+                        &mut self.config.windows_clear,
                         &mut self.config.windows_config,
                     );
                 });

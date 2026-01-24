@@ -144,9 +144,12 @@ impl OverlayInterface {
         })
     }
     #[cfg(feature = "use_client_server")]
-    pub fn new_remote(config: OverlayConfig) -> Result<Self, OverlayError> {
+    pub fn new_remote(clear: bool, config: OverlayConfig) -> Result<Self, OverlayError> {
         let overlay = client_server::OverlayClient::new(Default::default());
         overlay.set_config(&config)?;
+        if clear {
+            overlay.remove_all_elements()?;
+        }
         Ok(OverlayInterface {
             overlay: OverlayImpl::Remote(overlay),
         })
