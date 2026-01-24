@@ -38,6 +38,20 @@ impl Default for OverlayTextNodeConfig {
         }
     }
 }
+impl OverlayTextNodeConfig {
+    #[cfg(feature = "use_client_server")]
+    pub fn to_instruction(&self, text: &str) -> crate::client_server::instructions::Text {
+        crate::client_server::instructions::Text {
+            position: (self.position.0 as f32, self.position.1 as f32),
+            size: (self.size.0 as f32, self.size.1 as f32),
+            font_size: self.font_size,
+            text_color: self.text_color,
+            fill_color: self.fill_color,
+            text: text.to_owned(),
+            ..Default::default()
+        }
+    }
+}
 
 #[derive(Debug)]
 struct CurrentLabel {
@@ -52,7 +66,7 @@ pub struct OverlayTextNode {
 
     text_label: Option<CurrentLabel>,
 
-    tokens_to_remove: Vec<screen_overlay::VisualId>,
+    token_to_remove: Option<screen_overlay::VisualId>,
 
     needs_update: bool,
 
@@ -82,13 +96,17 @@ impl Node for OverlayTextNode {
             .unwrap_or(true)
             || self.needs_update;
 
-        for old_id in self.tokens_to_remove.drain(..) {
-            let _ignore_error = interface.remove_id(&old_id);
-        }
-
         if needs_update {
             self.needs_update = false;
-            let id = interface.set_text(&self.config, &desired_text_lambda)?;
+            let id = if let Some(old_token) = self.token_to_remove.take() {
+                interface.remove_and_set_text(&old_token, &self.config, &desired_text_lambda)?
+            } else {
+                if let Some(old_token) = self.text_label.take().map(|z| z.text_token) {
+                    interface.remove_and_set_text(&old_token, &self.config, &desired_text_lambda)?
+                } else {
+                    interface.set_text(&self.config, &desired_text_lambda)?
+                }
+            };
 
             self.text_label = Some(CurrentLabel {
                 text: desired_text,
@@ -134,7 +152,7 @@ impl Node for OverlayTextNode {
 
     fn reset(&mut self) {
         if let Some(old_token) = self.text_label.take() {
-            self.tokens_to_remove.push(old_token.text_token);
+            self.token_to_remove = Some(old_token.text_token);
         }
         self.needs_update = true;
     }

@@ -22,6 +22,12 @@ pub(crate) trait OverlaySupport {
         text: &str,
     ) -> Result<VisualId, OverlayError>;
     fn remove_id(&self, id: &VisualId) -> Result<(), OverlayError>;
+    fn remove_and_set_text(
+        &self,
+        id: &VisualId,
+        text_config: &nodes::OverlayTextNodeConfig,
+        text: &str,
+    ) -> Result<VisualId, OverlayError>;
 }
 impl OverlaySupport for OverlayImpl {
     fn set_text(
@@ -58,14 +64,7 @@ impl OverlaySupport for OverlayImpl {
             }
             #[cfg(feature = "use_client_server")]
             OverlayImpl::Remote(overlay_client) => {
-                let text = client_server::instructions::Text {
-                    position: (text_config.position.0 as f32, text_config.position.1 as f32),
-                    size: (text_config.size.0 as f32, text_config.size.1 as f32),
-                    font_size: text_config.font_size,
-                    text: text.to_owned(),
-                    ..Default::default()
-                };
-                overlay_client.add_text(text)
+                overlay_client.add_text(text_config.to_instruction(text))
             }
         }
     }
@@ -77,6 +76,35 @@ impl OverlaySupport for OverlayImpl {
             }
             #[cfg(feature = "use_client_server")]
             OverlayImpl::Remote(overlay_client) => overlay_client.remove(*id),
+        }
+    }
+
+    fn remove_and_set_text(
+        &self,
+        id: &VisualId,
+        text_config: &nodes::OverlayTextNodeConfig,
+        text: &str,
+    ) -> Result<VisualId, OverlayError> {
+        match self {
+            OverlayImpl::Local(_) => {
+                let _ = self.remove_id(id)?;
+                self.set_text(text_config, text)
+            }
+            #[cfg(feature = "use_client_server")]
+            OverlayImpl::Remote(overlay_client) => {
+                let results = overlay_client.request(&[
+                    client_server::OverlayRequest {
+                        command: client_server::RequestCommand::Remove(*id),
+                    },
+                    client_server::OverlayRequest {
+                        command: client_server::RequestCommand::Add(client_server::Drawable::Text(
+                            text_config.to_instruction(text),
+                        )),
+                    },
+                ])?;
+                // Last one has the id.
+                results.last().unwrap().command.response_add()
+            }
         }
     }
 }

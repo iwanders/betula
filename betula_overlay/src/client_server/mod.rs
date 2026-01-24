@@ -73,7 +73,7 @@ pub enum Drawable {
     Text(instructions::Text),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-enum RequestCommand {
+pub enum RequestCommand {
     #[default]
     Hello,
     Add(Drawable),
@@ -83,11 +83,11 @@ enum RequestCommand {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct OverlayRequest {
-    command: RequestCommand,
+pub struct OverlayRequest {
+    pub command: RequestCommand,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-enum ResponseCommand {
+pub enum ResponseCommand {
     #[default]
     Hello,
     Add(VisualId),
@@ -96,34 +96,34 @@ enum ResponseCommand {
     RemoveAllElements,
 }
 impl ResponseCommand {
-    fn response_hello(&self) -> Result<(), OverlayError> {
+    pub fn response_hello(&self) -> Result<(), OverlayError> {
         match self {
             ResponseCommand::Hello => Ok(()),
             other => Err(format!("incorrect response {other:?}").into()),
         }
     }
 
-    fn response_add(&self) -> Result<VisualId, OverlayError> {
+    pub fn response_add(&self) -> Result<VisualId, OverlayError> {
         match self {
             ResponseCommand::Add(id) => Ok(*id),
             other => Err(format!("incorrect response {other:?}").into()),
         }
     }
 
-    fn response_remove(&self) -> Result<(), OverlayError> {
+    pub fn response_remove(&self) -> Result<(), OverlayError> {
         match self {
             ResponseCommand::Remove(_) => Ok(()),
             other => Err(format!("incorrect response {other:?}").into()),
         }
     }
 
-    fn response_remove_all(&self) -> Result<(), OverlayError> {
+    pub fn response_remove_all(&self) -> Result<(), OverlayError> {
         match self {
             ResponseCommand::RemoveAllElements => Ok(()),
             other => Err(format!("incorrect response {other:?}").into()),
         }
     }
-    fn response_reconfigure(&self) -> Result<(), OverlayError> {
+    pub fn response_reconfigure(&self) -> Result<(), OverlayError> {
         match self {
             ResponseCommand::Reconfigure => Ok(()),
             other => Err(format!("incorrect response {other:?}").into()),
@@ -132,8 +132,8 @@ impl ResponseCommand {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct OverlayResponse {
-    command: ResponseCommand,
+pub struct OverlayResponse {
+    pub command: ResponseCommand,
 }
 
 // serde_json::from_reader
@@ -255,7 +255,7 @@ impl OverlayClient {
     pub fn new(config: OverlayDaemonConfig) -> Self {
         Self { config }
     }
-    fn request(&self, req: &[OverlayRequest]) -> Result<Vec<OverlayResponse>, OverlayError> {
+    pub fn request(&self, req: &[OverlayRequest]) -> Result<Vec<OverlayResponse>, OverlayError> {
         let s = TcpStream::connect(self.config.bind)?;
         let wire_request = BulkRequest(req.to_vec());
         serde_json::to_writer(&s, &wire_request)?;
