@@ -113,6 +113,11 @@ fn single_value_from_stream<T: serde::de::DeserializeOwned, S: std::io::Read>(
         .unwrap() // we'll either get a value, or we'll get a parse error? Sounds legit?
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WireRequest(Vec<OverlayRequest>);
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct WireResponse(Vec<OverlayResponse>);
+
 impl OverlayServer {
     pub fn new(config: OverlayDaemonConfig, handle: OverlayHandle) -> Result<Self, OverlayError> {
         let listener = TcpListener::bind(config.bind)?;
@@ -167,9 +172,13 @@ impl OverlayServer {
             match stream {
                 Ok(s) => {
                     // do something with the TcpStream
-                    let req: OverlayRequest = single_value_from_stream(&s)?;
-                    let resp = self.process_request(&req)?;
-                    serde_json::to_writer(&s, &resp)?;
+                    let requests: WireRequest = single_value_from_stream(&s)?;
+                    let mut responses: WireResponse = Default::default();
+                    for req in requests.0.iter() {
+                        responses.0.push(self.process_request(&req)?);
+                    }
+
+                    serde_json::to_writer(&s, &responses)?;
                     // Dropping the stream closes it.
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -193,16 +202,22 @@ impl OverlayClient {
     pub fn new(config: OverlayDaemonConfig) -> Self {
         Self { config }
     }
-    fn request(&self, req: &OverlayRequest) -> Result<OverlayResponse, OverlayError> {
+    fn request(&self, req: &[OverlayRequest]) -> Result<Vec<OverlayResponse>, OverlayError> {
         let s = TcpStream::connect(self.config.bind)?;
-
-        serde_json::to_writer(&s, &req)?;
-        let resp: OverlayResponse = serde_json::from_reader(&s)?;
-        Ok(resp)
+        let wire_request = WireRequest(req.to_vec());
+        serde_json::to_writer(&s, &wire_request)?;
+        let resp: WireResponse = serde_json::from_reader(&s)?;
+        Ok(resp.0)
+    }
+    fn request_single(&self, req: &OverlayRequest) -> Result<OverlayResponse, OverlayError> {
+        self.request(&[req.clone()])?
+            .drain(..)
+            .next()
+            .ok_or("did not get a single response".into())
     }
 
     fn send_empty(&self, command: &Command) -> Result<(), OverlayError> {
-        let resp = self.request(&OverlayRequest {
+        let resp = self.request_single(&OverlayRequest {
             command: *command,
             payload: Payload::Empty,
         })?;
@@ -213,7 +228,7 @@ impl OverlayClient {
         }
     }
     fn send(&self, command: &Command, payload: Payload) -> Result<Payload, OverlayError> {
-        let resp = self.request(&OverlayRequest {
+        let resp = self.request_single(&OverlayRequest {
             command: *command,
             payload: payload,
         })?;
