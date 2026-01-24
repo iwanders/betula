@@ -60,84 +60,66 @@ pub mod instructions {
     }
 }
 
-// Trying something new here... >_<
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Transaction<A: Clone, B: Clone> {
-    /// The request component of this transaction.
-    Request(A),
-    /// The response counterpart of this transaction.
-    Response(B),
-}
-impl<A: Clone, B: Clone> Transaction<A, B> {
-    fn as_request(&self) -> Result<&A, OverlayError> {
-        match self {
-            Transaction::Request(a) => Ok(a),
-            Transaction::Response(_) => Err("transaction was not of request type".into()),
-        }
-    }
-    fn to_request(&self) -> Result<A, OverlayError> {
-        match self {
-            Transaction::Request(a) => Ok((*a).clone()),
-            Transaction::Response(_) => Err("transaction was not of request type".into()),
-        }
-    }
-    fn as_response(&self) -> Result<&B, OverlayError> {
-        match self {
-            Transaction::Request(_) => Err("transaction was not of response type".into()),
-            Transaction::Response(b) => Ok(b),
-        }
-    }
-    fn to_response(&self) -> Result<B, OverlayError> {
-        match self {
-            Transaction::Request(_) => Err("transaction was not of response type".into()),
-            Transaction::Response(b) => Ok((*b).clone()),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Drawable {
     Text(instructions::Text),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-enum Command {
+enum RequestCommand {
     #[default]
     Hello,
-    Add(Transaction<Drawable, VisualId>),
-    Remove(Transaction<VisualId, ()>),
+    Add(Drawable),
+    Remove(VisualId),
     RemoveAllElements,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct OverlayRequest {
-    // Guaranteed to only contain the response parts.
-    command: Command,
+    command: RequestCommand,
 }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+enum ResponseCommand {
+    #[default]
+    Hello,
+    Add(VisualId),
+    Remove(()),
+    RemoveAllElements,
+}
+impl ResponseCommand {
+    fn response_hello(&self) -> Result<(), OverlayError> {
+        match self {
+            ResponseCommand::Hello => Ok(()),
+            other => Err(format!("incorrect response {other:?}").into()),
+        }
+    }
+
+    fn response_add(&self) -> Result<VisualId, OverlayError> {
+        match self {
+            ResponseCommand::Add(id) => Ok(*id),
+            other => Err(format!("incorrect response {other:?}").into()),
+        }
+    }
+
+    fn response_remove(&self) -> Result<(), OverlayError> {
+        match self {
+            ResponseCommand::Remove(_) => Ok(()),
+            other => Err(format!("incorrect response {other:?}").into()),
+        }
+    }
+
+    fn response_remove_all(&self) -> Result<(), OverlayError> {
+        match self {
+            ResponseCommand::RemoveAllElements => Ok(()),
+            other => Err(format!("incorrect response {other:?}").into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OverlayResponse {
-    command: Command,
+    command: ResponseCommand,
 }
-impl OverlayResponse {
-    fn into_hello(&self) -> Result<(), OverlayError> {
-        match &self.command {
-            Command::Hello => Ok(()),
-            other => Err(format!("incorrect command {other:?}").into()),
-        }
-    }
-    fn into_remove_all_elements(&self) -> Result<(), OverlayError> {
-        match &self.command {
-            Command::RemoveAllElements => Ok(()),
-            other => Err(format!("incorrect command {other:?}").into()),
-        }
-    }
-    fn into_add(&self) -> Result<VisualId, OverlayError> {
-        match &self.command {
-            Command::Add(r) => r.to_response(),
-            other => Err(format!("incorrect command {other:?}").into()),
-        }
-    }
-}
+
 // serde_json::from_reader
 //  > If the stream does not end, such as in the case of a persistent socket connection, this function will not return.
 //  > It is possible instead to deserialize from a prefix of an input stream without looking for EOF by managing your own Deserializer.
@@ -172,16 +154,16 @@ impl OverlayServer {
         let overlay = self.handle.borrow_mut();
         println!("process_request: {req:?}");
         match &req.command {
-            Command::Hello => Ok(OverlayResponse {
-                command: Command::Hello,
+            RequestCommand::Hello => Ok(OverlayResponse {
+                command: ResponseCommand::Hello,
             }),
-            Command::RemoveAllElements => {
+            RequestCommand::RemoveAllElements => {
                 overlay.remove_all_elements();
                 Ok(OverlayResponse {
-                    command: Command::RemoveAllElements,
+                    command: ResponseCommand::RemoveAllElements,
                 })
             }
-            Command::Add(payload) => match &payload.as_request()? {
+            RequestCommand::Add(drawable) => match &drawable {
                 Drawable::Text(text) => {
                     use screen_overlay::PositionedElements;
                     let text_string = text.text.clone();
@@ -202,7 +184,7 @@ impl OverlayServer {
                     let text_token = overlay.add_drawable(drawable.into());
                     let text_id = text_token.into_id();
                     return Ok(OverlayResponse {
-                        command: Command::Add(Transaction::Response(text_id)),
+                        command: ResponseCommand::Add(text_id),
                     });
                 }
             },
@@ -262,23 +244,26 @@ impl OverlayClient {
 
     pub fn hello(&self) -> Result<(), OverlayError> {
         self.request_single(&OverlayRequest {
-            command: Command::Hello,
+            command: RequestCommand::Hello,
         })?
-        .into_hello()
+        .command
+        .response_hello()
     }
 
     pub fn remove_all_elements(&self) -> Result<(), OverlayError> {
         self.request_single(&OverlayRequest {
-            command: Command::RemoveAllElements,
+            command: RequestCommand::RemoveAllElements,
         })?
-        .into_remove_all_elements()
+        .command
+        .response_remove_all()
     }
 
     pub fn add_text(&self, text: instructions::Text) -> Result<VisualId, OverlayError> {
         self.request_single(&OverlayRequest {
-            command: Command::Add(Transaction::Request(Drawable::Text(text))),
+            command: RequestCommand::Add(Drawable::Text(text)),
         })?
-        .into_add()
+        .command
+        .response_add()
     }
 }
 
