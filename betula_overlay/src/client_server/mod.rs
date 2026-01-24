@@ -60,47 +60,84 @@ pub mod instructions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-enum Payload {
-    #[default]
-    Empty,
-    Id(VisualId),
-    Text(instructions::Text),
+// Trying something new here... >_<
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Transaction<A: Clone, B: Clone> {
+    /// The request component of this transaction.
+    Request(A),
+    /// The response counterpart of this transaction.
+    Response(B),
+}
+impl<A: Clone, B: Clone> Transaction<A, B> {
+    fn as_request(&self) -> Result<&A, OverlayError> {
+        match self {
+            Transaction::Request(a) => Ok(a),
+            Transaction::Response(_) => Err("transaction was not of request type".into()),
+        }
+    }
+    fn to_request(&self) -> Result<A, OverlayError> {
+        match self {
+            Transaction::Request(a) => Ok((*a).clone()),
+            Transaction::Response(_) => Err("transaction was not of request type".into()),
+        }
+    }
+    fn as_response(&self) -> Result<&B, OverlayError> {
+        match self {
+            Transaction::Request(_) => Err("transaction was not of response type".into()),
+            Transaction::Response(b) => Ok(b),
+        }
+    }
+    fn to_response(&self) -> Result<B, OverlayError> {
+        match self {
+            Transaction::Request(_) => Err("transaction was not of response type".into()),
+            Transaction::Response(b) => Ok((*b).clone()),
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Drawable {
+    Text(instructions::Text),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 enum Command {
     #[default]
     Hello,
-    Add,
+    Add(Transaction<Drawable, VisualId>),
+    Remove(Transaction<VisualId, ()>),
     RemoveAllElements,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct OverlayRequest {
+    // Guaranteed to only contain the response parts.
     command: Command,
-    payload: Payload,
-}
-impl OverlayRequest {
-    fn to_response(&self) -> OverlayResponse {
-        OverlayResponse {
-            command: self.command,
-            payload: Payload::Empty,
-        }
-    }
-    fn reply_with(&self, payload: Payload) -> OverlayResponse {
-        OverlayResponse {
-            command: self.command,
-            payload,
-        }
-    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OverlayResponse {
     command: Command,
-    payload: Payload,
 }
-
+impl OverlayResponse {
+    fn into_hello(&self) -> Result<(), OverlayError> {
+        match &self.command {
+            Command::Hello => Ok(()),
+            other => Err(format!("incorrect command {other:?}").into()),
+        }
+    }
+    fn into_remove_all_elements(&self) -> Result<(), OverlayError> {
+        match &self.command {
+            Command::RemoveAllElements => Ok(()),
+            other => Err(format!("incorrect command {other:?}").into()),
+        }
+    }
+    fn into_add(&self) -> Result<VisualId, OverlayError> {
+        match &self.command {
+            Command::Add(r) => r.to_response(),
+            other => Err(format!("incorrect command {other:?}").into()),
+        }
+    }
+}
 // serde_json::from_reader
 //  > If the stream does not end, such as in the case of a persistent socket connection, this function will not return.
 //  > It is possible instead to deserialize from a prefix of an input stream without looking for EOF by managing your own Deserializer.
@@ -114,9 +151,10 @@ fn single_value_from_stream<T: serde::de::DeserializeOwned, S: std::io::Read>(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct WireRequest(Vec<OverlayRequest>);
+struct BulkRequest(Vec<OverlayRequest>);
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct WireResponse(Vec<OverlayResponse>);
+struct BulkResponse(Vec<OverlayResponse>);
 
 impl OverlayServer {
     pub fn new(config: OverlayDaemonConfig, handle: OverlayHandle) -> Result<Self, OverlayError> {
@@ -133,14 +171,18 @@ impl OverlayServer {
     fn process_request(&self, req: &OverlayRequest) -> Result<OverlayResponse, OverlayError> {
         let overlay = self.handle.borrow_mut();
         println!("process_request: {req:?}");
-        match req.command {
-            Command::Hello => Ok(req.to_response()),
+        match &req.command {
+            Command::Hello => Ok(OverlayResponse {
+                command: Command::Hello,
+            }),
             Command::RemoveAllElements => {
                 overlay.remove_all_elements();
-                Ok(req.to_response())
+                Ok(OverlayResponse {
+                    command: Command::RemoveAllElements,
+                })
             }
-            Command::Add => match &req.payload {
-                Payload::Text(text) => {
+            Command::Add(payload) => match &payload.as_request()? {
+                Drawable::Text(text) => {
                     use screen_overlay::PositionedElements;
                     let text_string = text.text.clone();
 
@@ -159,12 +201,14 @@ impl OverlayServer {
 
                     let text_token = overlay.add_drawable(drawable.into());
                     let text_id = text_token.into_id();
-                    return Ok(req.reply_with(Payload::Id(text_id)));
-                }
-                payload => {
-                    return Err(format!("got incorrect payload: {:?}", payload).into());
+                    return Ok(OverlayResponse {
+                        command: Command::Add(Transaction::Response(text_id)),
+                    });
                 }
             },
+            _ => {
+                todo!()
+            }
         }
     }
     pub fn service(&mut self) -> Result<(), OverlayError> {
@@ -172,8 +216,8 @@ impl OverlayServer {
             match stream {
                 Ok(s) => {
                     // do something with the TcpStream
-                    let requests: WireRequest = single_value_from_stream(&s)?;
-                    let mut responses: WireResponse = Default::default();
+                    let requests: BulkRequest = single_value_from_stream(&s)?;
+                    let mut responses: BulkResponse = Default::default();
                     for req in requests.0.iter() {
                         responses.0.push(self.process_request(&req)?);
                     }
@@ -204,9 +248,9 @@ impl OverlayClient {
     }
     fn request(&self, req: &[OverlayRequest]) -> Result<Vec<OverlayResponse>, OverlayError> {
         let s = TcpStream::connect(self.config.bind)?;
-        let wire_request = WireRequest(req.to_vec());
+        let wire_request = BulkRequest(req.to_vec());
         serde_json::to_writer(&s, &wire_request)?;
-        let resp: WireResponse = serde_json::from_reader(&s)?;
+        let resp: BulkResponse = serde_json::from_reader(&s)?;
         Ok(resp.0)
     }
     fn request_single(&self, req: &OverlayRequest) -> Result<OverlayResponse, OverlayError> {
@@ -216,44 +260,25 @@ impl OverlayClient {
             .ok_or("did not get a single response".into())
     }
 
-    fn send_empty(&self, command: &Command) -> Result<(), OverlayError> {
-        let resp = self.request_single(&OverlayRequest {
-            command: *command,
-            payload: Payload::Empty,
-        })?;
-        if resp.command == *command {
-            return Ok(());
-        } else {
-            Err(format!("got unexpected instruction back {:?}", resp.command).into())
-        }
-    }
-    fn send(&self, command: &Command, payload: Payload) -> Result<Payload, OverlayError> {
-        let resp = self.request_single(&OverlayRequest {
-            command: *command,
-            payload: payload,
-        })?;
-        if resp.command == *command {
-            return Ok(resp.payload);
-        } else {
-            Err(format!("got unexpected instruction back {:?}", resp.command).into())
-        }
-    }
-
     pub fn hello(&self) -> Result<(), OverlayError> {
-        self.send_empty(&Command::Hello)
+        self.request_single(&OverlayRequest {
+            command: Command::Hello,
+        })?
+        .into_hello()
     }
 
     pub fn remove_all_elements(&self) -> Result<(), OverlayError> {
-        self.send_empty(&Command::RemoveAllElements)
+        self.request_single(&OverlayRequest {
+            command: Command::RemoveAllElements,
+        })?
+        .into_remove_all_elements()
     }
 
     pub fn add_text(&self, text: instructions::Text) -> Result<VisualId, OverlayError> {
-        let resp = self.send(&Command::Add, Payload::Text(text))?;
-        if let Payload::Id(z) = resp {
-            Ok(z)
-        } else {
-            Err(format!("got incorrect payload for add_text {:?}", resp).into())
-        }
+        self.request_single(&OverlayRequest {
+            command: Command::Add(Transaction::Request(Drawable::Text(text))),
+        })?
+        .into_add()
     }
 }
 
