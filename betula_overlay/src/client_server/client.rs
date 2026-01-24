@@ -70,7 +70,9 @@ pub fn main() -> std::result::Result<(), betula_overlay::OverlayError> {
                 ..Default::default()
             };
 
-            client.add_text(text)?;
+            let id = client.add_text(text)?;
+            // std::thread::sleep(std::time::Duration::from_millis(1000));
+            // client.remove(id)?;
         }
         Commands::RemoveAllElements => {
             client.remove_all_elements()?;

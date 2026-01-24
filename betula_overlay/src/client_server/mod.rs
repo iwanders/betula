@@ -188,8 +188,12 @@ impl OverlayServer {
                     });
                 }
             },
-            _ => {
-                todo!()
+            RequestCommand::Remove(id) => {
+                overlay.remove_element(*id);
+
+                return Ok(OverlayResponse {
+                    command: ResponseCommand::Remove(()),
+                });
             }
         }
     }
@@ -258,6 +262,13 @@ impl OverlayClient {
         .response_remove_all()
     }
 
+    pub fn remove(&self, id: VisualId) -> Result<(), OverlayError> {
+        self.request_single(&OverlayRequest {
+            command: RequestCommand::Remove(id),
+        })?
+        .command
+        .response_remove()
+    }
     pub fn add_text(&self, text: instructions::Text) -> Result<VisualId, OverlayError> {
         self.request_single(&OverlayRequest {
             command: RequestCommand::Add(Drawable::Text(text)),
